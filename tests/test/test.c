@@ -4,30 +4,33 @@
 
 void print(void* data, unsigned int data_len) {
 
-	printf("\x1b[33m %u \x1b[0m", *(uint8_t*)data);
+	if( data ) {
+		printf("\x1b[33m %lu \x1b[0m", *(unsigned long*)data);
+	} else {
+		printf("\x1b[33m null \x1b[0m");
+	}
 }
 
 int encoder_test() {
 
-	uint8_t n = 0b1110100;
-	GRAPH* graph = watermark_encode(&n, sizeof(n));
+	// big endian
+	uint8_t n_be[4] = {0b10101, 0b1110001, 0b0011010, 0b011001};
+
+	GRAPH* graph = watermark_encode(&n_be, 4);
 
 	graph_print(graph, print);
 	ctdd_assert(1);
 
-	// take out bits from the nodes
-	GRAPH* node = graph;
-	for(; node; node = node->next) {
-		free(node->data);
-		node->data = NULL;
-	}
+	unsigned long n_bits = 0;
+	uint8_t* data = watermark_decode(graph, &n_bits);
 
-	unsigned long num_byte=0;
-	void* data = watermark_decode(graph, &num_byte);
+	ctdd_assert( n_bits == 4 );
+	ctdd_assert( !!data );
 
-	ctdd_assert( data );
-	printf("%d\n", *(uint8_t*)data);
-	ctdd_assert( *(uint8_t*)data == n );
+	ctdd_assert( n_be[0] == data[0] );
+	ctdd_assert( n_be[1] == data[1] );
+	ctdd_assert( n_be[2] == data[2] );
+	ctdd_assert( n_be[3] == data[3] );
 
 	graph_free(graph);
 

@@ -43,7 +43,7 @@ COVERAGE_COMMAND:=@$(UNTESTED_DETECTOR_COMMAND); $(GCOV_COMMAND) | awk '{ sum +=
 RUN_TESTS_COMMAND:=@valgrind -q --exit-on-first-error=yes --error-exitcode=1 --tool=memcheck\
 		--show-reachable=yes --leak-check=yes --track-origins=yes $(TEST_TARGET_FINAL) --gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
 STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=naming \
-	$(INCLUDE) --suppress=missingIncludeSystem --quiet --enable=all $(SRC) $(TESTS_SRC)
+	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
 SHELL := /bin/bash
 .PHONY: all folders clean debug release test spy profile hist

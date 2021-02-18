@@ -54,7 +54,7 @@ uint8_t* get_bit_arr(GRAPH* graph, unsigned long n_bits) {
 		if( graph->connections[0].node != graph->next ){
 
 			WM_NODE* dest = graph->connections[0].node->data;
-			printf("decoder e|o: %lu %lu %lu %lu\n", decoder.n_even, decoder.n_odd, dest->idx, dest->is_odd);
+
 			// check if destination is in fact valid (not an inner node)
 			if( ( dest->is_odd && dest->idx >= decoder.n_odd ) || ( !dest->is_odd && dest->idx >= decoder.n_even ) ) {
 
@@ -70,8 +70,10 @@ uint8_t* get_bit_arr(GRAPH* graph, unsigned long n_bits) {
 			// 2.5 remove nodes from stack that are on top of the destination
 			if( dest->is_odd ) {
 				decoder.n_odd = dest->idx+1;
+				decoder.n_even = dest->idx;
 			} else {
 				decoder.n_even = dest->idx+1;
+				decoder.n_odd = dest->idx+1;
 			}
 
 		} else {
@@ -112,7 +114,7 @@ void* get_bit_sequence(uint8_t* bits, unsigned long n_bits, unsigned long num_by
 	memset(data, 0x00, num_bytes);
 
 	// zeroes before first one
-	int8_t offset = n_bits % 8;
+	int8_t offset = (8 - n_bits % 8);
 
 	for(unsigned long i=0; i < num_bytes; i++) {
 
@@ -132,13 +134,17 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 
 	// 0. get number of bits
 	unsigned long n_bits = num_nodes(graph)-1;
-	*num_bytes = (n_bits/8) + (n_bits%8);
+	*num_bytes = (n_bits/8) + !!(n_bits%8);
 
 	// 1. get bit array
 	uint8_t* bit_arr = get_bit_arr(graph, n_bits);
 
 	// get_bit_arr returns NULL if the watermark is wrong (backedge to inner node)
 	if(!bit_arr) return NULL;
+
+	for(unsigned int i=0; i < n_bits; i++) {
+		printf("%hhu", bit_arr[i]);
+	}
 
 	// 2. turn bit_array into sequence of bits
 	void* data = get_bit_sequence(bit_arr, n_bits, *num_bytes);

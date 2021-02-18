@@ -14,123 +14,160 @@ typedef struct ENCODER {
 	GRAPH** even;
 	unsigned long n_even;
 
+	// stack size history
+	unsigned long* history;
+	unsigned long n_history;
+
 } ENCODER;
 
-void add_to_odd(ENCODER* encoder, GRAPH* node) {
-	encoder->odd[encoder->n_odd++] = node;
+uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
+
+	uint8_t byte = data[bit_idx/8];
+	return byte & ( 0b10000000 >> (bit_idx % 8));
 }
 
-void add_to_even(ENCODER* encoder, GRAPH* node) {
-	encoder->even[encoder->n_even++] = node;
-}
+uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 
-void connect_to_backedge(ENCODER* encoder, uint8_t connect_to_odd) {
-
-	// 1. get random node to connect to
-	if( connect_to_odd ) {
-
-		unsigned long idx = rand() % encoder->n_odd;
-		GRAPH* node = encoder->odd[idx];
-		graph_oriented_connect(encoder->final_node, node);
-		// remove new inner nodes
-		encoder->n_odd = idx+1;
-	} else {
-		unsigned long idx = rand() % encoder->n_even;
-		GRAPH* node = encoder->even[idx];
-		graph_oriented_connect(encoder->final_node, node);
-		// remove new inner nodes
-		encoder->n_even = idx+1;
-	}
-}
-
-void encode_bit(ENCODER* encoder, uint8_t bit) {
-
-	// 1. create node and insert it in the node
-	graph_insert(encoder->final_node, graph_create(&bit, sizeof(uint8_t)));
-
-	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
-	encoder->final_node = encoder->final_node->next;
-
-	// 2. connect to backedge to odd or even node
-	uint8_t is_odd = !( encoder->final_node->prev == encoder->odd[encoder->n_odd-1]);
-
-	uint8_t connect_to_odd = bit ? !is_odd : is_odd ;
-
-	connect_to_backedge(encoder, connect_to_odd);
-
-	// 3. add new node as a new valid node
-	if(is_odd) {
-		add_to_odd(encoder, encoder->final_node);
-	} else {
-		add_to_even(encoder, encoder->final_node);
-	}
-}
-
-uint8_t get_bit(uint8_t byte, uint8_t bit_idx) {
-
-	return byte & ( 0b10000000 >> bit_idx );
-}
-
-void encode_byte(ENCODER* encoder, uint8_t byte, uint8_t* bit_1_found) {
-
-	uint8_t one=1;
-
-	// 1. iterate over bits
-	for(uint8_t bit_idx=0; bit_idx < 8; bit_idx++) {
-
-		// 2. get current bit
-		uint8_t bit = get_bit(byte, bit_idx);
-
-		// 3. if we just found the first positive bit, create first node
-		if( !*bit_1_found ) {
-
-			if( *bit_1_found = bit ) {
-
-				encoder->graph = graph_create(&one, sizeof(uint8_t));
-				encoder->final_node = encoder->graph;
-				add_to_odd(encoder, encoder->graph);
+	// praticamente python
+	for(unsigned long i = 0; i < data_len; i++) {
+		if(data[i]) {
+			for(uint8_t j = 0; j < 8; j++) {
+				if(get_bit(data, i*8+j)) {
+					return i*8 + j;
+				}
 			}
-		// 4. if first positive bit was already found, just encode whatever we find normally
-		} else {
-			encode_bit(encoder, bit);	
 		}
+	}
+
+	return data_len*8;
+}
+
+void add_node_to_stacks(ENCODER* encoder, unsigned long is_odd) {
+
+	// save size of the stack with different parity
+	encoder->history[encoder->n_history++] = is_odd ? encoder->n_even : encoder->n_odd;
+
+	// save to stack with the same parity
+	GRAPH** stack = is_odd ? encoder->odd : encoder->even;
+	unsigned long* n = is_odd ? &encoder->n_odd : &encoder->n_even;
+	stack[(*n)++] = encoder->final_node;
+}
+
+ENCODER* encoder_create(unsigned long n_bits) {
+
+	ENCODER* encoder = malloc( sizeof(ENCODER) );
+	encoder->odd = malloc(sizeof(GRAPH*) * (n_bits/2+1));
+	encoder->even = malloc(sizeof(GRAPH*) * (n_bits/2));
+	encoder->history = malloc(sizeof(unsigned long) * n_bits);
+	encoder->n_history = 0;
+	encoder->n_odd = 0;
+	encoder->n_even = 0;
+
+	// create graph
+	unsigned long one = 1;
+	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
+	add_node_to_stacks(encoder, 1);
+
+	return encoder;
+}
+
+void encoder_free(ENCODER* encoder) {
+
+	free(encoder->odd);
+	free(encoder->even);
+	free(encoder->history);
+	free(encoder);
+}
+
+void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
+
+	idx++;
+
+	GRAPH* new_node = graph_create(&idx, sizeof(idx));
+
+	// save index of the node in the hamiltonian path
+	graph_insert(encoder->final_node, new_node);
+	graph_oriented_connect(encoder->final_node, new_node);
+	encoder->final_node = new_node;
+}
+
+void pop_all(unsigned long* n, unsigned long idx) {
+
+	*n = idx+1;
+}
+
+void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
+
+	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
+
+	GRAPH** dest_stack = is_dest_odd ? encoder->odd : encoder->even;
+	unsigned long* n_dest = is_dest_odd ? &encoder->n_odd : &encoder->n_even;
+
+	unsigned long* not_n_dest = is_dest_odd ? &encoder->n_even : &encoder->n_odd;
+
+	if( *n_dest ) {
+		unsigned long dest_idx = rand() % *n_dest;
+		GRAPH* dest = dest_stack[ dest_idx ];
+		graph_oriented_connect(encoder->final_node, dest);
+		pop_all(n_dest, dest_idx);
+		pop_all(not_n_dest, encoder->history[ dest_idx ]);
+	}
+}
+
+void encode_bit(ENCODER* encoder, uint8_t bit, uint8_t is_odd, unsigned long idx) {
+
+	// 1. add node to graph
+	add_node_to_graph(
+			encoder,
+			idx
+		);
+
+	// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
+	add_backedge(
+			encoder,
+			bit,
+			is_odd
+		);
+
+	// 3. add node to proper parity stack, and to the history stack
+	add_node_to_stacks(
+			encoder,
+			is_odd
+		);
+}
+
+void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
+
+	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
+
+		// 0-based index of the node's position in the hamiltonian path
+		unsigned long idx = i-trailing_zeroes;
+
+		encode_bit(
+				encoder,
+				get_bit(data, i),
+				(i-trailing_zeroes-1) & 1,
+				idx
+			);
 	}
 }
 
 GRAPH* watermark_encode(void* data, unsigned long data_len) {
 
-	if( !data || !data_len ) return NULL;
+	unsigned long trailing_zeroes = get_trailing_zeroes(data, data_len);
+	unsigned long n_bits = data_len * 8 - trailing_zeroes;
 
-	// initialize RNG
-	srand(time(0));
+	ENCODER* encoder = encoder_create(n_bits);
 
-	// initialize encoder
-	ENCODER* encoder = malloc(sizeof(ENCODER));
-	encoder->graph = NULL;
-	encoder->final_node = NULL;
-	encoder->even = malloc(sizeof(GRAPH*) * data_len * 4);
-	encoder->odd = malloc(sizeof(GRAPH*) * data_len * 4);
-	encoder->n_even = encoder->n_odd = 0;
+	encode(encoder, data, n_bits + trailing_zeroes, trailing_zeroes);
 
-	uint8_t bit_1_found = 0;
+	// add final node
+	graph_insert(encoder->final_node, graph_empty());
+	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
 
-	uint8_t* bytes = data;
+	GRAPH* graph = encoder->graph;
 
-	for(unsigned long i=0; i < data_len; i++) {
-		encode_byte(encoder, bytes[i], &bit_1_found);
-	}
-
-	// add an empty node after the ones with encoded bits
-	uint8_t full = 0xff;
-	GRAPH* final_node = graph_create(&full, sizeof(full));
-	graph_insert(encoder->final_node, final_node);
-	graph_oriented_connect(encoder->final_node, final_node);
-
-	GRAPH* final_graph = encoder->graph;
-
-	free(encoder->even);
-	free(encoder->odd);
-	free(encoder);
-
-	return final_graph;
+	encoder_free(encoder);
+	
+	return graph;
 }

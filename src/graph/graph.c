@@ -23,7 +23,7 @@ void graph_alloc(GRAPH* graph, unsigned int data_len){
 	graph->data_len = data_len;
 
 	//allocate memory according to new data_len
-	graph->data = malloc(sizeof( graph->data_len ));
+	graph->data = malloc( graph->data_len );
 }
 
 GRAPH* graph_create(void* data, unsigned int data_len) {
