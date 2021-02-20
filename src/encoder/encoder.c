@@ -96,6 +96,11 @@ void pop_all(unsigned long* n, unsigned long idx) {
 	*n = idx+1;
 }
 
+void pop_all_history(unsigned long* n, unsigned long size) {
+
+	*n = size;
+}
+
 void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
 
 	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
@@ -110,7 +115,7 @@ void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
 		GRAPH* dest = dest_stack[ dest_idx ];
 		graph_oriented_connect(encoder->final_node, dest);
 		pop_all(n_dest, dest_idx);
-		pop_all(not_n_dest, encoder->history[ dest_idx ]);
+		pop_all_history(not_n_dest, encoder->history[ dest_idx ]);
 	}
 }
 

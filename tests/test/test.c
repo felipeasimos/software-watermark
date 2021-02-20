@@ -14,7 +14,7 @@ void print(void* data, unsigned int data_len) {
 int encoder_test() {
 
 	// big endian
-	uint8_t n_be[4] = {0b10101, 0b1110001, 0b0011010, 0b011001};
+	uint8_t n_be[4] = { 0b10101, 0b1110001, 0b0011010, 0b011001 };
 
 	GRAPH* graph = watermark_encode(&n_be, 4);
 
