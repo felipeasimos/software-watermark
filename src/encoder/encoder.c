@@ -159,6 +159,8 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 GRAPH* watermark_encode(void* data, unsigned long data_len) {
 
+	srand(time(0));
+
 	unsigned long trailing_zeroes = get_trailing_zeroes(data, data_len);
 	unsigned long n_bits = data_len * 8 - trailing_zeroes;
 
