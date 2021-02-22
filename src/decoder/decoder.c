@@ -9,6 +9,10 @@ typedef struct WM_NODE {
 
 typedef struct DECODER {
 
+	#ifdef DEBUG
+		GRAPH* graph;
+	#endif
+
 	GRAPH* current_node;
 
 	// odd labeled stack
@@ -42,7 +46,7 @@ void label_new_current_node(DECODER* decoder) {
 	uint8_t is_odd = !(decoder->n_history & 1);
 
 	// get indexes
-	unsigned long stack_idx = is_odd ? decoder->n_even : decoder->n_odd;
+	unsigned long stack_idx = is_odd ? decoder->n_odd : decoder->n_even;
 	WM_NODE wm_node_info = { decoder->n_history, stack_idx };
 
 	// add node to stacks
@@ -71,46 +75,164 @@ DECODER* decoder_create(GRAPH* graph, unsigned long n_bits) {
 	decoder->n_even = 0;
 	decoder->n_bits = n_bits;
 
+	#ifdef DEBUG
+		decoder->graph = graph;
+	#endif
+
 	return decoder;
 }
+
+uint8_t is_inner_node(DECODER* decoder, GRAPH* node) {
+
+	WM_NODE* node_info = node->data;
+	uint8_t is_odd = !(node_info->hamiltonian_idx & 1);
+
+	GRAPH** stack = is_odd ? decoder->odd : decoder->even;
+	unsigned long n = is_odd ? decoder->n_odd : decoder->n_even;
+
+	return !( node_info->stack_idx < n && stack[node_info->stack_idx] == node );
+}
+
+void update_stacks_to_new_backedge(DECODER* decoder, WM_NODE* dest) {
+
+	if( !( dest->hamiltonian_idx & 1 ) ) {
+		decoder->n_odd = dest->stack_idx + 1;
+		decoder->n_even = decoder->history[dest->hamiltonian_idx];
+	} else {
+		decoder->n_odd = decoder->history[dest->hamiltonian_idx];
+		decoder->n_even = dest->stack_idx + 1;
+	}
+}
+
+#ifdef DEBUG
+void print_node(void* data, unsigned int data_len) {
+
+	if( data ) {
+		printf("\x1b[33m %lu %s\x1b[0m",
+				data_len == sizeof(unsigned long) ? *(unsigned long*)data : ((WM_NODE*)data)->hamiltonian_idx + 1,
+				data_len == sizeof(unsigned long) ? "(untouched)" : "(WM_NODE)");
+	} else {	
+		printf("\x1b[33m null \x1b[0m");
+	}
+}
+
+void print_stacks(DECODER* decoder) {
+
+	printf("e o h\n");
+	for( unsigned long i=0; i < decoder->n_history; i++) {
+
+		unsigned long even = i < decoder->n_even ? ((WM_NODE*)decoder->even[i]->data)->hamiltonian_idx+1 : 0;
+		unsigned long odd = i < decoder->n_odd ? ((WM_NODE*)decoder->odd[i]->data)->hamiltonian_idx+1 : 0;
+		printf("%lu %lu %lu %s\n", even, odd, decoder->history[i], decoder->n_history & 1 ? "(e)" : "(o)");
+	}
+}
+
+void print_inner_node_log(DECODER* decoder, WM_NODE* dest, unsigned long i, uint8_t* bit_arr) {
+
+	printf("ERRO (idx %lu): dest node %lu é inner node\n", i+1, dest->hamiltonian_idx+1);
+	printf("dest node info:\n");
+	printf("\tis_odd: %d\n", !(dest->hamiltonian_idx & 1));
+	printf("\tstack_idx (0-based): %lu\n", dest->stack_idx);
+	printf("\thamiltonian_idx (1-based): %lu\n", dest->hamiltonian_idx);
+	printf("current bit arr: ");
+	for( unsigned long j=0; j < i; j++ ) printf("%hhu ", bit_arr[j]);
+	printf("\n");
+	print_stacks(decoder);
+	graph_print(decoder->graph, print_node);
+}
+
+void print_bit_arr(uint8_t* bit_arr, unsigned long n) {
+
+	for(unsigned long i = 0; i < n; i++) printf("%hhu ", bit_arr[i]);
+	printf("\n");
+}
+#endif
 
 uint8_t* get_bit_array(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
 
-	while( decoder->current_node->next ) {
+	// iterate over every node but the last
+	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
 
-		// check if there is backedge
-		if( decoder->current_node->connections->node ) {
+		// check if there is backedge (must have two connections, the first one is the backedge)
+		if( decoder->current_node->connections && decoder->current_node->connections->next ) {
 
-		} else {
+			GRAPH* dest_node = decoder->current_node->connections->node;
+			WM_NODE* dest = ((WM_NODE*)dest_node->data);
 
-			// check if this is the first node
-			if( !decoder->current_node->prev ) {
-
-				bit_arr[0]=1;
-			// check if this is the final node
-			} else if ( !decoder->current_node->next ) {
-
-				return bit_arr;
-			// else the node could always have connected to the first node (since it is
-			// never an inner vertex). Since it didn't, it means it has the value inverse
-			// to the one it would have if it connected to the first node
-			} else {
-
-				// get index and subtract by first node's idx (1)
-				// + 1 - 1 + hamiltonian_idx, since the hamiltonian_idx is saved as a zero based idx
-				unsigned long diff = ((WM_NODE*)decoder->current_node->data)->hamiltonian_idx;
-				
-				// diff is the hamiltonian_idx!
-				bit_arr[diff] = !!(diff & 1);
+			// check if it is inner node
+			if( is_inner_node(decoder, dest_node) ) {
+				#ifdef DEBUG
+					print_inner_node_log(decoder, dest, i, bit_arr);
+				#endif
+				free(bit_arr);
+				return NULL;
 			}
+
+			update_stacks_to_new_backedge(decoder, dest);
+			// 1 if diff is odd, 0 otherwise
+			bit_arr[i] = (i - dest->hamiltonian_idx) & 1;
+
+		// check if this is the first node
+		} else if( !decoder->current_node->prev ) {
+
+			bit_arr[0]=1;
+
+		// else the node could always have connected to the first node (since it is
+		// never an inner vertex). Since it didn't, it means it has the value inverse
+		// to the one it would have if it connected to the first node
+		} else {
+			// if a bit is 1, the backedge should go to a node with different parity
+			// if a bit is 0, the backedge should go to a node with the same parity
+			// since there is no backedge here, and we can always connect to the first
+			// node, we just need to see what is the current node's parity, to know
+			// the bit it encodes (it the value which can't be represented by an
+			// backedge to the first node)
+
+			// 1 - current_node = i. If i is odd, the bit is 0, if i is even the bit is 1.
+			bit_arr[i] = !(i & 1);
 		}
 
 		label_new_current_node(decoder);
 		decoder->current_node = decoder->current_node->next;
 	}
+
+	return bit_arr;
 }
+
+void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {
+
+	uint8_t* byte = &data[i/8];
+
+	if( value ) {
+		*byte |= 0b10000000 >> (i%8);
+	} else {
+		*byte &= ~(0b10000000 >> (i%8));
+	}
+}
+
+uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
+
+	unsigned long num_bytes = n_bits / 8 + !!( n_bits % 8 ); 
+	uint8_t* data = malloc( sizeof(uint8_t) * num_bytes );
+	memset(data, 0x00, num_bytes);
+
+	// get trailing_zeros in first byte
+	uint8_t offset = n_bits % 8 ? 8 - (n_bits % 8) : 0;
+
+	for( unsigned long i = 0; i < n_bits; i++ ) set_bit( data, i+offset, bit_arr[i] );
+
+	return data;
+}
+
+void decoder_free(DECODER* decoder) {
+
+	free(decoder->even);
+	free(decoder->odd);
+	free(decoder->history);
+	free(decoder);
+} 
 
 // basically do the same as the encoder, but with too differences:
 // 1. instead to random backedges, just check the current node's
@@ -121,7 +243,7 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 
 	if( !graph ) return NULL;
 
-	// 1. get number of bits (and label nodes)
+	// 1. get number of bits
 	unsigned long n_bits = get_num_bits(graph);
 	*num_bytes = n_bits/8 + !!(n_bits%8);
 
@@ -131,11 +253,13 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 	// 3. get bit array (nodes are labeled as they are evaluated)
 	uint8_t* bit_arr = get_bit_array(decoder);
 
+	if( !bit_arr ) return NULL;
+
 	// 4. turn bit array into bit sequence
-	// uint8_t* data = get_bit_sequence(  );
+	uint8_t* data = get_bit_sequence( bit_arr, n_bits);
 
 	free(bit_arr);
-	free(decoder);
+	decoder_free(decoder);
 
-	// return data;
+	return data;
 }

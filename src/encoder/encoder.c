@@ -20,6 +20,19 @@ typedef struct ENCODER {
 
 } ENCODER;
 
+#ifdef DEBUG 
+void print_stacks_encoder(ENCODER* encoder) {
+
+	printf("e o h\n");
+	for( unsigned long i=0; i < encoder->n_history; i++) {
+
+		unsigned long even = i < encoder->n_even ? (*(unsigned long*)encoder->even[i]->data) : 0;
+		unsigned long odd = i < encoder->n_odd ? (*(unsigned long*)encoder->odd[i]->data) : 0;
+		printf("%lu %lu %lu %s\n", even, odd, encoder->history[i], encoder->n_history & 1 ? "(e)" : "(o)");
+	}
+}
+#endif
+
 uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
 
 	uint8_t byte = data[bit_idx/8];
@@ -115,7 +128,7 @@ void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
 		GRAPH* dest = dest_stack[ dest_idx ];
 		graph_oriented_connect(encoder->final_node, dest);
 		pop_all(n_dest, dest_idx);
-		pop_all_history(not_n_dest, encoder->history[ dest_idx ]);
+		pop_all_history(not_n_dest, encoder->history[ (*(unsigned long*)dest->data) - 1 ]);
 	}
 }
 
@@ -159,9 +172,15 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 GRAPH* watermark_encode(void* data, unsigned long data_len) {
 
+	if( !data || !data_len ) return NULL;
+
 	srand(time(0));
 
 	unsigned long trailing_zeroes = get_trailing_zeroes(data, data_len);
+
+	// only zeroes
+	if( trailing_zeroes == data_len * 8 ) return NULL;
+
 	unsigned long n_bits = data_len * 8 - trailing_zeroes;
 
 	ENCODER* encoder = encoder_create(n_bits);

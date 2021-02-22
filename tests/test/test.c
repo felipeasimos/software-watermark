@@ -2,7 +2,7 @@
 #include "encoder/encoder.h"
 #include "decoder/decoder.h"
 
-void print(void* data, unsigned int data_len) {
+void print_node_func(void* data, unsigned int data_len) {
 
 	if( data ) {
 		printf("\x1b[33m %lu \x1b[0m", *(unsigned long*)data);
@@ -18,7 +18,6 @@ int encoder_test() {
 
 	GRAPH* graph = watermark_encode(&n_be, 4);
 
-	graph_print(graph, print);
 	ctdd_assert(graph);
 
 	graph_free(graph);
@@ -37,27 +36,43 @@ int decoder_test() {
 	1     0     1     0     1
 	*/
 
+	unsigned long idx = 1;
+
 	// 1
-	GRAPH* graph = graph_empty();
+	GRAPH* graph = graph_create(&idx, sizeof(idx));
 	GRAPH* final = graph;
+	idx++;
 
 	// 0
-	graph_insert(final, graph_empty());
-	graph_oriented_connect(final->next, final);
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
 	final = final->next;
+	idx++;
 
 	// 1
-	graph_insert(final, graph_empty());
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+	graph_oriented_connect(final->next, final);
+	final = final->next;
+	idx++;
+
+	// 0
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
 	graph_oriented_connect(final->next, final->prev);
 	final = final->next;
-
-	// 0
-	graph_insert(final, graph_empty());
-	final = final->next;
+	idx++;
 
 	// 1
-	graph_insert(final, graph_empty());
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
 	graph_oriented_connect(final->next, final);
+	final = final->next;
+	idx++;
+
+	// null node at the end
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
 
 	unsigned long n=0;
 	uint8_t* data = watermark_decode(graph, &n);
@@ -65,15 +80,43 @@ int decoder_test() {
 	ctdd_assert(data);
 	ctdd_assert( n );
 	ctdd_assert( n == 1 );
+	ctdd_assert( data[0] == 0b10101 );
 
 	free(data);
 	graph_free(graph);
+
+	return 0;
+}
+
+uint8_t check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size) {
+
+	// start checking i from the end
+	for(unsigned long j=0; j < n; j++) {
+		if( i[i_size - j - 1] != result[n - j - 1] ) return 0;
+	}
+	return 1;
+}
+
+int _1_to_10_8_test() {
+
+	for(unsigned long i=1; i < 100000000; i++) {
+
+		if( !( i % 1000000) ) printf("%lu\n", i);
+		GRAPH* graph = watermark_encode(&i, sizeof(i));
+		ctdd_assert( graph );
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark_decode(graph, &num_bytes);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+	}
+	return 0;
 }
 
 int run_tests() {
 
 	ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
+	ctdd_verify(_1_to_10_8_test);
 
 	return 0;
 }
