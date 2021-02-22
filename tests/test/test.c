@@ -101,13 +101,17 @@ int _1_to_10_8_test() {
 
 	for(unsigned long i=1; i < 100000000; i++) {
 
-		if( !( i % 1000000) ) printf("%lu\n", i);
+		if( !( i % 100000) ) printf("%lu\n", i);
 		GRAPH* graph = watermark_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
 	}
 	return 0;
 }
