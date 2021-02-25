@@ -1,7 +1,7 @@
 #include "ctdd/ctdd.h"
 #include "encoder/encoder.h"
 #include "decoder/decoder.h"
-#include "rs_api/rslib.h"
+#include "rs_api/rs.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -123,6 +123,37 @@ int reed_solomon_api_test() {
 	free_rs(rs);
 }
 
+int reed_solomon_heavy_test() {
+
+	srand(time(0));
+
+	for(unsigned int i = 5; i < 124; i++) {
+
+		uint8_t data[i];
+		memset(data, 0x00, i);
+		for(unsigned int j=1; j < i; j++) data[j-1] = i;
+
+		uint16_t par[i];
+		memset(par, 0x00, i*2);
+
+		rs_encode((uint8_t*)&data, i, (uint16_t*)&par, i);
+
+		uint8_t received_data[i];
+		memcpy(received_data, data, i);
+
+		// tamper with message
+		for(unsigned int j=0; j < i/2 - 1; j++) received_data[ rand() % i ] = rand();
+
+		int result = rs_decode((uint8_t*)&received_data, i, (uint16_t*)&par, i);
+
+		ctdd_assert(result > -1);
+
+		ctdd_assert( !memcmp(received_data, data, i) );
+	}
+
+	return 0;
+}
+
 uint8_t check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size) {
 
 	// start checking i from the end
@@ -134,6 +165,39 @@ uint8_t check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size
 
 int rs_encoder_decoder_test() {
 
+	for(unsigned long i=1; i < 100000000; i++) {
+
+		if( !( i % 100000) ) printf("%lu\n", i);
+
+		// get parity
+		uint16_t par[sizeof(i)];
+		memset( par, 0x00, sizeof(par) );
+
+		rs_encode((uint8_t*)&i, sizeof(i), (uint16_t*)&par, sizeof(i));
+
+		// get parity with the data inside the graph
+		uint8_t final_data[sizeof(i) + sizeof(par)];
+		memcpy(final_data, &i, sizeof(i));
+		memcpy(final_data + sizeof(i), par, sizeof(par));
+
+		GRAPH* graph = watermark_encode(&final_data, sizeof(final_data));
+		ctdd_assert( graph );
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark_decode(graph, &num_bytes);
+		ctdd_assert( num_bytes );
+
+		// check i
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes - sizeof(par), sizeof(i)) );
+
+		// check parity
+		ctdd_assert( !memcmp(par, result+num_bytes-sizeof(par), sizeof(par)) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+
+	return 0;
 }
 
 int _1_to_10_8_test() {
@@ -160,6 +224,7 @@ int run_tests() {
 	ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
 	ctdd_verify(reed_solomon_api_test);
+	ctdd_verify(reed_solomon_heavy_test);
 	ctdd_verify(rs_encoder_decoder_test);
 	// ctdd_verify(_1_to_10_8_test);
 
