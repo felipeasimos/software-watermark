@@ -6,13 +6,14 @@ OBJ_DIR := $(BUILD_DIR)/objects
 APP_DIR := $(BUILD_DIR)/app
 TEST_OBJ_DIR := $(BUILD_DIR)/tests
 TEST_SRC_DIR := $(ROOT_DIR)/tests
+THIRD_PARTY_OBJS_DIR := $(ROOT_DIR)/objs
 
 TEST_FILE_EXTENSION := c
 SRC_FILE_EXTENSION := c
 
 # targets and pre-requisites
 SRC := $(wildcard $(SRC_DIR)/*/*.$(SRC_FILE_EXTENSION))
-OBJECTS := $(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o)
+OBJECTS := $(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o) $(wildcard $(THIRD_PARTY_OBJS_DIR)/*.o)
 
 TESTS_SRC := $(wildcard $(TEST_SRC_DIR)/*/*.$(TEST_FILE_EXTENSION))
 TESTS_OBJ := $(TESTS_SRC:$(TEST_SRC_DIR)/%.$(TEST_FILE_EXTENSION)=$(TEST_OBJ_DIR)/%.o)

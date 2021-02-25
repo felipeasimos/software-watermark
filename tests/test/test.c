@@ -1,6 +1,7 @@
-#include <ctdd/ctdd.h>
+#include "ctdd/ctdd.h"
 #include "encoder/encoder.h"
 #include "decoder/decoder.h"
+#include "rs_api/rslib.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -88,6 +89,40 @@ int decoder_test() {
 	return 0;
 }
 
+int reed_solomon_api_test() {
+
+	// RS(255, 223)
+	int symbol_size = 8;
+	int gfpoly = 0x187;
+	int fcr = 0;
+	int prim = 1;
+
+	// also the number of roots in the generator polynomial
+	int parity_len = 32; // 2T
+	int data_len = 223;
+
+	struct rs_control* rs = init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
+
+	srand(time(0));
+
+	uint8_t data[data_len];
+	for(unsigned int i = 0; i < data_len; i++) data[i] = rand();
+	uint16_t par[parity_len];
+	memset(par, 0x00, parity_len * sizeof(uint16_t));
+
+	encode_rs8(rs, (uint8_t*)&data, data_len, (uint16_t*)&par, 0);
+	
+	uint8_t received_data[data_len];
+	memcpy(received_data, data, data_len);
+	for(unsigned int i = 0; i < 5; i++) received_data[rand() % data_len] = rand();
+
+	decode_rs8(rs, (uint8_t*)&received_data, (uint16_t*)&par, data_len, NULL, 0, NULL, 0, NULL);
+
+	for(unsigned int i=0; i < data_len; i++) ctdd_assert( received_data[i] == data[i] );
+
+	free_rs(rs);
+}
+
 uint8_t check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size) {
 
 	// start checking i from the end
@@ -95,6 +130,10 @@ uint8_t check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size
 		if( i[i_size - j - 1] != result[n - j - 1] ) return 0;
 	}
 	return 1;
+}
+
+int rs_encoder_decoder_test() {
+
 }
 
 int _1_to_10_8_test() {
@@ -120,7 +159,9 @@ int run_tests() {
 
 	ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
-	ctdd_verify(_1_to_10_8_test);
+	ctdd_verify(reed_solomon_api_test);
+	ctdd_verify(rs_encoder_decoder_test);
+	// ctdd_verify(_1_to_10_8_test);
 
 	return 0;
 }
