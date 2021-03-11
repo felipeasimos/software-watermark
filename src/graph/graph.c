@@ -202,17 +202,30 @@ void graph_free(GRAPH* graph){
 	for(tmp = graph->next; graph; graph = tmp, tmp = graph ? graph->next : NULL) graph_free_node(graph);
 }
 
+void graph_default_print_func(void* data, unsigned int data_len){
+
+	if( !data ) {
+		printf("\x1b[33m null \x1b[0m");
+	} else if ( data_len == sizeof(unsigned long) ) {
+		printf("\x1b[33m %lu \x1b[0m", *(unsigned long*)data);
+	} else if ( data_len == sizeof(unsigned int) ) {
+		printf("\x1b[33m %u \x1b[0m", *(unsigned int*)data);
+	} else if ( data_len == sizeof(unsigned short) ) {
+		printf("\x1b[33m %hu \x1b[0m", *(unsigned short*)data);
+	} else if (data_len == sizeof(char)) {
+		printf("\x1b[33m %hhu \x1b[0m", *(char*)data);
+	} else {
+		printf("\x1b[33m %p \x1b[0m", data);
+	}
+}
+
 void graph_print_node(GRAPH* graph, void (*print_func)(void*, unsigned int) ){
 
 	//if no graph node was given nothing happens
 	if( !graph ) return;
 
-	void default_print_func(void* data, unsigned int data_len){
-		printf("\x1b[33m %u \x1b[0m", *(unsigned int*)data);
-	}
-
 	//calls default print function if none was given
-	(print_func ?: default_print_func)( graph->data, graph->data_len );
+	(print_func ?: graph_default_print_func)( graph->data, graph->data_len );
 }
 
 void graph_print(GRAPH* graph, void(*print_func)(void*, unsigned int)){

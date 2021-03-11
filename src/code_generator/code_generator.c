@@ -29,88 +29,69 @@ STRING* string_create(char* str, unsigned long str_len) {
 
 void string_free(STRING* str) {
 
+	if(!str) return;
+
 	free(str->str);
 	free(str);
 }
 
-STRING* string_copy(STRING* str) {
+STRING* string_clone(STRING* str) {
+
+	if( !str ) return NULL;
 
 	return string_create(str->str, str->len);
 }
 
+STRING* string_copy(STRING* str, STRING* to_clone) {
+
+	if( !str || !to_clone ) return NULL;
+
+	free(str->str);
+	str->len = to_clone->len;
+	str->str = malloc(str->len+1);
+	strncpy(str->str, to_clone->str, str->len);
+	return str;
+}
+
 STRING* string_append(STRING* str, STRING* appendix) {
 
-	str = string_copy(str);
-	// update length
+	if( str ) {
+		if( !appendix ) return str;
+	} else if( appendix ){
+		return string_clone(appendix);
+	}
+
+	unsigned long old_len = str->len;
+
 	str->len += appendix->len;
-	// get more memory using previously calculated length
 	str->str = realloc(str->str, str->len+1);
+
 	// concatenate strings
-	strncat(str->str, appendix->str, appendix->len);
+	for(unsigned long i = old_len; i < str->len; i++) str->str[i] = appendix->str[ i - old_len ];
 
 	return str;
 }
 
 STRING* string_truncate(STRING* str, unsigned long new_len) {
 
-	return string_create(str->str, new_len);
+	if( !str ) return NULL;
+
+	str->str = realloc(str->str, new_len+1);
+	str->str[new_len] = 0x00;
+	str->len = new_len;
+	return str;
 }
 
 STRING* string_from(STRING* str, unsigned long idx) {
 
-	if( idx > str->len-1 ) idx = str->len;
+	if( !str || idx > str->len-1 ) return NULL;
 
-	return string_create(str->str + idx, str->len - idx);
-}
+	char* str_old = str->str;
+	str->len -= idx;
+	str->str = malloc(str->len + 1);
 
-STRING* string_replace(STRING* str, STRING* replace, unsigned long substr_idx, unsigned long substr_len) {
-
-	// replace = str[:substr_idx] + replace + str[substr_idx:]
-	STRING* beginning = string_truncate(str, substr_idx+1);
-	STRING* end = string_from(str, substr_idx+substr_len);
-
-	STRING* str1 = string_append(beginning, replace);
-	STRING* str2 = string_append(str1, end);
-
-	string_free(beginning);
-	string_free(end);
-	string_free(str1);
-
-	return str2;
-}
-
-STRING* string_find_and_replace(STRING* str, STRING* find, STRING* replace) {
-
-	STRING* tmp;
-	for(unsigned long i=0; i < str->len;) {
-		// get index of substring
-		char* substr_pointer = strstr((const char*)(str->str + i), (const char*)find->str);
-		if( !substr_pointer ) {
-			return i ? str : NULL;
-		}
-
-		unsigned long substr_idx = substr_pointer - str->str;
-
-		tmp = string_replace(str, replace, substr_idx, find->len);
-		string_free(str);
-		str = tmp;
-		i = substr_idx + replace->len;
-	}
-
+	strncpy(str->str, str_old+idx, str->len);
 	return str;
-}
-
-void string_add_to_node(GRAPH* node, char* new_code) {
-
-	if( node->data ) {
-		STRING* old_str = node->data;
-		STRING* tmp = string_create(new_code, 0);
-		node->data = string_append(old_str, tmp);
-		string_free(tmp);
-		string_free(old_str);
-	} else {
-		node->data = string_create(new_code, 0);
-	}
 }
 
 char* watermark_get_code(GRAPH* graph) {
@@ -120,27 +101,38 @@ char* watermark_get_code(GRAPH* graph) {
 	for(node = graph; node; node = node->next) {
 		free(node->data);
 		node->data = NULL;
+		node->data_len = 0;
 	}
 
 	// make code blocks
+	STRING* opening_bracket = string_create("{", 1);
+	unsigned long i = 0;
 	for(node = graph; node->next; node = node->next) {
 
 		// check if there is a backedge
 		if( node->connections && node->connections->next ) {
-			// add "do {\n" to destination, add "} while();\n"
-			string_add_to_node(node->connections->node, (char*)"do {\n");
-			string_add_to_node(node, (char*)"} while();\n");
+			if(!node->data) node->data_len = sizeof(STRING);
+			if(!node->connections->node->data) node->connections->node->data_len = sizeof(STRING);
+
+			// add } to the beginning of source node
+			STRING* tmp = node->data;
+			node->data = string_append(string_create("}", 1), node->data);
+			string_free(tmp);
+			
+			// add { to the end of the destination node
+			node->connections->node->data = string_append(node->connections->node->data, opening_bracket);
 		}
 	}
+	string_free(opening_bracket);
+
+	graph_print(graph, NULL);
 
 	STRING* final = string_create("",0);
 	// join all the code blocks in one string
-	for(node = graph; node->next; node=node->next) {
+	for(node = graph; node->next; node = node->next) {
 	
 		if( node->data ) {
-			STRING* tmp = final;
 			final = string_append(final, node->data);
-			string_free(tmp);
 			string_free(node->data);
 			node->data = NULL;
 		}

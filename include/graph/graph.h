@@ -1,9 +1,10 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#include<stdlib.h>
-#include<string.h>
-#include<stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
 
 struct CONNECTION; //just so we can point to CONNECTION struct before including connection.h
 

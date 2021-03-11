@@ -47,7 +47,7 @@ STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=nam
 	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
 SHELL := /bin/bash
-.PHONY: all folders clean debug release test spy profile hist
+.PHONY: all folders clean debug release test profile hist
 
 release: CPPFLAGS += -O2 -fPIC
 release: | clean all 
@@ -71,7 +71,6 @@ folders:
 	@mkdir -p $(TEST_OBJ_DIR)
 
 clean:
-	-@rm -vf spy
 	-@rm -rvf $(OBJ_DIR)/*
 	-@rm -rvf $(APP_DIR)/*
 	-@rm -rvf $(TEST_OBJ_DIR)/*

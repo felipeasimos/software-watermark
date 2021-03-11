@@ -21,7 +21,6 @@ int encoder_test() {
 	GRAPH* graph = watermark_encode(&n_be, 4);
 
 	ctdd_assert(graph);
-
 	graph_free(graph);
 
 	return 0;
@@ -126,7 +125,7 @@ int reed_solomon_api_test() {
 	return 0;
 }
 
-int reed_solomon_heavy_test() {
+int reed_solomon_api_heavy_test() {
 
 	srand(time(0));
 
@@ -188,7 +187,7 @@ int rs_encoder_decoder_test() {
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
-
+		graph_print(graph, NULL);
 		// check i
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes - sizeof(par), sizeof(i)) );
 
@@ -224,8 +223,9 @@ int _1_to_10_8_test() {
 
 int code_test() {
 
-	uint8_t n = 0b01010101;
+	uint8_t n = 0b010000;
 	GRAPH* graph = watermark_encode(&n, sizeof(n));
+	graph_print(graph, print_node_func);
 	char* code = watermark_get_code(graph);
 	printf("%s", code);
 	free(code);
@@ -239,8 +239,8 @@ int run_tests() {
 	ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
 	ctdd_verify(reed_solomon_api_test);
+	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
-	//ctdd_verify(reed_solomon_heavy_test);
 	//ctdd_verify(rs_encoder_decoder_test);
 	//ctdd_verify(_1_to_10_8_test);
 
