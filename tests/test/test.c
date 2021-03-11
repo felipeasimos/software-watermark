@@ -2,6 +2,7 @@
 #include "encoder/encoder.h"
 #include "decoder/decoder.h"
 #include "rs_api/rs.h"
+#include "code_generator/code_generator.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -102,7 +103,7 @@ int reed_solomon_api_test() {
 	int data_len = 223;
 
 	struct rs_control* rs = init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
-
+	ctdd_assert(rs);
 	srand(time(0));
 
 	uint8_t data[data_len];
@@ -121,6 +122,8 @@ int reed_solomon_api_test() {
 	for(unsigned int i=0; i < data_len; i++) ctdd_assert( received_data[i] == data[i] );
 
 	free_rs(rs);
+
+	return 0;
 }
 
 int reed_solomon_heavy_test() {
@@ -219,14 +222,27 @@ int _1_to_10_8_test() {
 	return 0;
 }
 
+int code_test() {
+
+	uint8_t n = 0b01010101;
+	GRAPH* graph = watermark_encode(&n, sizeof(n));
+	char* code = watermark_get_code(graph);
+	printf("%s", code);
+	free(code);
+	graph_free(graph);
+
+	return 0;
+}
+
 int run_tests() {
 
 	ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
 	ctdd_verify(reed_solomon_api_test);
-	ctdd_verify(reed_solomon_heavy_test);
-	ctdd_verify(rs_encoder_decoder_test);
-	// ctdd_verify(_1_to_10_8_test);
+	ctdd_verify(code_test);
+	//ctdd_verify(reed_solomon_heavy_test);
+	//ctdd_verify(rs_encoder_decoder_test);
+	//ctdd_verify(_1_to_10_8_test);
 
 	return 0;
 }
