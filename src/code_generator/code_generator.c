@@ -8,6 +8,21 @@ typedef struct STRING {
 	unsigned long len;
 } STRING;
 
+typedef struct GEN_TABLE {
+
+	const char** table;
+	unsigned long len;
+	unsigned long next;
+} GEN_TABLE;
+
+#define ARRAY_SIZE(arr) sizeof(arr)/sizeof(arr[0])
+
+#define GEN_TABLE_CREATE(...) {\
+	.table = (const char*[]){__VA_ARGS__},\
+	.len = ARRAY_SIZE( ( (const char*[]){__VA_ARGS__} ) ),\
+	.next = 0,\
+}
+
 STRING* string_create(char* str, unsigned long str_len) {
 
 	STRING* string = malloc(sizeof(STRING));
@@ -17,7 +32,7 @@ STRING* string_create(char* str, unsigned long str_len) {
 		string->len = str_len ? str_len : strlen(str);
 
 		string->str = malloc(string->len+1);
-		strncpy(string->str, str, string->len);
+		for(unsigned long i=0; i < string->len; i++) string->str[i] = str[i];
 		string->str[string->len]=0x00;
 	} else {
 		string->str = NULL;
@@ -49,7 +64,8 @@ STRING* string_copy(STRING* str, STRING* to_clone) {
 	free(str->str);
 	str->len = to_clone->len;
 	str->str = malloc(str->len+1);
-	strncpy(str->str, to_clone->str, str->len);
+	for(unsigned long i=0; i < str->len; i++) str->str[i] = to_clone->str[i];
+	str->str[str->len]=0x00;
 	return str;
 }
 
@@ -82,19 +98,7 @@ STRING* string_truncate(STRING* str, unsigned long new_len) {
 	return str;
 }
 
-STRING* string_from(STRING* str, unsigned long idx) {
-
-	if( !str || idx > str->len-1 ) return NULL;
-
-	char* str_old = str->str;
-	str->len -= idx;
-	str->str = malloc(str->len + 1);
-
-	strncpy(str->str, str_old+idx, str->len);
-	return str;
-}
-
-char* watermark_get_code(GRAPH* graph) {
+void free_data_from_nodes(GRAPH* graph) {
 
 	GRAPH* node=NULL;
 	// get rid of all data stored in the nodes
@@ -103,11 +107,14 @@ char* watermark_get_code(GRAPH* graph) {
 		node->data = NULL;
 		node->data_len = 0;
 	}
+}
+
+void generate_code_blocks(GRAPH* graph) {
 
 	// make code blocks
 	STRING* opening_bracket = string_create("{", 1);
 	unsigned long i = 0;
-	for(node = graph; node->next; node = node->next) {
+	for(GRAPH* node = graph; node->next; node = node->next) {
 
 		// check if there is a backedge
 		if( node->connections && node->connections->next ) {
@@ -124,12 +131,13 @@ char* watermark_get_code(GRAPH* graph) {
 		}
 	}
 	string_free(opening_bracket);
+}
 
-	graph_print(graph, NULL);
+char* join_strings_from_graph(GRAPH* graph) {
 
 	STRING* final = string_create("",0);
 	// join all the code blocks in one string
-	for(node = graph; node->next; node = node->next) {
+	for(GRAPH* node = graph; node->next; node = node->next) {
 	
 		if( node->data ) {
 			final = string_append(final, node->data);
@@ -141,4 +149,253 @@ char* watermark_get_code(GRAPH* graph) {
 	char* final_string = final->str;
 	free(final);
 	return final_string;
+}
+
+STRING* generate_variable(GEN_TABLE* variables) {
+
+	// <variable>
+	STRING* var;
+	// use old variable?
+	if( variables->next && ( rand() & 1 ) ) {
+
+		return string_create( (char*) variables->table[ rand() % variables->next ], 0 );
+	// get new variable
+	} else {
+
+		// do we generate a new one?
+		if( variables->next >= variables->len ) {
+
+			unsigned long id = variables->next - variables->len;
+			char s[50]={0};
+			sprintf(s, "x%llu", id);
+			var = string_create(s, 0);
+		// get new variable from table
+		} else {
+			var = string_create( (char*) variables->table[ variables->next ], 0 );
+		}
+		variables->next++;
+	}
+
+	return var;
+}
+
+STRING* generate_variable_or_value(GEN_TABLE* variables, GEN_TABLE* values) {
+
+	STRING* var = NULL;
+	// <variable> | <value>
+	if( rand() & 1 ) {
+
+		var = generate_variable(variables);
+	} else {
+		var = string_create((char*)values->table[ rand() % values->len ], 0);
+	}
+
+	return var;
+}
+
+STRING* generate_initializer(char* variable, GEN_TABLE* initializers, GEN_TABLE* values) {
+
+	// <initializer> <variable> = ≲value>;\n
+	STRING* init = string_create((char*)initializers->table[ rand() % initializers->len ], 0);
+	STRING* var1 = string_create(variable, 0);
+	STRING* assignment = string_create(" = ", 0);
+	STRING* var2 = string_create((char*)values->table[ rand() % values->len ], 0);
+	STRING* endline = string_create((char*)";\n", 0);
+
+	STRING* initializer = string_append( init, string_append( var1, string_append( assignment, string_append(var2, endline) ) ) );
+
+	initializer = string_clone( initializer );
+	string_free(init);
+	string_free(var1);
+	string_free(assignment);
+	string_free(var2);
+	string_free(endline);
+
+	return initializer;
+}
+
+char* get_variable_at_index(GEN_TABLE* variables, unsigned long i) {
+
+	char* var = NULL;
+	if( i >= variables->len ) {
+
+		unsigned long id = i - variables->len;
+		var = malloc(50);
+		sprintf(var, "x%llu", id);
+	} else {
+		var = (char*)variables->table[ i ];
+	}
+	return var;
+}
+
+STRING* generate_initializers(GEN_TABLE* variables, GEN_TABLE* initializers, GEN_TABLE* values) {
+
+	STRING* init=NULL;
+	for(unsigned long i=0; i < variables->next; i++) {
+
+		char* var = get_variable_at_index(variables, i);
+
+		STRING* new_initializer = generate_initializer(var, initializers, values);
+		init = string_append(init, new_initializer);
+		string_free(new_initializer);
+	}
+	return init;
+}
+
+STRING* generate_expression(GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* operations) {
+
+	STRING* exp=NULL;
+
+	STRING* var1 = generate_variable(variables);
+	STRING* assignment = string_create((char*)"= ", 0);
+	STRING* var2 = generate_variable(variables);
+	STRING* op = string_create( (char*)operations->table[ rand() % operations->len ], 0 );
+
+	if( rand() & 1 ) {
+		// <variable> = <variable> <operation> ( <value> | <variable> )
+		STRING* var3 = generate_variable(variables);
+
+		exp = string_append(var1, string_append(assignment, string_append( var2, string_append(op, var3) )));
+	} else {
+		// <variable> <operation>= ( <value> | <variable> )
+		exp = string_append(var1, string_append(op, string_append(assignment, var2)));
+	}
+	exp = string_clone(exp);
+	string_free(var1);
+	string_free(assignment);
+	string_free(var2);
+	string_free(op);
+
+	return exp;
+}
+
+STRING* generate_condition(GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* comparisons) {
+
+	// <variable> <comparisons> <variable>
+
+	STRING* var1 = generate_variable(variables);
+	STRING* comp = string_create( (char*)comparisons->table[ rand() % comparisons->len ], 0 );
+	STRING* var2 = generate_variable_or_value(variables, values);
+
+	STRING* condition = string_append( var1, string_append( comp, var2 ) );
+
+	condition = string_clone(condition);
+	string_free(var1);
+	string_free(comp);
+	string_free(var2);
+
+	return condition;
+}
+
+STRING* generate_tabs(unsigned long tabs) {
+
+	char s[tabs+1];
+	for(unsigned long i = 0; i < tabs; i++) s[i] = '\t';
+	STRING* t = string_create(tabs? s : "", tabs);
+	return t;
+}
+
+STRING*  generate_opening_bracket_snippet(
+		unsigned long tabs,
+		GEN_TABLE* variables,
+		GEN_TABLE* values,
+		GEN_TABLE* operations) {
+
+	// <n tabs>do {\n
+	// <n+1 tabs><expression>;\n
+
+	STRING* t1 = generate_tabs(tabs++);
+	STRING* do_ = string_create("do {\n", 0);
+
+	STRING* t2 = generate_tabs(tabs);
+	STRING* exp = generate_expression(variables, values, operations);
+
+	STRING* endline = string_create(";\n", 0);
+
+	STRING* opening = string_append(t1, string_append( do_, string_append( t2, string_append(exp, endline) ) ));
+
+	opening = string_clone(opening);
+	string_free( t1 );
+	string_free( do_ );
+	string_free( t2 );
+	string_free( exp );
+	string_free( endline );
+
+	return opening;
+}
+
+STRING* generate_closing_bracket_snippet(
+		unsigned long tabs,
+		GEN_TABLE* variables,
+		GEN_TABLE* values,
+		GEN_TABLE* comparisons) {
+
+	// <n tabs>while( <condition> );\n
+	STRING* t = generate_tabs(--tabs);
+	STRING* while_ = string_create((char*)"while( ", 0);
+	STRING* condition = generate_condition(variables, values, comparisons);
+	STRING*	endline = string_create((char*)");\n", 0);
+
+	STRING* closing = string_append( t, string_append( while_, string_append( condition, endline ) ) );
+
+	closing = string_clone(closing);
+	string_free(t);
+	string_free(while_);
+	string_free(condition);
+	string_free(endline);
+
+	return closing;
+}
+
+void generate_pseudocode(GRAPH* graph) {
+
+	// tables used to produce code
+	GEN_TABLE variables = GEN_TABLE_CREATE("ptr", "idx", "x", "y", "n", "i", "len");
+	GEN_TABLE values = GEN_TABLE_CREATE("0b1010000", "'a'", "0xdeadbeef", "1", "0");
+	GEN_TABLE comparisons = GEN_TABLE_CREATE(" > ", " < ", " == ", " != ", " <= ", " >= ", " ^ ", " && ", " || ", " & ", " | ");
+	GEN_TABLE operations = GEN_TABLE_CREATE("*", "/", "+", "-", "|", "&", "^");
+	GEN_TABLE initializers = GEN_TABLE_CREATE("int ", "unsigned long ", "unsigned int ", "short ", "size_t ", "ssize_t ");
+
+	unsigned long tabs = 0;
+
+	for(GRAPH* node=graph; node->next; node = node->next) {
+
+		if( node->data ) {
+
+			STRING* new_str = string_create("", 0);
+			STRING* old_str = node->data;
+			// iterate through string
+			for(unsigned long i = 0; i < old_str->len; i++) {
+
+				if( old_str->str[i] == '{' ) {
+					STRING* new_part = generate_opening_bracket_snippet(tabs, &variables, &values, &operations);
+					string_append(new_str, new_part);
+					string_free(new_part);
+					tabs++;
+				} else {
+					STRING* new_part = generate_closing_bracket_snippet(tabs, &variables, &values, &comparisons);
+					string_append(new_str, new_part);
+					string_free(new_part);
+					tabs--;
+				}
+			}
+			string_copy(node->data, new_str);
+		}
+
+	}
+
+	STRING* tmp = graph->data;
+	STRING* init = graph->data = string_append( generate_initializers(&variables, &initializers, &values), graph->data);
+	string_free(tmp);
+}
+
+char* watermark_get_code(GRAPH* graph) {
+
+	free_data_from_nodes(graph);
+
+	generate_code_blocks(graph);
+
+	generate_pseudocode(graph);
+
+	return join_strings_from_graph(graph);
 }
