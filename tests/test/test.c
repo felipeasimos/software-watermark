@@ -223,7 +223,7 @@ int _1_to_10_8_test() {
 
 int code_test() {
 
-	uint8_t n = 0b010000;
+	uint8_t n[4] = {0b010000, 0b101010, 0b1010101, 0b1010101};
 	GRAPH* graph = watermark_encode(&n, sizeof(n));
 	graph_print(graph, print_node_func);
 	char* code = watermark_get_code(graph);

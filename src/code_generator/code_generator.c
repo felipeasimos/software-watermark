@@ -13,6 +13,9 @@ typedef struct GEN_TABLE {
 	const char** table;
 	unsigned long len;
 	unsigned long next;
+	unsigned long last;
+	unsigned long new;
+	unsigned long new_counter;
 } GEN_TABLE;
 
 #define ARRAY_SIZE(arr) sizeof(arr)/sizeof(arr[0])
@@ -21,6 +24,9 @@ typedef struct GEN_TABLE {
 	.table = (const char*[]){__VA_ARGS__},\
 	.len = ARRAY_SIZE( ( (const char*[]){__VA_ARGS__} ) ),\
 	.next = 0,\
+	.last = (unsigned long)-1,\
+	.new = 5,\
+	.new_counter = 0\
 }
 
 STRING* string_create(char* str, unsigned long str_len) {
@@ -85,6 +91,8 @@ STRING* string_append(STRING* str, STRING* appendix) {
 	// concatenate strings
 	for(unsigned long i = old_len; i < str->len; i++) str->str[i] = appendix->str[ i - old_len ];
 
+	str->str[str->len]=0x00;
+
 	return str;
 }
 
@@ -92,9 +100,9 @@ STRING* string_truncate(STRING* str, unsigned long new_len) {
 
 	if( !str ) return NULL;
 
-	str->str = realloc(str->str, new_len+1);
-	str->str[new_len] = 0x00;
 	str->len = new_len;
+	str->str = realloc(str->str, str->len+1);
+	str->str[str->len] = 0x00;
 	return str;
 }
 
@@ -151,17 +159,42 @@ char* join_strings_from_graph(GRAPH* graph) {
 	return final_string;
 }
 
+STRING* generate_non_repeating_variable(GEN_TABLE* variables) {
+
+	unsigned long idx;
+	do {
+		idx = rand() % variables->next;
+	} while( idx == variables->last );
+
+	variables->last = idx;
+
+	if( idx >= variables->len ) {
+	
+		unsigned long id = idx - variables->len;
+		char s[50]={0};
+		sprintf(s,"x%llu", id);
+		return string_create(s, 0);
+	} else {
+	
+		return string_create( (char*)variables->table[idx], 0 );
+	}
+
+}
+
 STRING* generate_variable(GEN_TABLE* variables) {
 
 	// <variable>
-	STRING* var;
+	STRING* var = NULL;
 	// use old variable?
-	if( variables->next && ( rand() & 1 ) ) {
+	if( variables->next > 1 && variables->new > variables->new_counter ) {
 
-		return string_create( (char*) variables->table[ rand() % variables->next ], 0 );
+		variables->new_counter++;
+		return generate_non_repeating_variable(variables);
 	// get new variable
 	} else {
 
+		variables->new_counter=0;
+		variables->new++;
 		// do we generate a new one?
 		if( variables->next >= variables->len ) {
 
@@ -173,7 +206,7 @@ STRING* generate_variable(GEN_TABLE* variables) {
 		} else {
 			var = string_create( (char*) variables->table[ variables->next ], 0 );
 		}
-		variables->next++;
+		variables->last = variables->next++;
 	}
 
 	return var;
@@ -247,24 +280,37 @@ STRING* generate_expression(GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* 
 	STRING* exp=NULL;
 
 	STRING* var1 = generate_variable(variables);
+
+	STRING* space1 = string_create(" ", 0);
+	STRING* space2 = string_create(" ", 0);
+	STRING* space3 = string_create(" ", 0);
 	STRING* assignment = string_create((char*)"= ", 0);
-	STRING* var2 = generate_variable(variables);
+	STRING* var2 = generate_variable_or_value(variables, values);
 	STRING* op = string_create( (char*)operations->table[ rand() % operations->len ], 0 );
 
 	if( rand() & 1 ) {
 		// <variable> = <variable> <operation> ( <value> | <variable> )
 		STRING* var3 = generate_variable(variables);
 
-		exp = string_append(var1, string_append(assignment, string_append( var2, string_append(op, var3) )));
+		exp = string_append(var1,
+				string_append(space1,
+					string_append(assignment,
+						string_append( var2,
+							string_append(space2,
+								string_append(op,
+									string_append(space3, var3 ) ))))));
 	} else {
 		// <variable> <operation>= ( <value> | <variable> )
-		exp = string_append(var1, string_append(op, string_append(assignment, var2)));
+		exp = string_append(var1, string_append( space1, string_append(op, string_append(assignment, var2))));
 	}
 	exp = string_clone(exp);
 	string_free(var1);
 	string_free(assignment);
 	string_free(var2);
 	string_free(op);
+	string_free(space1);
+	string_free(space2);
+	string_free(space3);
 
 	return exp;
 }
@@ -352,7 +398,7 @@ void generate_pseudocode(GRAPH* graph) {
 	// tables used to produce code
 	GEN_TABLE variables = GEN_TABLE_CREATE("ptr", "idx", "x", "y", "n", "i", "len");
 	GEN_TABLE values = GEN_TABLE_CREATE("0b1010000", "'a'", "0xdeadbeef", "1", "0");
-	GEN_TABLE comparisons = GEN_TABLE_CREATE(" > ", " < ", " == ", " != ", " <= ", " >= ", " ^ ", " && ", " || ", " & ", " | ");
+	GEN_TABLE comparisons = GEN_TABLE_CREATE(" > ", " < ", " == ", " != ", " <= ", " >= ", " ^ ", " & ");
 	GEN_TABLE operations = GEN_TABLE_CREATE("*", "/", "+", "-", "|", "&", "^");
 	GEN_TABLE initializers = GEN_TABLE_CREATE("int ", "unsigned long ", "unsigned int ", "short ", "size_t ", "ssize_t ");
 
@@ -380,6 +426,7 @@ void generate_pseudocode(GRAPH* graph) {
 				}
 			}
 			string_copy(node->data, new_str);
+			string_free(new_str);
 		}
 
 	}
