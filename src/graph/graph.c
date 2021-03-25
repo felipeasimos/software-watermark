@@ -184,7 +184,7 @@ GRAPH* graph_delete(GRAPH* graph_to_delete){
 	graph_insert( graph_to_delete->prev, graph_to_delete->next );//now no node points to graph_to_delete
 
 	//save pointer to valid node to return
-	GRAPH* to_return = graph_to_delete->prev ?: graph_to_delete->next;
+	GRAPH* to_return = graph_to_delete->prev ? graph_to_delete->prev : graph_to_delete->next;
 
 	graph_free_node( graph_to_delete ); //bye bye
 
@@ -225,7 +225,7 @@ void graph_print_node(GRAPH* graph, void (*print_func)(void*, unsigned int) ){
 	if( !graph ) return;
 
 	//calls default print function if none was given
-	(print_func ?: graph_default_print_func)( graph->data, graph->data_len );
+	(print_func ? print_func : graph_default_print_func)( graph->data, graph->data_len );
 }
 
 void graph_print(GRAPH* graph, void(*print_func)(void*, unsigned int)){

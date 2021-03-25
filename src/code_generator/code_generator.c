@@ -121,7 +121,7 @@ void generate_code_blocks(GRAPH* graph) {
 
 	// make code blocks
 	STRING* opening_bracket = string_create("{", 1);
-	unsigned long i = 0;
+
 	for(GRAPH* node = graph; node->next; node = node->next) {
 
 		// check if there is a backedge
@@ -172,7 +172,7 @@ STRING* generate_non_repeating_variable(GEN_TABLE* variables) {
 	
 		unsigned long id = idx - variables->len;
 		char s[50]={0};
-		sprintf(s,"x%llu", id);
+		sprintf(s,"x%lu", id);
 		return string_create(s, 0);
 	} else {
 	
@@ -200,7 +200,7 @@ STRING* generate_variable(GEN_TABLE* variables) {
 
 			unsigned long id = variables->next - variables->len;
 			char s[50]={0};
-			sprintf(s, "x%llu", id);
+			sprintf(s, "x%lu", id);
 			var = string_create(s, 0);
 		// get new variable from table
 		} else {
@@ -254,7 +254,7 @@ char* get_variable_at_index(GEN_TABLE* variables, unsigned long i) {
 
 		unsigned long id = i - variables->len;
 		var = malloc(50);
-		sprintf(var, "x%llu", id);
+		sprintf(var, "x%lu", id);
 	} else {
 		var = (char*)variables->table[ i ];
 	}
@@ -272,7 +272,7 @@ STRING* generate_initializers(GEN_TABLE* variables, GEN_TABLE* initializers, GEN
 		init = string_append(init, new_initializer);
 		string_free(new_initializer);
 	}
-	return init;
+	return init ? init : string_create("",0);
 }
 
 STRING* generate_expression(GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* operations) {
@@ -378,7 +378,7 @@ STRING* generate_closing_bracket_snippet(
 
 	// <n tabs>while( <condition> );\n
 	STRING* t = generate_tabs(--tabs);
-	STRING* while_ = string_create((char*)"while( ", 0);
+	STRING* while_ = string_create((char*)"} while( ", 0);
 	STRING* condition = generate_condition(variables, values, comparisons);
 	STRING*	endline = string_create((char*)");\n", 0);
 
@@ -397,10 +397,10 @@ void generate_pseudocode(GRAPH* graph) {
 
 	// tables used to produce code
 	GEN_TABLE variables = GEN_TABLE_CREATE("ptr", "idx", "x", "y", "n", "i", "len");
-	GEN_TABLE values = GEN_TABLE_CREATE("0b1010000", "'a'", "0xdeadbeef", "1", "0");
+	GEN_TABLE values = GEN_TABLE_CREATE("0b1010000", "'a'", "0x00", "1", "0", "4096", "~1", "'z'");
 	GEN_TABLE comparisons = GEN_TABLE_CREATE(" > ", " < ", " == ", " != ", " <= ", " >= ", " ^ ", " & ");
 	GEN_TABLE operations = GEN_TABLE_CREATE("*", "/", "+", "-", "|", "&", "^");
-	GEN_TABLE initializers = GEN_TABLE_CREATE("int ", "unsigned long ", "unsigned int ", "short ", "size_t ", "ssize_t ");
+	GEN_TABLE initializers = GEN_TABLE_CREATE("int ", "unsigned long ", "unsigned int ", "short ");
 
 	unsigned long tabs = 0;
 
@@ -432,7 +432,7 @@ void generate_pseudocode(GRAPH* graph) {
 	}
 
 	STRING* tmp = graph->data;
-	STRING* init = graph->data = string_append( generate_initializers(&variables, &initializers, &values), graph->data);
+	graph->data = string_append( generate_initializers(&variables, &initializers, &values), graph->data);
 	string_free(tmp);
 }
 

@@ -1,3 +1,26 @@
+# v Settings to be changed per-project v
+# v v v v v v v v v vvvv v v v v v v v v
+
+ROOT_DIR :=.
+TEST_FILE_EXTENSION := c
+SRC_FILE_EXTENSION := c
+
+TARGET := watermark
+TEST_TARGET := test
+
+# libraries (without -l)
+LIBS :=
+MAIN_LIBS :=
+TEST_LIBS :=
+
+# libraries locations
+LIBS_LOCATION :=
+MAIN_LIBS_LOCATION :=
+TEST_LIBS_LOCATION :=
+
+# ^ Settings to be changed per-project ^
+# ^ ^ ^ ^ ^ ^ ^ ^ ^ ^^^^ ^ ^ ^ ^ ^ ^ ^ ^ 
+
 ROOT_DIR :=.
 SRC_DIR := $(ROOT_DIR)/src
 INCLUDE_DIR := $(ROOT_DIR)/include
@@ -8,9 +31,6 @@ TEST_OBJ_DIR := $(BUILD_DIR)/tests
 TEST_SRC_DIR := $(ROOT_DIR)/tests
 THIRD_PARTY_OBJS_DIR := $(ROOT_DIR)/objs
 
-TEST_FILE_EXTENSION := c
-SRC_FILE_EXTENSION := c
-
 # targets and pre-requisites
 SRC := $(wildcard $(SRC_DIR)/*/*.$(SRC_FILE_EXTENSION))
 OBJECTS := $(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o) $(wildcard $(THIRD_PARTY_OBJS_DIR)/*.o)
@@ -18,23 +38,38 @@ OBJECTS := $(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o) $(wildcard $
 TESTS_SRC := $(wildcard $(TEST_SRC_DIR)/*/*.$(TEST_FILE_EXTENSION))
 TESTS_OBJ := $(TESTS_SRC:$(TEST_SRC_DIR)/%.$(TEST_FILE_EXTENSION)=$(TEST_OBJ_DIR)/%.o)
 
-TARGET := libwatermark.so
-TEST_TARGET := test
+TARGET_LIB := lib$(TARGET).so
+
+MAIN := $(TARGET).$(SRC_FILE_EXTENSION)
 
 # libraries (without -l)
-LIBS :=
-TEST_LIBS :=
+MAIN_LIBS := $(TARGET) $(MAIN_LIBS)
+
+# libraries location
+LIBS_LOCATION :=
+MAIN_LIBS_LOCATION :=$(APP_DIR) $(MAIN_LIB_LOCATION) 
+
+# libraries directories
+LIBS_DIR_LOCATION := $(LIBS_LOCATION)
+MAIN_LIBS_DIR_LOCATION := $(MAIN_LIBS_LOCATION)
+
+# libraries settings
+LIBS_LOCATION := $(addprefix -L,$(LIBS_LOCATION))
+MAIN_LIBS_LOCATION := $(addprefix -L,$(MAIN_LIBS_LOCATION))
+TEST_LIBS_LOCATION := $(addprefix -L,$(TEST_LIBS_LOCATION))
 
 # compiler settings
-CPP := c99
-CPPFLAG := -pedantic-errors -Wall -Wextra -Werror -fPIC
-LDFLAGS := $(addprefix -l,$(LIBS))
+CC := c99
+CFLAGS := -pedantic-errors -Wall -Wextra -Werror -fPIC
+LDFLAGS :=
 INCLUDE := -I$(INCLUDE_DIR)
 
-TEST_LIBS := $(addprefix -l,$(TEST_LIBS))
+LIBS := $(LIBS_LOCATION) $(addprefix -l,$(LIBS))
+MAIN_LIBS := $(MAIN_LIBS_LOCATION) $(addprefix -l,$(MAIN_LIBS))
+TEST_LIBS := $(TEST_LIBS_LOCATION) $(addprefix -l,$(TEST_LIBS))
 
 # final preparations (don't change this)
-TARGET_FINAL := $(APP_DIR)/$(TARGET)
+TARGET_LIB_FINAL := $(APP_DIR)/$(TARGET_LIB)
 TEST_TARGET_FINAL := $(ROOT_DIR)/$(TEST_TARGET)
 
 # tests, static analysis and code coverage
@@ -47,20 +82,29 @@ STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=nam
 	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
 SHELL := /bin/bash
-.PHONY: all folders clean debug release test profile hist
+.PHONY: lib folders clean debug release test profile hist main compilemain
 
-release: CPPFLAGS += -O2 -fPIC
-release: | clean all 
+# build lib, run tests, compile and run main
+all: | debug lib main
 
-all: folders $(TARGET_FINAL)
+release: CFLAGS += -O2 -fPIC
+release: | clean lib 
 
-debug: CPPFLAGS += -DDEBUG -g -fPIC
+compilemain: LDFLAGS += $(MAIN_LIBS)
+compilemain: release
+	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
+
+main: release compilemain
+	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) ./$(TARGET)
+
+lib: folders $(TARGET_LIB_FINAL)
+
+debug: CFLAGS += -DDEBUG -g -fPIC
 debug: COVERAGE = --coverage
-debug: $(TESTS_OBJ) test all
+debug: $(TESTS_OBJ) test lib
 
-test: LDFLAGS += $(TEST_LIBS)
 test: $(TESTS_OBJ) $(OBJECTS) 
-	@$(CPP) $(CPPFLAGS) $(INCLUDE) $(COVERAGE) -o $(TEST_TARGET_FINAL) $^ $(LDFLAGS)
+	@$(CC) $(CFLAGS) $(INCLUDE) $(COVERAGE) -o $(TEST_TARGET_FINAL) $^ $(LDFLAGS)
 	$(STATIC_ANALYSIS_COMMAND)
 	$(RUN_TESTS_COMMAND)
 	$(COVERAGE_COMMAND)
@@ -76,15 +120,17 @@ clean:
 	-@rm -rvf $(TEST_OBJ_DIR)/*
 	-@rm -vf $(TEST_TARGET_FINAL)
 
-$(TARGET_FINAL): $(OBJECTS)
+$(TARGET_LIB_FINAL): $(OBJECTS)
 	@mkdir -p $(@D)
-	@$(CPP) $(CPPFLAGS) -shared -o $(TARGET_FINAL) $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -shared -o $(TARGET_LIB_FINAL) $^ $(LDFLAGS)
 
+$(OBJECTS): LDFLAGS += $(LIBS)
 $(OBJECTS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.$(SRC_FILE_EXTENSION)
 	@mkdir -p $(@D)
-	@$(CPP) $(CPPFLAGS) $(INCLUDE) $(COVERAGE) -c $< -o $@
+	@$(CC) $(CFLAGS) $(INCLUDE) $(COVERAGE) -c $< -o $@
 
 $(TESTS_OBJ): $(OBJECTS)
+$(TESTS_OBJ): LDFLAGS += $(TEST_LIBS)
 $(TESTS_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.$(TEST_FILE_EXTENSION)
 	@mkdir -p $(@D)
-	@$(CPP) $(CPPFLAGS) $(INCLUDE) -c $< -o $@
+	@$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@

@@ -205,10 +205,11 @@ void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {
 
 	uint8_t* byte = &data[i/8];
 
+	// 0x80 = 0b1000_0000
 	if( value ) {
-		*byte |= 0b10000000 >> (i%8);
+		*byte |= 0x80 >> (i%8);
 	} else {
-		*byte &= ~(0b10000000 >> (i%8));
+		*byte &= ~(0x80 >> (i%8));
 	}
 }
 
@@ -262,4 +263,23 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 	decoder_free(decoder);
 
 	return data;
+}
+
+void* watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+
+	if( num_rs_bytes >= *num_bytes ) return NULL;
+
+	uint8_t* data = watermark_decode(graph, num_bytes);
+
+	int result = rs_decode(data, *num_bytes, (uint16_t*)( data + (*num_bytes - num_rs_bytes) ), num_rs_bytes);
+
+	// if there were no errors or they were corrected
+	if( result >= 0 ) {
+
+		return data;
+
+	// if there were errors and they could not be corrected
+	}
+	free(data);
+	return NULL;
 }

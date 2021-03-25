@@ -35,8 +35,9 @@ void print_stacks_encoder(ENCODER* encoder) {
 
 uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
 
+	// 0x80 = 0b1000_0000
 	uint8_t byte = data[bit_idx/8];
-	return byte & ( 0b10000000 >> (bit_idx % 8));
+	return byte & ( 0x80 >> (bit_idx % 8));
 }
 
 uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
@@ -196,4 +197,20 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
 	encoder_free(encoder);
 	
 	return graph;
+}
+
+GRAPH* watermark_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
+
+	uint16_t par[num_rs_bytes];
+	memset(par, 0x00, num_rs_bytes);
+
+	// get parity data
+	rs_encode(data, data_len, par, num_rs_bytes);
+
+	// copy data + parity data
+	uint8_t final_data[data_len + num_rs_bytes];
+	memcpy(final_data, data, data_len);
+	memcpy(final_data + data_len, par, num_rs_bytes * 2);
+
+	return watermark_encode(final_data, data_len);
 }

@@ -6,7 +6,7 @@
 
 void print_node_func(void* data, unsigned int data_len) {
 
-	if( data ) {
+	if( data && data_len ) {
 		printf("\x1b[33m %lu \x1b[0m", *(unsigned long*)data);
 	} else {
 		printf("\x1b[33m null \x1b[0m");
@@ -16,7 +16,7 @@ void print_node_func(void* data, unsigned int data_len) {
 int encoder_test() {
 
 	// big endian
-	uint8_t n_be[4] = { 0b10101, 0b1110001, 0b0011010, 0b011001 };
+	uint8_t n_be[4] = { 0xde, 0xad, 0xbe, 0xef };
 
 	GRAPH* graph = watermark_encode(&n_be, 4);
 
@@ -81,7 +81,7 @@ int decoder_test() {
 	ctdd_assert(data);
 	ctdd_assert( n );
 	ctdd_assert( n == 1 );
-	ctdd_assert( data[0] == 0b10101 );
+	ctdd_assert( data[0] == 0x15 );
 
 	free(data);
 	graph_free(graph);
@@ -106,7 +106,7 @@ int reed_solomon_api_test() {
 	srand(time(0));
 
 	uint8_t data[data_len];
-	for(unsigned int i = 0; i < data_len; i++) data[i] = rand();
+	for(unsigned int i = 0; i < (unsigned int) data_len; i++) data[i] = rand();
 	uint16_t par[parity_len];
 	memset(par, 0x00, parity_len * sizeof(uint16_t));
 
@@ -118,7 +118,7 @@ int reed_solomon_api_test() {
 
 	decode_rs8(rs, (uint8_t*)&received_data, (uint16_t*)&par, data_len, NULL, 0, NULL, 0, NULL);
 
-	for(unsigned int i=0; i < data_len; i++) ctdd_assert( received_data[i] == data[i] );
+	for(unsigned int i=0; i < (unsigned int) data_len; i++) ctdd_assert( received_data[i] == data[i] );
 
 	free_rs(rs);
 
@@ -223,7 +223,7 @@ int _1_to_10_8_test() {
 
 int code_test() {
 
-	uint8_t n[4] = {0b010000, 0b101010, 0b1010101, 0b1010101};
+	uint8_t n[] = {16};
 	GRAPH* graph = watermark_encode(&n, sizeof(n));
 	graph_print(graph, print_node_func);
 	char* code = watermark_get_code(graph);
