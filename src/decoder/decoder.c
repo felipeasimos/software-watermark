@@ -278,8 +278,54 @@ void* watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned 
 
 		return data;
 
-	// if there were errors and they could not be corrected
 	}
+
+	// if there were errors and they could not be corrected
 	free(data);
 	return NULL;
+}
+
+unsigned long watermark_num_edges(GRAPH* graph) {
+
+	unsigned long num_edges = 0;
+
+	// visit each node and see the connections
+	for(; graph; graph = graph->next)
+
+		// get size of connections list
+		for(CONNECTION* connection = graph->connections; connection; connection = connection->next)
+			num_edges++;
+
+	return num_edges;
+}
+
+unsigned long watermark_num_hamiltonian_edges(GRAPH* graph) {
+
+	unsigned long num_edges = 0;
+
+	// visit each node, except the final one and see the connections
+	for(; graph->next; graph = graph->next) {
+		num_edges++;
+	}
+
+	return num_edges;
+}
+
+unsigned long watermark_num_nodes(GRAPH* graph) {
+
+	unsigned long num_nodes = 0;
+	for(; graph; graph = graph->next) {
+		num_nodes++;
+	}
+
+	return num_nodes;
+}
+
+unsigned long watermark_cyclomatic_complexity(GRAPH* graph) {
+
+	// there is only one exit always
+	// cyclomatic complexity = # edges - # nodes + 2 * # nodes with exit points
+	// cyclomatic complexity = # edges - # nodes + 2
+
+	return watermark_num_edges(graph) - watermark_num_nodes(graph) + 2;
 }

@@ -17,7 +17,7 @@ typedef struct GRAPH{
 	struct CONNECTION* connections; //start of simple linked list of connections
 	struct GRAPH* next; //next node in the node double linked list
 	struct GRAPH* prev; //previous node in the node double linked list
-}GRAPH;
+} GRAPH;
 
 #include "connection/connection.h" //we can't include it before 'struct CONNECTION;'
 

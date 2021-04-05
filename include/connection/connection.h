@@ -12,7 +12,7 @@ typedef struct CONNECTION{
 	long double weight;
 	struct CONNECTION* next; //next connection in the original node's simple linked list of connections
 	struct GRAPH* node; //node this connection represents
-}CONNECTION;
+} CONNECTION;
 
 #include "graph/graph.h" //we can't include it before 'struct GRAPH;'
 

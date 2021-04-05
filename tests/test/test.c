@@ -31,10 +31,14 @@ int decoder_test() {
 	// we are representing this:
 	/*
 	      .-----------.
-	      |-----.	  |.----.
+	      |-----.	    |.----.
 	      |     |     ||    |
 	      v     |     |v    |
-	1     0     1     0     1
+	1 ->  0 ->  1 ->  0 ->  1
+	# edges = 7
+	# nodes = 5
+	# cyclomatic complexity = 4
+	# non hamiltoninan edges = 3
 	*/
 
 	unsigned long idx = 1;
@@ -74,6 +78,11 @@ int decoder_test() {
 	// null node at the end
 	graph_insert(final, graph_create(&idx, sizeof(idx)));
 	graph_oriented_connect(final, final->next);
+
+	ctdd_assert( watermark_num_edges(graph) == 8 );
+	ctdd_assert( watermark_num_nodes(graph) == 6 );
+	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
+	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 5 );
 
 	unsigned long n=0;
 	uint8_t* data = watermark_decode(graph, &n);
