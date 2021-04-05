@@ -122,7 +122,7 @@ clean:
 
 $(TARGET_LIB_FINAL): $(OBJECTS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -shared -o $(TARGET_LIB_FINAL) $^ $(LDFLAGS)
+	@$(CC) $(CFLAGS) -shared -o $(TARGET_LIB_FINAL) $^ $(LDFLAGS)
 
 $(OBJECTS): LDFLAGS += $(LIBS)
 $(OBJECTS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.$(SRC_FILE_EXTENSION)

@@ -171,7 +171,7 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 	}
 }
 
-GRAPH* watermark_encode(void* data, unsigned long data_len) {
+GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 
 	if( !data || !data_len ) return NULL;
 
@@ -199,7 +199,7 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
 	return graph;
 }
 
-GRAPH* watermark_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
+GRAPH* watermark2014_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
 
 	uint16_t par[num_rs_bytes];
 	memset(par, 0x00, num_rs_bytes);
@@ -212,5 +212,5 @@ GRAPH* watermark_encode_with_rs(void* data, unsigned long data_len, unsigned lon
 	memcpy(final_data, data, data_len);
 	memcpy(final_data + data_len, par, num_rs_bytes * 2);
 
-	return watermark_encode(final_data, data_len);
+	return watermark2014_encode(final_data, data_len);
 }

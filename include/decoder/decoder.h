@@ -5,9 +5,9 @@
 #include <stdint.h>
 #include "rs_api/rs.h"
 
-void* watermark_decode(GRAPH* graph, unsigned long* num_bytes);
+void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes);
 
-void* watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes);
+void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes);
 
 unsigned long watermark_num_edges(GRAPH* graph);
 

@@ -240,7 +240,7 @@ void decoder_free(DECODER* decoder) {
 // backedge and infer bit value from it
 // 2. instead of just the hamiltonian path index (which is the same as
 // the history idx) and index in its parity's stack (used to check if watermark is valid)
-void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
+void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
 	if( !graph ) return NULL;
 
@@ -265,11 +265,11 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 	return data;
 }
 
-void* watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
 
 	if( num_rs_bytes >= *num_bytes ) return NULL;
 
-	uint8_t* data = watermark_decode(graph, num_bytes);
+	uint8_t* data = watermark2014_decode(graph, num_bytes);
 
 	int result = rs_decode(data, *num_bytes, (uint16_t*)( data + (*num_bytes - num_rs_bytes) ), num_rs_bytes);
 

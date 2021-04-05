@@ -18,7 +18,7 @@ int encoder_test() {
 	// big endian
 	uint8_t n_be[4] = { 0xde, 0xad, 0xbe, 0xef };
 
-	GRAPH* graph = watermark_encode(&n_be, 4);
+	GRAPH* graph = watermark2014_encode(&n_be, 4);
 
 	ctdd_assert(graph);
 	graph_free(graph);
@@ -80,7 +80,7 @@ int decoder_test() {
 	graph_oriented_connect(final, final->next);
 
 	unsigned long n=0;
-	uint8_t* data = watermark_decode(graph, &n);
+	uint8_t* data = watermark2014_decode(graph, &n);
 
 	ctdd_assert(data);
 	ctdd_assert( n );
@@ -198,12 +198,11 @@ int rs_encoder_decoder_test() {
 		memcpy(final_data, &i, sizeof(i));
 		memcpy(final_data + sizeof(i), par, sizeof(par));
 
-		GRAPH* graph = watermark_encode(&final_data, sizeof(final_data));
+		GRAPH* graph = watermark2014_encode(&final_data, sizeof(final_data));
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
-		uint8_t* result = watermark_decode(graph, &num_bytes);
+		uint8_t* result = watermark2014_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
-		graph_print(graph, NULL);
 		// check i
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes - sizeof(par), sizeof(i)) );
 
@@ -223,10 +222,10 @@ int _1_to_10_8_test() {
 	for(unsigned long i=1; i < 100000000; i++) {
 
 		if( !( i % 100000) ) printf("%lu\n", i);
-		GRAPH* graph = watermark_encode(&i, sizeof(i));
+		GRAPH* graph = watermark2014_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
-		uint8_t* result = watermark_decode(graph, &num_bytes);
+		uint8_t* result = watermark2014_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
 
@@ -240,7 +239,7 @@ int _1_to_10_8_test() {
 int code_test() {
 
 	uint8_t n[] = {16};
-	GRAPH* graph = watermark_encode(&n, sizeof(n));
+	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
 	graph_print(graph, print_node_func);
 	char* code = watermark_get_code(graph);
 	printf("%s", code);
