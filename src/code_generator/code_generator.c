@@ -299,6 +299,7 @@ STRING* generate_expression(GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* 
 							string_append(space2,
 								string_append(op,
 									string_append(space3, var3 ) ))))));
+		string_free(var3);
 	} else {
 		// <variable> <operation>= ( <value> | <variable> )
 		exp = string_append(var1, string_append( space1, string_append(op, string_append(assignment, var2))));

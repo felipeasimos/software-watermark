@@ -305,7 +305,14 @@ unsigned long watermark_num_hamiltonian_edges(GRAPH* graph) {
 
 	// visit each node, except the final one and see the connections
 	for(; graph->next; graph = graph->next) {
-		num_edges++;
+
+		// the last connection is the one to the next node
+		// check if we are connecting to the next node in the
+		// hamiltonian path or if we jumped it
+		CONNECTION* last = graph->connections;
+		for(; last && last->next; last = last->next); // get last connection in the list
+
+		num_edges += ( last && last->node == graph->next);
 	}
 
 	return num_edges;

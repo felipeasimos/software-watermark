@@ -109,7 +109,6 @@ void graph_oriented_disconnect(GRAPH* graph_from, GRAPH* graph_to){
 	if( graph_from->connections->node == graph_to ){
 		CONNECTION* new_root = graph_from->connections->next;
 		free( graph_from->connections );
-		graph_from->connections = NULL;
 		graph_from->connections = new_root;
 	}	
 }

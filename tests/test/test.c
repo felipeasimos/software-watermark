@@ -79,11 +79,6 @@ int decoder_test() {
 	graph_insert(final, graph_create(&idx, sizeof(idx)));
 	graph_oriented_connect(final, final->next);
 
-	ctdd_assert( watermark_num_edges(graph) == 8 );
-	ctdd_assert( watermark_num_nodes(graph) == 6 );
-	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
-	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 5 );
-
 	unsigned long n=0;
 	uint8_t* data = watermark_decode(graph, &n);
 
@@ -91,6 +86,18 @@ int decoder_test() {
 	ctdd_assert( n );
 	ctdd_assert( n == 1 );
 	ctdd_assert( data[0] == 0x15 );
+
+	ctdd_assert( watermark_num_edges(graph) == 8 );
+	ctdd_assert( watermark_num_nodes(graph) == 6 );
+	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
+	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 5 );
+
+	// test with missing hamiltonian edge
+	graph_oriented_disconnect(graph->next, graph->next->next);
+	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 4 );	
+	ctdd_assert( watermark_num_edges(graph) == 7 );
+	ctdd_assert( watermark_num_nodes(graph) == 6 );
+	ctdd_assert( watermark_cyclomatic_complexity(graph) == 3 );
 
 	free(data);
 	graph_free(graph);
