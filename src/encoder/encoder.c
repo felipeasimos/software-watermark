@@ -1,22 +1,26 @@
 #include "encoder/encoder.h"
 
+typedef struct PSTACK {
+
+	GRAPH** stack;
+	unsigned long n;
+} PSTACK;
+
+typedef struct HSTACK {
+
+	unsigned long* stack;
+	unsigned long n;
+} HSTACK;
+
 typedef struct ENCODER {
 
 	// nodes have pointer as data, which point to a list
 	GRAPH* graph;
 	GRAPH* final_node;
 
-	// odd labeled stack
-	GRAPH** odd;
-	unsigned long n_odd;
-
-	// even labeled stack
-	GRAPH** even;
-	unsigned long n_even;
-
-	// stack size history
-	unsigned long* history;
-	unsigned long n_history;
+	PSTACK odd;
+	PSTACK even;
+	HSTACK history;
 
 } ENCODER;
 
@@ -24,11 +28,11 @@ typedef struct ENCODER {
 void print_stacks_encoder(ENCODER* encoder) {
 
 	printf("e o h\n");
-	for( unsigned long i=0; i < encoder->n_history; i++) {
+	for( unsigned long i=0; i < encoder->history.n; i++) {
 
-		unsigned long even = i < encoder->n_even ? (*(unsigned long*)encoder->even[i]->data) : 0;
-		unsigned long odd = i < encoder->n_odd ? (*(unsigned long*)encoder->odd[i]->data) : 0;
-		printf("%lu %lu %lu %s\n", even, odd, encoder->history[i], encoder->n_history & 1 ? "(e)" : "(o)");
+		unsigned long even = i < encoder->even.n ? (*(unsigned long*)encoder->even.stack[i]->data) : 0;
+		unsigned long odd = i < encoder->odd.n ? (*(unsigned long*)encoder->odd.stack[i]->data) : 0;
+		printf("%lu %lu %lu %s\n", even, odd, encoder->history.stack[i], encoder->history.n & 1 ? "(e)" : "(o)");
 	}
 }
 #endif
@@ -56,26 +60,29 @@ uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 	return data_len*8;
 }
 
+PSTACK* get_parity_stack(ENCODER* encoder, uint8_t is_odd) {
+	return is_odd ? &encoder->odd : &encoder->even;
+}
+
 void add_node_to_stacks(ENCODER* encoder, unsigned long is_odd) {
 
 	// save size of the stack with different parity
-	encoder->history[encoder->n_history++] = is_odd ? encoder->n_even : encoder->n_odd;
+	encoder->history.stack[encoder->history.n++] = is_odd ? encoder->even.n : encoder->odd.n;
 
 	// save to stack with the same parity
-	GRAPH** stack = is_odd ? encoder->odd : encoder->even;
-	unsigned long* n = is_odd ? &encoder->n_odd : &encoder->n_even;
-	stack[(*n)++] = encoder->final_node;
+	PSTACK* stack = get_parity_stack(encoder, is_odd);
+	stack->stack[stack->n++] = encoder->final_node;
 }
 
 ENCODER* encoder_create(unsigned long n_bits) {
 
 	ENCODER* encoder = malloc( sizeof(ENCODER) );
-	encoder->odd = malloc(sizeof(GRAPH*) * (n_bits/2+1));
-	encoder->even = malloc(sizeof(GRAPH*) * (n_bits/2));
-	encoder->history = malloc(sizeof(unsigned long) * n_bits);
-	encoder->n_history = 0;
-	encoder->n_odd = 0;
-	encoder->n_even = 0;
+	encoder->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
+	encoder->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
+	encoder->history.stack = malloc(sizeof(unsigned long) * n_bits);
+	encoder->history.n = 0;
+	encoder->odd.n = 0;
+	encoder->even.n = 0;
 
 	// create graph
 	unsigned long one = 1;
@@ -87,9 +94,9 @@ ENCODER* encoder_create(unsigned long n_bits) {
 
 void encoder_free(ENCODER* encoder) {
 
-	free(encoder->odd);
-	free(encoder->even);
-	free(encoder->history);
+	free(encoder->odd.stack);
+	free(encoder->even.stack);
+	free(encoder->history.stack);
 	free(encoder);
 }
 
@@ -105,31 +112,30 @@ void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
 	encoder->final_node = new_node;
 }
 
-void pop_all(unsigned long* n, unsigned long idx) {
+void pop_all(PSTACK* stack, unsigned long idx) {
 
-	*n = idx+1;
+	stack->n = idx+1;
 }
 
-void pop_all_history(unsigned long* n, unsigned long size) {
+void pop_all_history(PSTACK* stack, unsigned long size) {
 
-	*n = size;
+	stack->n = size;
 }
 
 void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
 
 	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
 
-	GRAPH** dest_stack = is_dest_odd ? encoder->odd : encoder->even;
-	unsigned long* n_dest = is_dest_odd ? &encoder->n_odd : &encoder->n_even;
+	PSTACK* dest_stack = get_parity_stack(encoder, is_dest_odd);
 
-	unsigned long* not_n_dest = is_dest_odd ? &encoder->n_even : &encoder->n_odd;
+	PSTACK* not_dest_stack = get_parity_stack(encoder, !is_dest_odd);
 
-	if( *n_dest ) {
-		unsigned long dest_idx = rand() % *n_dest;
-		GRAPH* dest = dest_stack[ dest_idx ];
-		graph_oriented_connect(encoder->final_node, dest);
-		pop_all(n_dest, dest_idx);
-		pop_all_history(not_n_dest, encoder->history[ (*(unsigned long*)dest->data) - 1 ]);
+	if( dest_stack->n ) {
+		unsigned long dest_idx = rand() % dest_stack->n;
+		GRAPH* dest_node = dest_stack->stack[ dest_idx ];
+		graph_oriented_connect(encoder->final_node, dest_node);
+		pop_all(dest_stack, dest_idx);
+		pop_all_history(not_dest_stack, encoder->history.stack[ (*(unsigned long*)dest_node->data) - 1 ]);
 	}
 }
 

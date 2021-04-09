@@ -256,8 +256,8 @@ int run_tests() {
 	ctdd_verify(reed_solomon_api_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
-	//ctdd_verify(rs_encoder_decoder_test);
-	//ctdd_verify(_1_to_10_8_test);
+	ctdd_verify(rs_encoder_decoder_test);
+	ctdd_verify(_1_to_10_8_test);
 
 	return 0;
 }
