@@ -64,14 +64,24 @@ PSTACK* get_parity_stack(ENCODER* encoder, uint8_t is_odd) {
 	return is_odd ? &encoder->odd : &encoder->even;
 }
 
-void add_node_to_stacks(ENCODER* encoder, unsigned long is_odd) {
+void add_node_to_stacks(ENCODER* encoder, GRAPH* node, unsigned long is_odd) {
 
 	// save size of the stack with different parity
 	encoder->history.stack[encoder->history.n++] = is_odd ? encoder->even.n : encoder->odd.n;
 
 	// save to stack with the same parity
 	PSTACK* stack = get_parity_stack(encoder, is_odd);
-	stack->stack[stack->n++] = encoder->final_node;
+	stack->stack[stack->n++] = node;
+}
+
+void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
+
+	idx++;
+
+	// save index of the node in the hamiltonian path
+	graph_insert(encoder->final_node, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
+	encoder->final_node = encoder->final_node->next;
 }
 
 ENCODER* encoder_create(unsigned long n_bits) {
@@ -87,7 +97,11 @@ ENCODER* encoder_create(unsigned long n_bits) {
 	// create graph
 	unsigned long one = 1;
 	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
-	add_node_to_stacks(encoder, 1);
+	add_node_to_stacks(encoder, encoder->final_node, 1);
+
+	//for(unsigned long i = 1; i < n_bits; i++) {
+	//	add_node_to_graph();
+	//}
 
 	return encoder;
 }
@@ -100,18 +114,6 @@ void encoder_free(ENCODER* encoder) {
 	free(encoder);
 }
 
-void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
-
-	idx++;
-
-	GRAPH* new_node = graph_create(&idx, sizeof(idx));
-
-	// save index of the node in the hamiltonian path
-	graph_insert(encoder->final_node, new_node);
-	graph_oriented_connect(encoder->final_node, new_node);
-	encoder->final_node = new_node;
-}
-
 void pop_all(PSTACK* stack, unsigned long idx) {
 
 	stack->n = idx+1;
@@ -122,7 +124,7 @@ void pop_all_history(PSTACK* stack, unsigned long size) {
 	stack->n = size;
 }
 
-void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
+void add_backedge(ENCODER* encoder, GRAPH* source_node, uint8_t bit, uint8_t is_odd) {
 
 	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
 
@@ -133,7 +135,7 @@ void add_backedge(ENCODER* encoder, uint8_t bit, uint8_t is_odd) {
 	if( dest_stack->n ) {
 		unsigned long dest_idx = rand() % dest_stack->n;
 		GRAPH* dest_node = dest_stack->stack[ dest_idx ];
-		graph_oriented_connect(encoder->final_node, dest_node);
+		graph_oriented_connect(source_node, dest_node);
 		pop_all(dest_stack, dest_idx);
 		pop_all_history(not_dest_stack, encoder->history.stack[ (*(unsigned long*)dest_node->data) - 1 ]);
 	}
@@ -150,6 +152,7 @@ void encode_bit(ENCODER* encoder, uint8_t bit, uint8_t is_odd, unsigned long idx
 	// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
 	add_backedge(
 			encoder,
+			encoder->final_node,
 			bit,
 			is_odd
 		);
@@ -157,6 +160,7 @@ void encode_bit(ENCODER* encoder, uint8_t bit, uint8_t is_odd, unsigned long idx
 	// 3. add node to proper parity stack, and to the history stack
 	add_node_to_stacks(
 			encoder,
+			encoder->final_node,
 			is_odd
 		);
 }
