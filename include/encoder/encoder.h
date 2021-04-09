@@ -5,6 +5,7 @@
 #include <time.h>
 #include "graph/graph.h"
 #include "rs_api/rs.h"
+#include "utils/utils.h"
 
 GRAPH* watermark2014_encode(void* data, unsigned long data_len);
 

@@ -1,38 +1,23 @@
 #include "encoder/encoder.h"
 
-typedef struct PSTACK {
-
-	GRAPH** stack;
-	unsigned long n;
-} PSTACK;
-
-typedef struct HSTACK {
-
-	unsigned long* stack;
-	unsigned long n;
-} HSTACK;
-
 typedef struct ENCODER {
 
 	// nodes have pointer as data, which point to a list
 	GRAPH* graph;
 	GRAPH* final_node;
 
-	PSTACK odd;
-	PSTACK even;
-	HSTACK history;
-
+	STACKS stacks;
 } ENCODER;
 
 #ifdef DEBUG 
 void print_stacks_encoder(ENCODER* encoder) {
 
 	printf("e o h\n");
-	for( unsigned long i=0; i < encoder->history.n; i++) {
+	for( unsigned long i=0; i < encoder->stacks.history.n; i++) {
 
-		unsigned long even = i < encoder->even.n ? (*(unsigned long*)encoder->even.stack[i]->data) : 0;
-		unsigned long odd = i < encoder->odd.n ? (*(unsigned long*)encoder->odd.stack[i]->data) : 0;
-		printf("%lu %lu %lu %s\n", even, odd, encoder->history.stack[i], encoder->history.n & 1 ? "(e)" : "(o)");
+		unsigned long even = i < encoder->stacks.even.n ? (*(unsigned long*)encoder->stacks.even.stack[i]->data) : 0;
+		unsigned long odd = i < encoder->stacks.odd.n ? (*(unsigned long*)encoder->stacks.odd.stack[i]->data) : 0;
+		printf("%lu %lu %lu %s\n", even, odd, encoder->stacks.history.stack[i], encoder->stacks.history.n & 1 ? "(e)" : "(o)");
 	}
 }
 #endif
@@ -60,20 +45,6 @@ uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 	return data_len*8;
 }
 
-PSTACK* get_parity_stack(ENCODER* encoder, uint8_t is_odd) {
-	return is_odd ? &encoder->odd : &encoder->even;
-}
-
-void add_node_to_stacks(ENCODER* encoder, GRAPH* node, unsigned long is_odd) {
-
-	// save size of the stack with different parity
-	encoder->history.stack[encoder->history.n++] = is_odd ? encoder->even.n : encoder->odd.n;
-
-	// save to stack with the same parity
-	PSTACK* stack = get_parity_stack(encoder, is_odd);
-	stack->stack[stack->n++] = node;
-}
-
 void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
 
 	idx++;
@@ -87,17 +58,17 @@ void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
 ENCODER* encoder_create(unsigned long n_bits) {
 
 	ENCODER* encoder = malloc( sizeof(ENCODER) );
-	encoder->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
-	encoder->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
-	encoder->history.stack = malloc(sizeof(unsigned long) * n_bits);
-	encoder->history.n = 0;
-	encoder->odd.n = 0;
-	encoder->even.n = 0;
+	encoder->stacks.odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
+	encoder->stacks.even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
+	encoder->stacks.history.stack = malloc(sizeof(unsigned long) * n_bits);
+	encoder->stacks.history.n = 0;
+	encoder->stacks.odd.n = 0;
+	encoder->stacks.even.n = 0;
 
 	// create graph
 	unsigned long one = 1;
 	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
-	add_node_to_stacks(encoder, encoder->final_node, 1);
+	add_node_to_stacks(&encoder->stacks, encoder->final_node, 1);
 
 	for(unsigned long i = 1; i < n_bits; i++) {
 		add_node_to_graph(encoder, i);
@@ -113,37 +84,10 @@ ENCODER* encoder_create(unsigned long n_bits) {
 
 void encoder_free(ENCODER* encoder) {
 
-	free(encoder->odd.stack);
-	free(encoder->even.stack);
-	free(encoder->history.stack);
+	free(encoder->stacks.odd.stack);
+	free(encoder->stacks.even.stack);
+	free(encoder->stacks.history.stack);
 	free(encoder);
-}
-
-void pop_all(PSTACK* stack, unsigned long idx) {
-
-	stack->n = idx+1;
-}
-
-void pop_all_history(PSTACK* stack, unsigned long size) {
-
-	stack->n = size;
-}
-
-void add_backedge(ENCODER* encoder, GRAPH* source_node, uint8_t bit, uint8_t is_odd) {
-
-	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
-
-	PSTACK* dest_stack = get_parity_stack(encoder, is_dest_odd);
-
-	PSTACK* not_dest_stack = get_parity_stack(encoder, !is_dest_odd);
-
-	if( dest_stack->n ) {
-		unsigned long dest_idx = rand() % dest_stack->n;
-		GRAPH* dest_node = dest_stack->stack[ dest_idx ];
-		graph_oriented_connect(source_node, dest_node);
-		pop_all(dest_stack, dest_idx);
-		pop_all_history(not_dest_stack, encoder->history.stack[ (*(unsigned long*)dest_node->data) - 1 ]);
-	}
 }
 
 void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
@@ -158,7 +102,7 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 		// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
 		add_backedge(
-				encoder,
+				&encoder->stacks,
 				node,
 				bit,
 				is_odd
@@ -166,7 +110,7 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 		// 3. add node to proper parity stack, and to the history stack
 		add_node_to_stacks(
-				encoder,
+				&encoder->stacks,
 				node,
 				is_odd
 			);
