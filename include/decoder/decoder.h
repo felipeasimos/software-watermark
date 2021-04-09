@@ -1,7 +1,7 @@
 #ifndef DECODER_H
 #define DECODER_H
 
-#include "graph/graph.h"
+#include "utils/utils.h"
 #include <stdint.h>
 #include "rs_api/rs.h"
 

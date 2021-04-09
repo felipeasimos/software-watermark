@@ -209,9 +209,9 @@ int rs_encoder_decoder_test() {
 		// check parity
 		ctdd_assert( !memcmp(par, result+num_bytes-sizeof(par), sizeof(par)) );
 
-		// 10^8 tests won't be a good idea if we don't deallocate memory
-		graph_free(graph);
+		// 10^8 tests won't be a good idea if we don't deallocate memory	
 		free(result);
+		graph_free(graph);
 	}
 
 	return 0;
@@ -220,6 +220,8 @@ int rs_encoder_decoder_test() {
 int _1_to_10_8_test() {
 
 	for(unsigned long i=1; i < 100000000; i++) {
+
+		printf("i: %lu\n", i);
 
 		if( !( i % 100000) ) printf("%lu\n", i);
 		GRAPH* graph = watermark2014_encode(&i, sizeof(i));
@@ -238,11 +240,11 @@ int _1_to_10_8_test() {
 
 int code_test() {
 
-	uint8_t n[] = {16};
+	uint8_t n[] = {4};
 	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
-	graph_print(graph, print_node_func);
+	graph_print(graph, NULL);
 	char* code = watermark_get_code(graph);
-	printf("%s", code);
+	printf("'%s'\n", code);
 	free(code);
 	graph_free(graph);
 
@@ -251,12 +253,12 @@ int code_test() {
 
 int run_tests() {
 
-	ctdd_verify(encoder_test);
+	//ctdd_verify(encoder_test);
 	ctdd_verify(decoder_test);
 	ctdd_verify(reed_solomon_api_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
-	ctdd_verify(rs_encoder_decoder_test);
+	// ctdd_verify(rs_encoder_decoder_test);
 	ctdd_verify(_1_to_10_8_test);
 
 	return 0;

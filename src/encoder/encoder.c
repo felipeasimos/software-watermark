@@ -99,9 +99,14 @@ ENCODER* encoder_create(unsigned long n_bits) {
 	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
 	add_node_to_stacks(encoder, encoder->final_node, 1);
 
-	//for(unsigned long i = 1; i < n_bits; i++) {
-	//	add_node_to_graph();
-	//}
+	for(unsigned long i = 1; i < n_bits; i++) {
+		add_node_to_graph(encoder, i);
+	}
+
+	// add final node (null)
+	graph_insert(encoder->final_node, graph_empty());
+	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
+	encoder->final_node = encoder->final_node->next;
 
 	return encoder;
 }
@@ -141,43 +146,31 @@ void add_backedge(ENCODER* encoder, GRAPH* source_node, uint8_t bit, uint8_t is_
 	}
 }
 
-void encode_bit(ENCODER* encoder, uint8_t bit, uint8_t is_odd, unsigned long idx) {
-
-	// 1. add node to graph
-	add_node_to_graph(
-			encoder,
-			idx
-		);
-
-	// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
-	add_backedge(
-			encoder,
-			encoder->final_node,
-			bit,
-			is_odd
-		);
-
-	// 3. add node to proper parity stack, and to the history stack
-	add_node_to_stacks(
-			encoder,
-			encoder->final_node,
-			is_odd
-		);
-}
-
 void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
+	//start from second node
+	GRAPH* node = encoder->graph->next;
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
 
 		// 0-based index of the node's position in the hamiltonian path
-		unsigned long idx = i-trailing_zeroes;
+		uint8_t is_odd = !((i-trailing_zeroes) & 1);
+		uint8_t bit = get_bit(data, i);
 
-		encode_bit(
+		// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
+		add_backedge(
 				encoder,
-				get_bit(data, i),
-				(i-trailing_zeroes-1) & 1,
-				idx
+				node,
+				bit,
+				is_odd
 			);
+
+		// 3. add node to proper parity stack, and to the history stack
+		add_node_to_stacks(
+				encoder,
+				node,
+				is_odd
+			);
+		node = node->next;
 	}
 }
 
@@ -197,10 +190,6 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 	ENCODER* encoder = encoder_create(n_bits);
 
 	encode(encoder, data, n_bits + trailing_zeroes, trailing_zeroes);
-
-	// add final node
-	graph_insert(encoder->final_node, graph_empty());
-	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
 
 	GRAPH* graph = encoder->graph;
 

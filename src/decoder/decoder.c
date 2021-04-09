@@ -35,6 +35,9 @@ unsigned long get_num_bits(GRAPH* graph) {
 	unsigned long i=0;
 	while( graph ) {
 		i++;
+		free(graph->data);
+		graph->data = NULL;
+		graph->data_len = 0;
 		graph = graph->next;
 	}
 	return i-1; // ignore final node (don't represent any bits)
@@ -129,7 +132,7 @@ void print_stacks(DECODER* decoder) {
 
 void print_inner_node_log(DECODER* decoder, WM_NODE* dest, unsigned long i, uint8_t* bit_arr) {
 
-	printf("ERRO (idx %lu): dest node %lu é inner node\n", i+1, dest->hamiltonian_idx+1);
+	printf("ERROR (idx %lu): dest node %lu is inner node\n", i+1, dest->hamiltonian_idx+1);
 	printf("dest node info:\n");
 	printf("\tis_odd: %d\n", !(dest->hamiltonian_idx & 1));
 	printf("\tstack_idx (0-based): %lu\n", dest->stack_idx);
@@ -155,10 +158,10 @@ uint8_t* get_bit_array(DECODER* decoder) {
 	// iterate over every node but the last
 	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
 
-		// check if there is backedge (must have two connections, the first one is the backedge)
-		if( decoder->current_node->connections && decoder->current_node->connections->next ) {
+		// check if there is a backedge ( connection with non-zero data_len will be the one )
+		GRAPH* dest_node = search_backedge(decoder->current_node);
+		if( dest_node ) {
 
-			GRAPH* dest_node = decoder->current_node->connections->node;
 			WM_NODE* dest = ((WM_NODE*)dest_node->data);
 
 			// check if it is inner node
@@ -244,7 +247,7 @@ void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
 	if( !graph ) return NULL;
 
-	// 1. get number of bits
+	// 1. get number of bits and set nodes to null
 	unsigned long n_bits = get_num_bits(graph);
 	*num_bytes = n_bits/8 + !!(n_bits%8);
 

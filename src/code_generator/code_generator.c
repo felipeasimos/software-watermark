@@ -124,10 +124,14 @@ void generate_code_blocks(GRAPH* graph) {
 
 	for(GRAPH* node = graph; node->next; node = node->next) {
 
-		// check if there is a backedge
-		if( node->connections && node->connections->next ) {
+		// mark every node we go through, so we can detected backedges in the future
+		node->data_len = UINT_MAX; // backedges will have data_len equal to a non-zero positive number
+
+		// check if there is a backedge (get connection where data != NULL)
+		GRAPH* backedge_node = search_backedge(node);
+		if( backedge_node ) {
 			if(!node->data) node->data_len = sizeof(STRING);
-			if(!node->connections->node->data) node->connections->node->data_len = sizeof(STRING);
+			if(!backedge_node->data) backedge_node->data_len = sizeof(STRING);
 
 			// add } to the beginning of source node
 			STRING* tmp = node->data;
@@ -135,7 +139,7 @@ void generate_code_blocks(GRAPH* graph) {
 			string_free(tmp);
 			
 			// add { to the end of the destination node
-			node->connections->node->data = string_append(node->connections->node->data, opening_bracket);
+			backedge_node->data = string_append(backedge_node->data, opening_bracket);
 		}
 	}
 	string_free(opening_bracket);
