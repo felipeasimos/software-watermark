@@ -159,7 +159,7 @@ uint8_t* get_bit_array(DECODER* decoder) {
 	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
 
 		// check if there is a backedge ( connection with non-zero data_len will be the one )
-		GRAPH* dest_node = search_backedge(decoder->current_node);
+		GRAPH* dest_node = get_backedge(decoder->current_node);
 		if( dest_node ) {
 
 			WM_NODE* dest = ((WM_NODE*)dest_node->data);

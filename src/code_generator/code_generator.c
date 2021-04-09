@@ -128,7 +128,7 @@ void generate_code_blocks(GRAPH* graph) {
 		node->data_len = UINT_MAX; // backedges will have data_len equal to a non-zero positive number
 
 		// check if there is a backedge (get connection where data != NULL)
-		GRAPH* backedge_node = search_backedge(node);
+		GRAPH* backedge_node = get_backedge(node);
 		if( backedge_node ) {
 			if(!node->data) node->data_len = sizeof(STRING);
 			if(!backedge_node->data) backedge_node->data_len = sizeof(STRING);
