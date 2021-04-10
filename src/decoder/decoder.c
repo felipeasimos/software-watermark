@@ -163,16 +163,18 @@ uint8_t* get_bit_array(DECODER* decoder) {
 			// if a bit is 0, the backedge should go to a node with the same parity
 			// since there is no backedge here, and we can always connect to the first
 			// node, we just need to see what is the current node's parity, to know
-			// the bit it encodes (it the value which can't be represented by an
+			// the bit it encodes (it is the value which can't be represented by an
 			// backedge to the first node)
 
 			// 1 - current_node = i. If i is odd, the bit is 0, if i is even the bit is 1.
 			bit_arr[i] = !(i & 1);
 
-			// however, if there was a possible backedge, the graph is invalid
-			//if() {
-
-			//}
+			// however, if there was a possible backedge for the even stack, this only means
+			// that the graph is invalid
+			if( get_parity_stack(&decoder->stacks, 0)->n ) {
+				free(bit_arr);
+				return NULL;
+			}
 		}
 
 		label_new_current_node(decoder);
