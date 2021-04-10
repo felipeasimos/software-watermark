@@ -88,7 +88,7 @@ void encoder_free(ENCODER* encoder) {
 void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node
-	GRAPH* node = get_next_hamiltonian_node(encoder->graph);
+	GRAPH* node = get_next_hamiltonian_node2014(encoder->graph);
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
 
 		// 0-based index of the node's position in the hamiltonian path
@@ -104,7 +104,7 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 		// 3. add node to proper parity stack, and to the history stack
 		add_node_to_stacks( &encoder->stacks, node, is_odd );
-		node = get_next_hamiltonian_node(node);
+		node = get_next_hamiltonian_node2014(node);
 	}
 }
 

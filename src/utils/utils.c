@@ -51,8 +51,6 @@ void free_stacks(STACKS* stacks) {
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
 
-	if( !node ) return NULL;
-
 	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
 
 		if( is_backedge(conn->node) ) return conn->node;
@@ -62,10 +60,8 @@ GRAPH* get_backedge(GRAPH* node) {
 
 GRAPH* get_forward_edge(GRAPH* node) {
 
-	if( !node ) return NULL;
-
 	// the complexity of the algorithm itself is like O(n³), which is pretty bad,
-	// but since we can assure that a node will have at most 3 connections
+	// but since we can assure that a node will have at most 2 connections
 	// coming out of it, its okay.
 
 	// follow each connection and get the nodes that are 1 nodes apart from
@@ -76,13 +72,30 @@ GRAPH* get_forward_edge(GRAPH* node) {
 		GRAPH* forward_edge_destination = search_for_equal_node(conn, conn->node->connections);
 		if( forward_edge_destination ) return forward_edge_destination;
 	}
+
+	// there is the case where the hamiltonian edge got removed!
+	// we can know if this is the case if we are connected to a node that connect
+	// back to us (it will be the next hamiltonian node with a backedge pointing to us).
+	// the forward destination will be the connection that is not the next hamiltonian node	
+	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+		for(CONNECTION* conn2 = conn->node->connections; conn2; conn2 = conn2->next) {
+			// if true, we can assure one connection is a hamiltonian edge and the other is the
+			// forward edge
+			if( conn2->node == node ) {
+				return conn->node->connections->node == conn2->node ?
+					conn2->next->node : 
+					conn->node->connections->node; // conn2->prev
+			}
+		}
+	}
+
 	return NULL;
 }
 
 // the nodes we haven't passed througth must be marked with a data_len == 0
 GRAPH* get_next_hamiltonian_node(GRAPH* node) {
 
-	if( !node || !node->connections ) return NULL;
+	if( !node ) return NULL;
 
 	GRAPH* forward_edge = get_forward_edge(node);
 
@@ -91,6 +104,19 @@ GRAPH* get_next_hamiltonian_node(GRAPH* node) {
 		if( !is_backedge(conn->node) &&
 				( !forward_edge || conn->node != forward_edge ) ) return conn->node;
 	}
+
+	return NULL;
+}
+
+GRAPH* get_next_hamiltonian_node2014(GRAPH* node) {
+
+	if( !node ) return NULL;
+
+	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+
+		if( !is_backedge(conn->node) ) return conn->node;
+	}
+
 	return NULL;
 }
 

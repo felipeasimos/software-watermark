@@ -31,7 +31,7 @@ GRAPH* get_backedge(GRAPH* node);
 
 GRAPH* get_forward_edge(GRAPH* node);
 
-GRAPH* get_next_hamiltonian_node(GRAPH* node);
+GRAPH* get_next_hamiltonian_node2014(GRAPH* node);
 
 PSTACK* get_parity_stack(STACKS* stacks, uint8_t is_odd);
 

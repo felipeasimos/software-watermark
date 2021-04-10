@@ -170,7 +170,7 @@ uint8_t* get_bit_array(DECODER* decoder) {
 		}
 
 		label_new_current_node(decoder);
-		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
+		decoder->current_node = get_next_hamiltonian_node2014(decoder->current_node);
 	}
 
 	return bit_arr;
