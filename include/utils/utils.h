@@ -23,6 +23,10 @@ typedef struct STACKS {
 	HSTACK history;
 } STACKS;
 
+void create_stacks(STACKS* stacks, unsigned long n_bits);
+
+void free_stacks(STACKS* stacks);
+
 GRAPH* get_backedge(GRAPH* node);
 
 GRAPH* get_forward_edge(GRAPH* node);

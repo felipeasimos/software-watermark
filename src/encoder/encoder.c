@@ -65,13 +65,7 @@ void add_idx(GRAPH* node, unsigned long idx) {
 ENCODER* encoder_create(unsigned long n_bits) {
 
 	ENCODER* encoder = malloc( sizeof(ENCODER) );
-	encoder->stacks.odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
-	encoder->stacks.even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
-	encoder->stacks.history.stack = malloc(sizeof(unsigned long) * n_bits);
-	encoder->stacks.history.n = 0;
-	encoder->stacks.odd.n = 0;
-	encoder->stacks.even.n = 0;
-
+	create_stacks(&encoder->stacks, n_bits);
 	// create graph (all nodes are created without an index, except for the first one)
 	// indices are added as we go through the graph
 	unsigned long one = 1;
@@ -87,9 +81,7 @@ ENCODER* encoder_create(unsigned long n_bits) {
 
 void encoder_free(ENCODER* encoder) {
 
-	free(encoder->stacks.odd.stack);
-	free(encoder->stacks.even.stack);
-	free(encoder->stacks.history.stack);
+	free_stacks(&encoder->stacks);
 	free(encoder);
 }
 

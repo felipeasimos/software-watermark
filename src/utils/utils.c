@@ -26,6 +26,28 @@ void pop_all_history(PSTACK* stack, unsigned long size) {
 	stack->n = size;
 }
 
+void create_stacks(STACKS* stacks, unsigned long n_bits) {
+
+	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
+	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
+	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits);
+	stacks->history.n = 0;
+	stacks->odd.n = 0;
+	stacks->even.n = 0;
+}
+
+void free_stacks(STACKS* stacks) {
+
+	free(stacks->odd.stack);
+	free(stacks->even.stack);
+	free(stacks->history.stack);
+
+	stacks->odd.stack = NULL;
+	stacks->even.stack = NULL;
+	stacks->history.stack = NULL;
+}
+
+
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
 
