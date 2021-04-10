@@ -130,7 +130,7 @@ uint8_t* get_bit_array(DECODER* decoder) {
 	// iterate over every node but the last
 	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
 
-		// check if there is a backedge ( connection with non-zero data_len will be the one )
+		// check if there is a backedge ( connection with non-zero data_len is a valid backedge)
 		GRAPH* dest_node = get_backedge(decoder->current_node);
 		if( dest_node ) {
 
@@ -168,6 +168,11 @@ uint8_t* get_bit_array(DECODER* decoder) {
 
 			// 1 - current_node = i. If i is odd, the bit is 0, if i is even the bit is 1.
 			bit_arr[i] = !(i & 1);
+
+			// however, if there was a possible backedge, the graph is invalid
+			//if() {
+
+			//}
 		}
 
 		label_new_current_node(decoder);
@@ -204,7 +209,7 @@ void decoder_free(DECODER* decoder) {
 // the history idx) and index in its parity's stack (used to check if watermark is valid)
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
-	if( !graph ) return NULL;
+	if( !is_graph_structure_valid(graph) ) return NULL;
 
 	// 1. get number of bits and set nodes to null
 	unsigned long n_bits = get_num_bits(graph);
@@ -264,7 +269,6 @@ unsigned long watermark_num_edges(GRAPH* graph) {
 unsigned long watermark_num_hamiltonian_edges2014(GRAPH* graph) {
 
 	// in a 2014 graph there are only backedges and hamiltonian edges
-	// so we just need to count the non-hamiltonian edges, and no
 	// hamiltonian edge is removed, so we only need to get the number
 	// of bits. n_bits = n_nodes - 1, because of the last null node, 
 	// and since the number of edges is the number of nodes - 1, this

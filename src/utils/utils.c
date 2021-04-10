@@ -31,6 +31,33 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	}
 }
 
+uint8_t is_graph_structure_valid(GRAPH* graph) {
+
+	if( !graph ) return 0;
+	
+	// 1. first node has only a hamiltonian edge, and no less
+	if( !graph->connections || graph->connections->next ) return 0;
+
+	uint8_t node_without_connections_found=0;
+
+	for(; graph; graph = graph->next) {
+	
+		// 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
+		if( !graph->connections ) {
+			if( node_without_connections_found ) return 0;
+			else node_without_connections_found++;
+		}
+
+		// 3. every node has less than three outgoing connections
+		if( graph->connections && graph->connections->next && graph->connections->next->next ) return 0;
+
+		// 4. no connections to the same node
+		if( connection_search(graph->connections, graph) ) return 0;
+	}
+
+	return 1;
+}
+
 void create_stacks(STACKS* stacks, unsigned long n_bits) {
 
 	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));

@@ -22,6 +22,12 @@ typedef struct STACKS {
 	HSTACK history;
 } STACKS;
 
+// 1. first node has only a hamiltonian edge, and no less
+// 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
+// 3. every node has less than three outgoing connections
+// 4. no connections to the same node
+uint8_t is_graph_structure_valid(GRAPH* graph);
+
 void create_stacks(STACKS* stacks, unsigned long n_bits);
 
 void free_stacks(STACKS* stacks);
