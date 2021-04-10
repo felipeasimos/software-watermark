@@ -240,7 +240,7 @@ int _1_to_10_8_test() {
 
 int code_test() {
 
-	uint8_t n[] = {4};
+	uint8_t n[] = {16};
 	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
 	graph_print(graph, NULL);
 	char* code = watermark_get_code(graph);

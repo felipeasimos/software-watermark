@@ -37,6 +37,9 @@ PSTACK* get_parity_stack(STACKS* stacks, uint8_t is_odd);
 
 void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long is_odd);
 
+// 0 based idx
+void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx);
+
 void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd);
 
 #endif

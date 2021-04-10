@@ -108,19 +108,28 @@ void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long is_odd) {
 	stack->stack[stack->n++] = node;
 }
 
+// 0 based idx
+void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx) {
+
+	// get parity from hamiltonian idx	
+	uint8_t is_odd = !( backedge_h_idx & 1 );
+	PSTACK* dest_stack = get_parity_stack(stacks, is_odd);
+	PSTACK* not_dest_stack = get_parity_stack(stacks, !is_odd);
+
+	pop_all(dest_stack, backedge_p_idx);
+	pop_all_history(not_dest_stack, stacks->history.stack[ backedge_h_idx ]);
+}
+
 void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd) {
 
 	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
 
 	PSTACK* dest_stack = get_parity_stack(stacks, is_dest_odd);
 
-	PSTACK* not_dest_stack = get_parity_stack(stacks, !is_dest_odd);
-
 	if( dest_stack->n ) {
-		unsigned long dest_idx = rand() % dest_stack->n;
-		GRAPH* dest_node = dest_stack->stack[ dest_idx ];
+		unsigned long dest_idx = rand() % dest_stack->n;	
+		GRAPH* dest_node = dest_stack->stack[ dest_idx ];	
 		graph_oriented_connect(source_node, dest_node);
-		pop_all(dest_stack, dest_idx);
-		pop_all_history(not_dest_stack, stacks->history.stack[ (*(unsigned long*)dest_node->data) - 1 ]);
+		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);
 	}
 }
