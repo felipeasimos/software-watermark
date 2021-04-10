@@ -82,7 +82,7 @@ GRAPH* get_forward_edge(GRAPH* node) {
 // the nodes we haven't passed througth must be marked with a data_len == 0
 GRAPH* get_next_hamiltonian_node(GRAPH* node) {
 
-	if( !node ) return NULL;
+	if( !node || !node->connections ) return NULL;
 
 	GRAPH* forward_edge = get_forward_edge(node);
 

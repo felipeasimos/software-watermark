@@ -33,6 +33,10 @@ typedef struct DECODER {
 unsigned long get_num_bits(GRAPH* graph) {
 
 	unsigned long i=0;
+
+	// we don't care about the order, no need to call
+	// get_next_hamiltonian_node() here (it also wouldn't work before
+	// we nullify the node anyway)
 	while( graph ) {
 		i++;
 		free(graph->data);
@@ -198,7 +202,7 @@ uint8_t* get_bit_array(DECODER* decoder) {
 		}
 
 		label_new_current_node(decoder);
-		decoder->current_node = decoder->current_node->next;
+		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
 	}
 
 	return bit_arr;
