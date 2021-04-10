@@ -22,13 +22,6 @@ void print_stacks_encoder(ENCODER* encoder) {
 }
 #endif
 
-uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
-
-	// 0x80 = 0b1000_0000
-	uint8_t byte = data[bit_idx/8];
-	return byte & ( 0x80 >> (bit_idx % 8));
-}
-
 uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 
 	// praticamente python

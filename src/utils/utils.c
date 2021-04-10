@@ -4,18 +4,6 @@ uint8_t is_backedge(GRAPH* node) {
 	return node->data_len;
 }
 
-GRAPH* search_for_equal_node(CONNECTION* conn1, CONNECTION* conn2) {
-
-	for(; conn1; conn1 = conn1->next) {
-		for(; conn2; conn2 = conn2->next) {
-			if( conn1->node == conn2->node ) {
-				return conn1->node;
-			}
-		}
-	}
-	return NULL;
-}
-
 void pop_all(PSTACK* stack, unsigned long idx) {
 
 	stack->n = idx+1;
@@ -24,6 +12,23 @@ void pop_all(PSTACK* stack, unsigned long idx) {
 void pop_all_history(PSTACK* stack, unsigned long size) {
 
 	stack->n = size;
+}
+
+GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
+	// if we have a forward edge, we have two nodes connected:
+	GRAPH* node1 = node->connections->node;
+	GRAPH* node2 = node->connections->next->node;
+
+	// in this case we have, for sure, a forward edge among us, and two possibilities:
+	// 1. we have a removed hamiltonian edge afterwards, which means that both nodes
+	// have only one connection: one has a backedge and the other has a hamiltonian edge.
+	if( is_backedge(node1->connections->node) || is_backedge(node2->connections->node) ) {
+		return is_backedge(node1->connections->node) ? node2 : node1;
+	} else {
+		// 2. we have a forward edge and no missing hamiltonian edges, so this means that
+		// one node (the forward edge one) is the next hamiltonian node of the other
+		return connection_search(node1->connections, node2) ? node2 : node1;
+	}
 }
 
 void create_stacks(STACKS* stacks, unsigned long n_bits) {
@@ -47,6 +52,24 @@ void free_stacks(STACKS* stacks) {
 	stacks->history.stack = NULL;
 }
 
+uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
+
+	// 0x80 = 0b1000_0000
+	uint8_t byte = data[bit_idx/8];
+	return byte & ( 0x80 >> (bit_idx % 8));
+}
+
+void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {
+
+	uint8_t* byte = &data[i/8];
+
+	// 0x80 = 0b1000_0000
+	if( value ) {
+		*byte |= 0x80 >> (i%8);
+	} else {
+		*byte &= ~(0x80 >> (i%8));
+	}
+}
 
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
@@ -60,36 +83,44 @@ GRAPH* get_backedge(GRAPH* node) {
 
 GRAPH* get_forward_edge(GRAPH* node) {
 
-	// the complexity of the algorithm itself is like O(n³), which is pretty bad,
-	// but since we can assure that a node will have at most 2 connections
-	// coming out of it, its okay.
+	if( !node || !node->connections ) return node;
 
-	// follow each connection and get the nodes that are 1 nodes apart from
-	// 'node'. If one of them match one that is directly connected to 'node',
-	// that one is the forward edge destination
-	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+	// if we have only one connection, there is no forward edge
+	if( !node->connections->next ) {
+		return NULL;
+	} else {
+		// if we have 2 connections, one is hamiltonian path and the other
+		// is a forward edge of backedge
+		CONNECTION* conn1 = node->connections;
+		CONNECTION* conn2 = node->connections->next;
 
-		GRAPH* forward_edge_destination = search_for_equal_node(conn, conn->node->connections);
-		if( forward_edge_destination ) return forward_edge_destination;
+		if( is_backedge(conn1->node) || is_backedge(conn2->node) ) {
+			return NULL;
+		} else {
+			return find_guaranteed_forward_edge(node);
+		}	
 	}
+}
 
-	// there is the case where the hamiltonian edge got removed!
-	// we can know if this is the case if we are connected to a node that connect
-	// back to us (it will be the next hamiltonian node with a backedge pointing to us).
-	// the forward destination will be the connection that is not the next hamiltonian node	
-	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
-		for(CONNECTION* conn2 = conn->node->connections; conn2; conn2 = conn2->next) {
-			// if true, we can assure one connection is a hamiltonian edge and the other is the
-			// forward edge
-			if( conn2->node == node ) {
-				return conn->node->connections->node == conn2->node ?
-					conn2->next->node : 
-					conn->node->connections->node; // conn2->prev
-			}
+CONNECTION* get_hamiltonian_connection(GRAPH* node) {
+
+	if( !node || !node->connections ) return NULL;
+ 
+	// if there is only one connection, it is either a backedge or a hamiltonian
+	if( !node->connections->next ) {
+		return is_backedge(node->connections->node) ? NULL : node->connections;
+	} else {
+		// if there is two, one is a backedge or a forward edge, while the other
+		// is the hamiltonian
+		CONNECTION* conn1 = node->connections;
+		CONNECTION* conn2 = node->connections->next;
+
+		if( is_backedge(conn1->node) || is_backedge(conn2->node) ) {
+			return is_backedge(conn1->node) ? conn2 : conn1;
+		} else {
+			return find_guaranteed_forward_edge(node)->connections == conn1 ? conn2 : conn1;
 		}
 	}
-
-	return NULL;
 }
 
 // the nodes we haven't passed througth must be marked with a data_len == 0
@@ -97,15 +128,10 @@ GRAPH* get_next_hamiltonian_node(GRAPH* node) {
 
 	if( !node ) return NULL;
 
-	GRAPH* forward_edge = get_forward_edge(node);
+	CONNECTION* conn = get_hamiltonian_connection(node);
 
-	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
-
-		if( !is_backedge(conn->node) &&
-				( !forward_edge || conn->node != forward_edge ) ) return conn->node;
-	}
-
-	return NULL;
+	// we might have a removed hamiltonian edge, which means we only have a backedge
+	return conn ? conn->node : get_forward_edge(node->connections->node);
 }
 
 GRAPH* get_next_hamiltonian_node2014(GRAPH* node) {

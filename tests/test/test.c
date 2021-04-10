@@ -82,11 +82,10 @@ int metrics_test() {
 	ctdd_assert( watermark_num_edges(graph) == 8 );
 	ctdd_assert( watermark_num_nodes(graph) == 6 );
 	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
-	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 5 );
+	ctdd_assert( watermark_num_hamiltonian_edges2014(graph) == 5 );
 
-	// test with missing hamiltonian edge
+	// test with missing hamiltonian edge (we can't call watermark_num_hamiltonian_edges2014 for this though)
 	graph_oriented_disconnect(graph->next, graph->next->next);
-	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 4 );	
 	ctdd_assert( watermark_num_edges(graph) == 7 );
 	ctdd_assert( watermark_num_nodes(graph) == 6 );
 	ctdd_assert( watermark_cyclomatic_complexity(graph) == 3 );

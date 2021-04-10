@@ -11,6 +11,8 @@ void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsig
 
 unsigned long watermark_num_edges(GRAPH* graph);
 
+unsigned long watermark_num_hamiltonian_edges2014(GRAPH* graph);
+
 unsigned long watermark_num_hamiltonian_edges(GRAPH* graph);
 
 unsigned long watermark_num_nodes(GRAPH* graph);

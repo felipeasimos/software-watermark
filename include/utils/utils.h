@@ -2,7 +2,6 @@
 #define UTILS_H
 
 #include "graph/graph.h"
-#include <limits.h>
 
 typedef struct PSTACK {
 
@@ -27,9 +26,17 @@ void create_stacks(STACKS* stacks, unsigned long n_bits);
 
 void free_stacks(STACKS* stacks);
 
+uint8_t get_bit(uint8_t* data, unsigned long bit_idx);
+
+void set_bit( uint8_t* data, unsigned long i, uint8_t value );
+
 GRAPH* get_backedge(GRAPH* node);
 
 GRAPH* get_forward_edge(GRAPH* node);
+
+CONNECTION* get_hamiltonian_connection(GRAPH* node);
+
+GRAPH* get_next_hamiltonian_node(GRAPH* node);
 
 GRAPH* get_next_hamiltonian_node2014(GRAPH* node);
 

@@ -149,7 +149,8 @@ uint8_t* get_bit_array(DECODER* decoder) {
 			// 1 if diff is odd, 0 otherwise
 			bit_arr[i] = (i - dest->hamiltonian_idx) & 1;
 
-		// check if this is the first node
+		// check if this is the first node (the input graph must have the first
+		// hamiltonian node as the first node in the list)
 		} else if( !decoder->current_node->prev ) {
 
 			bit_arr[0]=1;
@@ -174,18 +175,6 @@ uint8_t* get_bit_array(DECODER* decoder) {
 	}
 
 	return bit_arr;
-}
-
-void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {
-
-	uint8_t* byte = &data[i/8];
-
-	// 0x80 = 0b1000_0000
-	if( value ) {
-		*byte |= 0x80 >> (i%8);
-	} else {
-		*byte &= ~(0x80 >> (i%8));
-	}
 }
 
 uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
@@ -272,6 +261,18 @@ unsigned long watermark_num_edges(GRAPH* graph) {
 	return num_edges;
 }
 
+unsigned long watermark_num_hamiltonian_edges2014(GRAPH* graph) {
+
+	// in a 2014 graph there are only backedges and hamiltonian edges
+	// so we just need to count the non-hamiltonian edges, and no
+	// hamiltonian edge is removed, so we only need to get the number
+	// of bits. n_bits = n_nodes - 1, because of the last null node, 
+	// and since the number of edges is the number of nodes - 1, this
+	// just give us the right result immediately.
+
+	return get_num_bits(graph);
+}
+
 unsigned long watermark_num_hamiltonian_edges(GRAPH* graph) {
 
 	unsigned long num_edges = 0;
@@ -279,16 +280,9 @@ unsigned long watermark_num_hamiltonian_edges(GRAPH* graph) {
 	// nullify data in every node
 	get_num_bits(graph);
 
-	// visit each node, except the final one and see the connections
-	for(; graph->next; graph = graph->next) {
+	for(; graph; graph = graph->next) {
 
-		// the last connection is the one to the next node
-		// check if we are connecting to the next node in the
-		// hamiltonian path or if we jumped it
-		CONNECTION* last = graph->connections;
-		for(; last && last->next; last = last->next); // get last connection in the list
-
-		num_edges += ( last && last->node == graph->next);
+		if( get_hamiltonian_connection(graph) ) num_edges++;
 	}
 
 	return num_edges;
