@@ -45,14 +45,21 @@ uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 	return data_len*8;
 }
 
-void add_node_to_graph(ENCODER* encoder, unsigned long idx) {
+void add_node_to_graph(ENCODER* encoder) {
 
-	idx++;
+	GRAPH* new_node = graph_empty();
 
 	// save index of the node in the hamiltonian path
-	graph_insert(encoder->final_node, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
-	encoder->final_node = encoder->final_node->next;
+	graph_insert(encoder->final_node, new_node);
+	graph_oriented_connect(encoder->final_node, new_node);
+	encoder->final_node = new_node;
+}
+
+void add_idx(GRAPH* node, unsigned long idx) {
+
+	idx++;
+	graph_alloc(node, sizeof(unsigned long));
+	*((unsigned long*)node->data) = idx;
 }
 
 ENCODER* encoder_create(unsigned long n_bits) {
@@ -65,19 +72,15 @@ ENCODER* encoder_create(unsigned long n_bits) {
 	encoder->stacks.odd.n = 0;
 	encoder->stacks.even.n = 0;
 
-	// create graph
+	// create graph (all nodes are created without an index, except for the first one)
+	// indices are added as we go through the graph
 	unsigned long one = 1;
 	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
 	add_node_to_stacks(&encoder->stacks, encoder->final_node, 1);
 
-	for(unsigned long i = 1; i < n_bits; i++) {
-		add_node_to_graph(encoder, i);
+	for(unsigned long i = 1; i < n_bits+1; i++) {
+		add_node_to_graph(encoder);
 	}
-
-	// add final node (null)
-	graph_insert(encoder->final_node, graph_empty());
-	graph_oriented_connect(encoder->final_node, encoder->final_node->next);
-	encoder->final_node = encoder->final_node->next;
 
 	return encoder;
 }
@@ -93,28 +96,23 @@ void encoder_free(ENCODER* encoder) {
 void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node
-	GRAPH* node = encoder->graph->next;
+	GRAPH* node = get_next_hamiltonian_node(encoder->graph);
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
 
 		// 0-based index of the node's position in the hamiltonian path
+		unsigned long idx = i-trailing_zeroes;
 		uint8_t is_odd = !((i-trailing_zeroes) & 1);
 		uint8_t bit = get_bit(data, i);
 
+		// 1. add index to node
+		add_idx(node, idx);
+
 		// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
-		add_backedge(
-				&encoder->stacks,
-				node,
-				bit,
-				is_odd
-			);
+		add_backedge( &encoder->stacks, node, bit, is_odd );
 
 		// 3. add node to proper parity stack, and to the history stack
-		add_node_to_stacks(
-				&encoder->stacks,
-				node,
-				is_odd
-			);
-		node = node->next;
+		add_node_to_stacks( &encoder->stacks, node, is_odd );
+		node = get_next_hamiltonian_node(node);
 	}
 }
 

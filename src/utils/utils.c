@@ -6,10 +6,13 @@ uint8_t is_backedge(GRAPH* node) {
 
 GRAPH* search_for_equal_node(CONNECTION* conn1, CONNECTION* conn2) {
 
-	for(; conn1; conn1 = conn1->next)
-		for(; conn2; conn2 = conn2->next)
-			if( conn1->node == conn2->node )
-				return conn2->node;
+	for(; conn1; conn1 = conn1->next) {
+		for(; conn2; conn2 = conn2->next) {
+			if( conn1->node == conn2->node ) {
+				return conn1->node;
+			}
+		}
+	}
 	return NULL;
 }
 
@@ -25,6 +28,9 @@ void pop_all_history(PSTACK* stack, unsigned long size) {
 
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
+
+	if( !node ) return NULL;
+
 	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
 
 		if( is_backedge(conn->node) ) return conn->node;
@@ -34,7 +40,9 @@ GRAPH* get_backedge(GRAPH* node) {
 
 GRAPH* get_forward_edge(GRAPH* node) {
 
-	// the complexity of the algorithm itself is like n³, which is pretty bad,
+	if( !node ) return NULL;
+
+	// the complexity of the algorithm itself is like O(n³), which is pretty bad,
 	// but since we can assure that a node will have at most 3 connections
 	// coming out of it, its okay.
 
@@ -46,18 +54,20 @@ GRAPH* get_forward_edge(GRAPH* node) {
 		GRAPH* forward_edge_destination = search_for_equal_node(conn, conn->node->connections);
 		if( forward_edge_destination ) return forward_edge_destination;
 	}
-
 	return NULL;
 }
 
 // the nodes we haven't passed througth must be marked with a data_len == 0
 GRAPH* get_next_hamiltonian_node(GRAPH* node) {
 
+	if( !node ) return NULL;
+
 	GRAPH* forward_edge = get_forward_edge(node);
 
 	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
 
-		if( !is_backedge(conn->node) && conn->node != forward_edge ) return conn->node;
+		if( !is_backedge(conn->node) &&
+				( !forward_edge || conn->node != forward_edge ) ) return conn->node;
 	}
 	return NULL;
 }
