@@ -15,17 +15,7 @@ typedef struct DECODER {
 
 	GRAPH* current_node;
 
-	// odd labeled stack
-	GRAPH** odd;
-	unsigned long n_odd;
-
-	// even labeled stack
-	GRAPH** even;
-	unsigned long n_even;
-
-	// stack size history
-	unsigned long* history;
-	unsigned long n_history;
+	STACKS stacks;
 
 	unsigned long n_bits;
 } DECODER;
@@ -50,19 +40,13 @@ unsigned long get_num_bits(GRAPH* graph) {
 void label_new_current_node(DECODER* decoder) {
 
 	// get parity	
-	uint8_t is_odd = !(decoder->n_history & 1);
+	uint8_t is_odd = !(decoder->stacks.history.n & 1);
 
 	// get indexes
-	unsigned long stack_idx = is_odd ? decoder->n_odd : decoder->n_even;
-	WM_NODE wm_node_info = { decoder->n_history, stack_idx };
+	unsigned long stack_idx = is_odd ? decoder->stacks.odd.n : decoder->stacks.even.n;
+	WM_NODE wm_node_info = { decoder->stacks.history.n, stack_idx };
 
-	// add node to stacks
-	decoder->history[decoder->n_history++] = is_odd ? decoder->n_even : decoder->n_odd;
-	if( is_odd ) {
-		decoder->odd[decoder->n_odd++] = decoder->current_node;
-	} else {
-		decoder->even[decoder->n_even++] = decoder->current_node;
-	}
+	add_node_to_stacks(&decoder->stacks, decoder->current_node, is_odd);
 
 	// get WM_NODE on the node
 	graph_alloc(decoder->current_node, sizeof(WM_NODE));
@@ -74,12 +58,8 @@ DECODER* decoder_create(GRAPH* graph, unsigned long n_bits) {
 	DECODER* decoder = malloc( sizeof(DECODER) );
 	decoder->current_node = graph;
 
-	decoder->odd = malloc(sizeof(GRAPH*) * (n_bits/2+1));
-	decoder->even = malloc(sizeof(GRAPH*) * (n_bits/2));
-	decoder->history = malloc(sizeof(unsigned long) * n_bits);
-	decoder->n_history = 0;
-	decoder->n_odd = 0;
-	decoder->n_even = 0;
+	create_stacks(&decoder->stacks, n_bits);
+
 	decoder->n_bits = n_bits;
 
 	#ifdef DEBUG
@@ -94,21 +74,9 @@ uint8_t is_inner_node(DECODER* decoder, GRAPH* node) {
 	WM_NODE* node_info = node->data;
 	uint8_t is_odd = !(node_info->hamiltonian_idx & 1);
 
-	GRAPH** stack = is_odd ? decoder->odd : decoder->even;
-	unsigned long n = is_odd ? decoder->n_odd : decoder->n_even;
+	PSTACK* stack = get_parity_stack(&decoder->stacks, is_odd);
 
-	return !( node_info->stack_idx < n && stack[node_info->stack_idx] == node );
-}
-
-void update_stacks_to_new_backedge(DECODER* decoder, WM_NODE* dest) {
-
-	if( !( dest->hamiltonian_idx & 1 ) ) {
-		decoder->n_odd = dest->stack_idx + 1;
-		decoder->n_even = decoder->history[dest->hamiltonian_idx];
-	} else {
-		decoder->n_odd = decoder->history[dest->hamiltonian_idx];
-		decoder->n_even = dest->stack_idx + 1;
-	}
+	return !( node_info->stack_idx < stack->n && stack->stack[node_info->stack_idx] == node );
 }
 
 #ifdef DEBUG
@@ -126,11 +94,11 @@ void print_node(void* data, unsigned int data_len) {
 void print_stacks(DECODER* decoder) {
 
 	printf("e o h\n");
-	for( unsigned long i=0; i < decoder->n_history; i++) {
+	for( unsigned long i=0; i < decoder->stacks.history.n; i++) {
 
-		unsigned long even = i < decoder->n_even ? ((WM_NODE*)decoder->even[i]->data)->hamiltonian_idx+1 : 0;
-		unsigned long odd = i < decoder->n_odd ? ((WM_NODE*)decoder->odd[i]->data)->hamiltonian_idx+1 : 0;
-		printf("%lu %lu %lu %s\n", even, odd, decoder->history[i], decoder->n_history & 1 ? "(e)" : "(o)");
+		unsigned long even = i < decoder->stacks.even.n ? ((WM_NODE*)decoder->stacks.even.stack[i]->data)->hamiltonian_idx+1 : 0;
+		unsigned long odd = i < decoder->stacks.odd.n ? ((WM_NODE*)decoder->stacks.odd.stack[i]->data)->hamiltonian_idx+1 : 0;
+		printf("%lu %lu %lu %s\n", even, odd, decoder->stacks.history.stack[i], decoder->stacks.history.n & 1 ? "(e)" : "(o)");
 	}
 }
 
@@ -177,7 +145,7 @@ uint8_t* get_bit_array(DECODER* decoder) {
 				return NULL;
 			}
 
-			update_stacks_to_new_backedge(decoder, dest);
+			pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
 			// 1 if diff is odd, 0 otherwise
 			bit_arr[i] = (i - dest->hamiltonian_idx) & 1;
 
@@ -236,9 +204,7 @@ uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
 
 void decoder_free(DECODER* decoder) {
 
-	free(decoder->even);
-	free(decoder->odd);
-	free(decoder->history);
+	free_stacks(&decoder->stacks);
 	free(decoder);
 } 
 
@@ -309,6 +275,9 @@ unsigned long watermark_num_edges(GRAPH* graph) {
 unsigned long watermark_num_hamiltonian_edges(GRAPH* graph) {
 
 	unsigned long num_edges = 0;
+
+	// nullify data in every node
+	get_num_bits(graph);
 
 	// visit each node, except the final one and see the connections
 	for(; graph->next; graph = graph->next) {

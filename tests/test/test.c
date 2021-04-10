@@ -26,6 +26,76 @@ int encoder_test() {
 	return 0;
 }
 
+int metrics_test() {
+
+	// we are representing this:
+	/*
+	      .-----------.
+	      |-----.	    |.----.
+	      |     |     ||    |
+	      v     |     |v    |
+	1 ->  0 ->  1 ->  0 ->  1
+	# edges = 7
+	# nodes = 5
+	# cyclomatic complexity = 4
+	# non hamiltoninan edges = 3
+	*/
+
+	unsigned long idx = 1;
+
+	// 1
+	GRAPH* graph = graph_create(&idx, sizeof(idx));
+	GRAPH* final = graph;
+	idx++;
+
+	// 0
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+	final = final->next;
+	idx++;
+
+	// 1
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+	graph_oriented_connect(final->next, final);
+	final = final->next;
+	idx++;
+
+	// 0
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+	graph_oriented_connect(final->next, final->prev);
+	final = final->next;
+	idx++;
+
+	// 1
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+	graph_oriented_connect(final->next, final);
+	final = final->next;
+	idx++;
+
+	// null node at the end
+	graph_insert(final, graph_create(&idx, sizeof(idx)));
+	graph_oriented_connect(final, final->next);
+
+	ctdd_assert( watermark_num_edges(graph) == 8 );
+	ctdd_assert( watermark_num_nodes(graph) == 6 );
+	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
+	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 5 );
+
+	// test with missing hamiltonian edge
+	graph_oriented_disconnect(graph->next, graph->next->next);
+	ctdd_assert( watermark_num_hamiltonian_edges(graph) == 4 );	
+	ctdd_assert( watermark_num_edges(graph) == 7 );
+	ctdd_assert( watermark_num_nodes(graph) == 6 );
+	ctdd_assert( watermark_cyclomatic_complexity(graph) == 3 );
+
+	graph_free(graph);
+
+	return 0;
+}
+
 int reed_solomon_api_test() {
 
 	// RS(255, 223)
@@ -175,6 +245,7 @@ int code_test() {
 int run_tests() {
 
 	//ctdd_verify(encoder_test);
+	ctdd_verify(metrics_test);
 	ctdd_verify(reed_solomon_api_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
