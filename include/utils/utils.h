@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include "graph/graph.h"
+#include <limits.h>
 
 typedef struct PSTACK {
 
@@ -36,6 +37,11 @@ uint8_t get_bit(uint8_t* data, unsigned long bit_idx);
 
 void set_bit( uint8_t* data, unsigned long i, uint8_t value );
 
+unsigned long get_num_bits2014(GRAPH* graph);
+
+// also free the data of each node
+unsigned long get_num_bits(GRAPH* graph);
+
 GRAPH* get_backedge(GRAPH* node);
 
 GRAPH* get_forward_edge(GRAPH* node);
@@ -53,6 +59,8 @@ void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long is_odd);
 // 0 based idx
 void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx);
 
-void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd);
+void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd);
+
+void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd);
 
 #endif

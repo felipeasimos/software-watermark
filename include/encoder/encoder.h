@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <time.h>
+#include <limits.h>
 #include "graph/graph.h"
 #include "rs_api/rs.h"
 #include "utils/utils.h"

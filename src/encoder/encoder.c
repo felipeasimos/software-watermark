@@ -9,6 +9,14 @@ typedef struct ENCODER {
 	STACKS stacks;
 } ENCODER;
 
+enum FORWARD_STATUS {
+	NONE=0,
+	FORWARD_SOURCE=1,
+	FORWARD_INNER=2,
+	FORWARD_DESTINATION=4,
+	FORWARD_REMOVE_HAMILTONIAN=8
+};
+
 #ifdef DEBUG 
 void print_stacks_encoder(ENCODER* encoder) {
 
@@ -42,7 +50,6 @@ void add_node_to_graph(ENCODER* encoder) {
 
 	GRAPH* new_node = graph_empty();
 
-	// save index of the node in the hamiltonian path
 	graph_insert(encoder->final_node, new_node);
 	graph_oriented_connect(encoder->final_node, new_node);
 	encoder->final_node = new_node;
@@ -78,7 +85,7 @@ void encoder_free(ENCODER* encoder) {
 	free(encoder);
 }
 
-void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
+void encode2014(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node
 	GRAPH* node = get_next_hamiltonian_node2014(encoder->graph);
@@ -86,14 +93,14 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 
 		// 0-based index of the node's position in the hamiltonian path
 		unsigned long idx = i-trailing_zeroes;
-		uint8_t is_odd = !((i-trailing_zeroes) & 1);
+		uint8_t is_odd = !((idx) & 1);
 		uint8_t bit = get_bit(data, i);
 
 		// 1. add index to node
 		add_idx(node, idx);
 
 		// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
-		add_backedge( &encoder->stacks, node, bit, is_odd );
+		add_backedge2014( &encoder->stacks, node, bit, is_odd );
 
 		// 3. add node to proper parity stack, and to the history stack
 		add_node_to_stacks( &encoder->stacks, node, is_odd );
@@ -101,7 +108,97 @@ void encode(ENCODER* encoder, void* data, unsigned long total_bits, unsigned lon
 	}
 }
 
-GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
+uint8_t prev_has_backedge_at_same_parity_stack(GRAPH* node, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
+
+	uint8_t is_odd = !((*(unsigned long*)node->data) & 1 );
+
+	return ( ( bit ? !is_odd : is_odd ) == ( last_bit ? is_odd : !is_odd ) ) && get_backedge(last_node);
+}
+
+unsigned long num_possible_backedges(ENCODER* encoder, GRAPH* node, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
+
+	uint8_t is_odd = !((*(unsigned long*)node->data) & 1 );
+
+	PSTACK* node_stack = get_parity_stack(&encoder->stacks, bit ? !is_odd : is_odd);
+
+	return node_stack->n - prev_has_backedge_at_same_parity_stack(node, last_node, bit, last_bit);
+}
+
+uint8_t update_forward_status(enum FORWARD_STATUS status) {
+
+	// update forward_status
+	if( status & FORWARD_DESTINATION ) status &= ~FORWARD_DESTINATION;
+	if( status & FORWARD_INNER ) status = (status & ~FORWARD_INNER) | FORWARD_DESTINATION;
+	if( status & FORWARD_SOURCE ) status = (status & ~FORWARD_SOURCE) | FORWARD_INNER;
+	return status;
+}
+
+void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
+
+	//start from second node
+	GRAPH* last_node = encoder->graph;
+	uint8_t last_bit = 1;
+	GRAPH* node = get_next_hamiltonian_node2014(encoder->graph);
+	enum FORWARD_STATUS forward_status = NONE;
+	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
+
+		// 0-based index of the node's position in the hamiltonian path
+		unsigned long idx = i-trailing_zeroes;
+		uint8_t is_odd = !((idx) & 1);
+		uint8_t bit = get_bit(data, i);
+
+		if( !( forward_status & FORWARD_DESTINATION ) )  add_idx(node, idx);
+		if( forward_status & FORWARD_DESTINATION ) {
+			i--;
+			// remove hamiltonian edge v-1 -> v if necessary
+			if( forward_status & FORWARD_REMOVE_HAMILTONIAN ) {
+
+				graph_oriented_disconnect(last_node, node);
+				forward_status &= ~FORWARD_REMOVE_HAMILTONIAN;
+			}
+			// just to mark that we passed through this node
+			node->data_len = UINT_MAX;
+		// check if there is an backedge available
+		} else if( num_possible_backedges(encoder, node, last_node, bit, last_bit) ) {
+
+			if( forward_status & FORWARD_INNER ) {
+
+				// don't add node to stacks
+				if( bit ) {
+
+					// add backedge to v - 1
+					graph_oriented_connect(node, last_node);
+					// ask to remove hamiltonian in the next iteration
+					forward_status |= FORWARD_REMOVE_HAMILTONIAN;
+				} else {
+
+					// nothing
+				}
+			} else {
+
+				// add random backedge
+				uint8_t prev_connects_to_same_stack = prev_has_backedge_at_same_parity_stack(node, last_node, bit, last_bit);
+				add_backedge(&encoder->stacks, node, prev_connects_to_same_stack, bit, is_odd);
+			}
+		} else {
+			if( bit ) {
+				// add node to graph and add forward edge
+				forward_status |= FORWARD_SOURCE;
+				add_node_to_graph(encoder);
+				// works since untouched nodes are source to only one connection
+				graph_oriented_connect(node, node->next->next);
+			}
+			if( !( forward_status & FORWARD_INNER ) ) add_node_to_stacks(&encoder->stacks, node, is_odd);
+		}
+
+		forward_status = update_forward_status(forward_status);
+		last_node = node;
+		last_bit = bit;
+		node = node->next;
+	}
+}
+
+GRAPH* _watermark_encode(void* data, unsigned long data_len, void (*encode)(ENCODER*, void*, unsigned long, unsigned long)) {
 
 	if( !data || !data_len ) return NULL;
 
@@ -125,7 +222,7 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 	return graph;
 }
 
-GRAPH* watermark2014_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
+GRAPH* _watermark_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes, GRAPH* (*watermark)(void*, unsigned long)) {
 
 	uint16_t par[num_rs_bytes];
 	memset(par, 0x00, num_rs_bytes);
@@ -138,5 +235,27 @@ GRAPH* watermark2014_encode_with_rs(void* data, unsigned long data_len, unsigned
 	memcpy(final_data, data, data_len);
 	memcpy(final_data + data_len, par, num_rs_bytes * 2);
 
-	return watermark2014_encode(final_data, data_len);
+	return watermark(final_data, data_len);
 }
+
+GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
+
+	return _watermark_encode(data, data_len, encode2014);
+}
+
+GRAPH* watermark2014_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
+
+	return _watermark_encode_with_rs(data, data_len, num_rs_bytes, watermark2014_encode);
+}
+
+GRAPH* watermark2017_encode(void* data, unsigned long data_len) {
+
+	return _watermark_encode(data, data_len, encode2017);
+}
+
+GRAPH* watermark2017_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes) {
+
+	return _watermark_encode_with_rs(data, data_len, num_rs_bytes, watermark2017_encode);
+}
+
+

@@ -63,9 +63,10 @@ void create_stacks(STACKS* stacks, unsigned long n_bits) {
 	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
 	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
 	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits);
-	stacks->history.n = 0;
+
 	stacks->odd.n = 0;
 	stacks->even.n = 0;
+	stacks->history.n = 0;
 }
 
 void free_stacks(STACKS* stacks) {
@@ -98,6 +99,44 @@ void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {
 	}
 }
 
+unsigned long get_num_bits2014(GRAPH* graph) {
+
+	unsigned long i = 0;
+
+	for(GRAPH* node = graph; node; node = node->next) {
+
+		i++;
+		free(node->data);
+		node->data = NULL;
+		node->data_len = 0;
+	}
+
+	return i-1;
+}
+
+unsigned long get_num_bits(GRAPH* graph) {
+
+	unsigned long i=0;
+
+	get_num_bits2014(graph);
+
+	// count nodes, decrementing count for when we see a forward edge
+	for(GRAPH* node = graph; node; node = node->next) {
+
+		node->data_len = UINT_MAX;
+		if( get_forward_edge(node) ) {
+			i--;
+		} else {
+			i++;
+		}
+	}
+
+	// make data_len = 0 again
+	for(GRAPH* node = graph; node; node = node->next) node->data_len = 0;
+
+	return i-1; // ignore final node (don't represent any bits)
+}
+
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
 
@@ -112,8 +151,8 @@ GRAPH* get_forward_edge(GRAPH* node) {
 
 	if( !node || !node->connections ) return node;
 
-	// if we have only one connection, there is no forward edge
-	if( !node->connections->next ) {
+	// if we have only one connection or less, there is no forward edge
+	if( !node->connections || !node->connections->next ) {
 		return NULL;
 	} else {
 		// if we have 2 connections, one is hamiltonian path and the other
@@ -199,14 +238,19 @@ void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long back
 	pop_all_history(not_dest_stack, stacks->history.stack[ backedge_h_idx ]);
 }
 
-void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd) {
+void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd) {
+
+	add_backedge(stacks, source_node, 0, bit, is_odd);
+}
+
+void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd) {
 
 	uint8_t is_dest_odd = bit ? !is_odd : is_odd;
 
 	PSTACK* dest_stack = get_parity_stack(stacks, is_dest_odd);
 
-	if( dest_stack->n ) {
-		unsigned long dest_idx = rand() % dest_stack->n;	
+	if( dest_stack->n && ( dest_stack->n - prev_has_backedge_in_this_stack ) ) {
+		unsigned long dest_idx = rand() % (dest_stack->n - prev_has_backedge_in_this_stack);	
 		GRAPH* dest_node = dest_stack->stack[ dest_idx ];	
 		graph_oriented_connect(source_node, dest_node);
 		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);

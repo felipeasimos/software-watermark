@@ -167,44 +167,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 	return bit_arr;
 }
 
-unsigned long get_node_idx(GRAPH* node) {
-
-	return (*(WM_NODE*)node->data).hamiltonian_idx;
-}
-
 uint8_t* get_bit_array2017(DECODER* decoder) {
-
-	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
-	memset(bit_arr, 0x00, sizeof(uint8_t) * decoder->n_bits);
-
-	// if positive, decrement it, if it is zero the current node is a forward destination
-	int forward_flag = -1;
-
-	// iterate over every node but the last
-	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
-
-		if( forward_flag != 0 ) {
-
-			if( get_forward_edge(decoder->current_node) ) {
-
-				bit_arr[i] = 1;
-				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && ( (i - get_node_idx(get_backedge(decoder->current_node))) & 1 ) ) {
-
-				bit_arr[i] = 1;
-			} else {
-
-				bit_arr[i] = 0;
-			}
-		}
-
-		if( forward_flag >= 0 ) forward_flag--;
-		label_new_current_node(decoder);
-		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
-	}
-
-	return bit_arr;
-
 }
 
 uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
@@ -227,11 +190,12 @@ void decoder_free(DECODER* decoder) {
 	free(decoder);
 } 
 
-void* _watermark_decode(GRAPH* graph, unsigned long* num_bytes, unsigned long n_bits, uint8_t* (*bit_array_func)(DECODER* decoder)) {
+void* _watermark_decode(GRAPH* graph, unsigned long* num_bytes, uint8_t* (*bit_array_func)(DECODER* decoder)) {
 
 	if( !is_graph_structure_valid(graph) ) return NULL;
 
 	// 1. get number of bits and set nodes to null
+	unsigned long n_bits = get_num_bits(graph);
 	*num_bytes = n_bits/8 + !!(n_bits%8);
 
 	// 2. create decoder struct
@@ -269,7 +233,7 @@ void* _watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned
 
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
-	return _watermark_decode(graph, num_bytes, get_num_bits2014(graph), get_bit_array2014);
+	return _watermark_decode(graph, num_bytes, get_bit_array2014);
 }
 
 void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
@@ -279,10 +243,10 @@ void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsig
 
 void* watermark2017_decode(GRAPH* graph, unsigned long* num_bytes) {
 
-	return _watermark_decode(graph, num_bytes, get_num_bits(graph), get_bit_array2017);
+	return _watermark_decode(graph, num_bytes, );
 }
 
 void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
 
-	return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode);
+	return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, );
 }

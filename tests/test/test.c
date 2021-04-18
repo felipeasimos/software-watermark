@@ -3,6 +3,7 @@
 #include "decoder/decoder.h"
 #include "rs_api/rs.h"
 #include "code_generator/code_generator.h"
+#include "metrics/metrics.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -82,7 +83,6 @@ int metrics_test() {
 	ctdd_assert( watermark_num_edges(graph) == 8 );
 	ctdd_assert( watermark_num_nodes(graph) == 6 );
 	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
-	ctdd_assert( watermark_num_hamiltonian_edges2014(graph) == 5 );
 
 	// test with missing hamiltonian edge (we can't call watermark_num_hamiltonian_edges2014 for this though)
 	graph_oriented_disconnect(graph->next, graph->next->next);
@@ -228,6 +228,28 @@ int _1_to_10_8_test() {
 	return 0;
 }
 
+int _2017_test() {
+
+	for(unsigned long i=1; i < 100000000; i++) {
+
+		printf("i: %lu\n", i);
+
+		if( !( i % 100000) ) printf("%lu\n", i);
+		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+		ctdd_assert( graph );
+		graph_print(graph, NULL);
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark2017_decode(graph, &num_bytes);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+	return 0;
+}
+
 int code_test() {
 
 	uint8_t n[] = {16};
@@ -249,7 +271,8 @@ int run_tests() {
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	// ctdd_verify(rs_encoder_decoder_test);
-	ctdd_verify(_1_to_10_8_test);
+	 ctdd_verify(_1_to_10_8_test);
+	//ctdd_verify(_2017_test);
 
 	return 0;
 }

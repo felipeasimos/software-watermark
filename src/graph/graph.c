@@ -198,7 +198,10 @@ void graph_free(GRAPH* graph){
 	GRAPH* tmp;
 
 	//iterate through list, freeing all nodes
-	for(tmp = graph->next; graph; graph = tmp, tmp = graph ? graph->next : NULL) graph_free_node(graph);
+	for(tmp = graph->next; graph; graph = tmp) {
+		tmp = graph->next;
+		graph_free_node(graph);
+	}
 }
 
 void graph_default_print_func(void* data, unsigned int data_len){
