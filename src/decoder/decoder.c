@@ -156,9 +156,11 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 		}
 
 		if( forward_flag >= 0 ) forward_flag--;
-		add_idx(decoder->current_node, h_idx);
-		h_idx++;
+
+		GRAPH* tmp = decoder->current_node;
 		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
+		add_idx(tmp, h_idx);
+		h_idx++;
 	}
 
 	return bit_arr;

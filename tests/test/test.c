@@ -148,15 +148,12 @@ int _1_to_10_8_test() {
 
 int _2017_test() {
 
-	unsigned long n=10000; //100000000
+	unsigned long n=100000000;
 	for(unsigned long i=1; i < n; i++) {
 
-		printf("2017: %lu\n", i);
-		if( !( i % (n/1000)) ) fprintf(stderr, "%lu\n", i);
+		if( !( i % 100000) ) fprintf(stderr, "%lu\n", i);
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
-		graph_print(graph, NULL);
-		fflush(stdout);
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2017_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
@@ -171,7 +168,7 @@ int _2017_test() {
 
 int simple_2017_test() {
 
-	for(uint8_t i=30; i < 31; i++) {
+	for(uint8_t i=1; i < 255; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		printf("%hhu\n", i);
@@ -211,8 +208,8 @@ int run_tests() {
 	//ctdd_verify(code_test);
 	// ctdd_verify(rs_encoder_decoder_test);
 	//ctdd_verify(_1_to_10_8_test);
-	ctdd_verify(simple_2017_test);
-	//ctdd_verify(_2017_test);
+	//ctdd_verify(simple_2017_test);
+	ctdd_verify(_2017_test);
 
 	return 0;
 }
