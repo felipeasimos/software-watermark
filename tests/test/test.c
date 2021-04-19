@@ -128,10 +128,10 @@ int rs_encoder_decoder_test() {
 
 int _1_to_10_8_test() {
 
-	unsigned long n=10000; //100000000
+	unsigned long n=100000000;
 	for(unsigned long i=1; i < n; i++) {
 
-		if( !( i % (n/100)) ) fprintf(stderr, "2014: %lu\n", i);
+		if( !( i % 100000 )) fprintf(stderr, "2014: %lu\n", i);
 		GRAPH* graph = watermark2014_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
@@ -207,9 +207,9 @@ int run_tests() {
 	//ctdd_verify(reed_solomon_api_heavy_test);
 	//ctdd_verify(code_test);
 	// ctdd_verify(rs_encoder_decoder_test);
-	//ctdd_verify(_1_to_10_8_test);
 	//ctdd_verify(simple_2017_test);
 	ctdd_verify(_2017_test);
+	ctdd_verify(_1_to_10_8_test);
 
 	return 0;
 }
