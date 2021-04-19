@@ -22,8 +22,8 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	// in this case we have, for sure, a forward edge among us, and two possibilities:
 	// 1. we have a removed hamiltonian edge afterwards, which means that both nodes
 	// have only one connection: one has a backedge and the other has a hamiltonian edge.
-	if( is_backedge(node1->connections->node) || is_backedge(node2->connections->node) ) {
-		return is_backedge(node1->connections->node) ? node2 : node1;
+	if( ( node1->connections && is_backedge(node1->connections->node) ) || ( node2->connections && is_backedge(node2->connections->node) ) ) {
+		return ( node1->connections && is_backedge(node1->connections->node) ) ? node2 : node1;
 	} else {
 		// 2. we have a forward edge and no missing hamiltonian edges, so this means that
 		// one node (the forward edge one) is the next hamiltonian node of the other
@@ -63,10 +63,10 @@ void create_stacks(STACKS* stacks, unsigned long n_bits) {
 	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
 	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
 	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits);
+	memset(stacks->history.stack, 0x00, sizeof(unsigned long) * n_bits);
 
 	stacks->odd.n = 0;
 	stacks->even.n = 0;
-	stacks->history.n = 0;
 }
 
 void free_stacks(STACKS* stacks) {
@@ -123,12 +123,8 @@ unsigned long get_num_bits(GRAPH* graph) {
 	// count nodes, decrementing count for when we see a forward edge
 	for(GRAPH* node = graph; node; node = node->next) {
 
+		if( !get_forward_edge(node) ) i++;
 		node->data_len = UINT_MAX;
-		if( get_forward_edge(node) ) {
-			i--;
-		} else {
-			i++;
-		}
 	}
 
 	// make data_len = 0 again
@@ -149,7 +145,7 @@ GRAPH* get_backedge(GRAPH* node) {
 
 GRAPH* get_forward_edge(GRAPH* node) {
 
-	if( !node || !node->connections ) return node;
+	if( !node ) return NULL;
 
 	// if we have only one connection or less, there is no forward edge
 	if( !node->connections || !node->connections->next ) {
@@ -160,9 +156,13 @@ GRAPH* get_forward_edge(GRAPH* node) {
 		CONNECTION* conn1 = node->connections;
 		CONNECTION* conn2 = node->connections->next;
 
+		fprintf(stderr, "%u %u\n", conn1->node->data_len, conn2->node->data_len);
+
 		if( is_backedge(conn1->node) || is_backedge(conn2->node) ) {
+			fprintf(stderr, "has backedge\n");
 			return NULL;
 		} else {
+			fprintf(stderr, "has forward edge\n");
 			return find_guaranteed_forward_edge(node);
 		}	
 	}
@@ -216,10 +216,10 @@ PSTACK* get_parity_stack(STACKS* stacks, uint8_t is_odd) {
 	return is_odd ? &stacks->odd : &stacks->even;
 }
 
-void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long is_odd) {
+void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long h_idx, unsigned long is_odd) {
 
 	// save size of the stack with different parity
-	stacks->history.stack[stacks->history.n++] = is_odd ? stacks->even.n : stacks->odd.n;
+	stacks->history.stack[h_idx] = is_odd ? stacks->even.n : stacks->odd.n;
 
 	// save to stack with the same parity
 	PSTACK* stack = get_parity_stack(stacks, is_odd);

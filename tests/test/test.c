@@ -14,87 +14,6 @@ void print_node_func(void* data, unsigned int data_len) {
 	}
 }
 
-int encoder_test() {
-
-	// big endian
-	uint8_t n_be[4] = { 0xde, 0xad, 0xbe, 0xef };
-
-	GRAPH* graph = watermark2014_encode(&n_be, 4);
-
-	ctdd_assert(graph);
-	graph_free(graph);
-
-	return 0;
-}
-
-int metrics_test() {
-
-	// we are representing this:
-	/*
-	      .-----------.
-	      |-----.	    |.----.
-	      |     |     ||    |
-	      v     |     |v    |
-	1 ->  0 ->  1 ->  0 ->  1
-	# edges = 7
-	# nodes = 5
-	# cyclomatic complexity = 4
-	# non hamiltoninan edges = 3
-	*/
-
-	unsigned long idx = 1;
-
-	// 1
-	GRAPH* graph = graph_create(&idx, sizeof(idx));
-	GRAPH* final = graph;
-	idx++;
-
-	// 0
-	graph_insert(final, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(final, final->next);
-	final = final->next;
-	idx++;
-
-	// 1
-	graph_insert(final, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(final, final->next);
-	graph_oriented_connect(final->next, final);
-	final = final->next;
-	idx++;
-
-	// 0
-	graph_insert(final, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(final, final->next);
-	graph_oriented_connect(final->next, final->prev);
-	final = final->next;
-	idx++;
-
-	// 1
-	graph_insert(final, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(final, final->next);
-	graph_oriented_connect(final->next, final);
-	final = final->next;
-	idx++;
-
-	// null node at the end
-	graph_insert(final, graph_create(&idx, sizeof(idx)));
-	graph_oriented_connect(final, final->next);
-
-	ctdd_assert( watermark_num_edges(graph) == 8 );
-	ctdd_assert( watermark_num_nodes(graph) == 6 );
-	ctdd_assert( watermark_cyclomatic_complexity(graph) == 4 );
-
-	// test with missing hamiltonian edge (we can't call watermark_num_hamiltonian_edges2014 for this though)
-	graph_oriented_disconnect(graph->next, graph->next->next);
-	ctdd_assert( watermark_num_edges(graph) == 7 );
-	ctdd_assert( watermark_num_nodes(graph) == 6 );
-	ctdd_assert( watermark_cyclomatic_complexity(graph) == 3 );
-
-	graph_free(graph);
-
-	return 0;
-}
-
 int reed_solomon_api_test() {
 
 	// RS(255, 223)
@@ -209,11 +128,10 @@ int rs_encoder_decoder_test() {
 
 int _1_to_10_8_test() {
 
-	for(unsigned long i=1; i < 100000000; i++) {
+	unsigned long n=10000; //100000000
+	for(unsigned long i=1; i < n; i++) {
 
-		printf("i: %lu\n", i);
-
-		if( !( i % 100000) ) printf("%lu\n", i);
+		if( !( i % (n/100)) ) fprintf(stderr, "2014: %lu\n", i);
 		GRAPH* graph = watermark2014_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
@@ -230,16 +148,39 @@ int _1_to_10_8_test() {
 
 int _2017_test() {
 
-	for(unsigned long i=1; i < 100000000; i++) {
+	unsigned long n=10000; //100000000
+	for(unsigned long i=1; i < n; i++) {
 
-		printf("i: %lu\n", i);
-
-		if( !( i % 100000) ) printf("%lu\n", i);
+		printf("2017: %lu\n", i);
+		if( !( i % (n/1000)) ) fprintf(stderr, "%lu\n", i);
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		graph_print(graph, NULL);
+		fflush(stdout);
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2017_decode(graph, &num_bytes);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+	return 0;
+}
+
+int simple_2017_test() {
+
+	for(uint8_t i=1; i < 29; i++) {
+		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+		ctdd_assert( graph );
+		printf("%hhu\n", i);
+		graph_print(graph, NULL);
+		fflush(stdout);
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark2017_decode(graph, &num_bytes);
+		printf("%hhu\n", *result);
+		fflush(stdout);
 		ctdd_assert( num_bytes );
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
 
@@ -265,13 +206,12 @@ int code_test() {
 
 int run_tests() {
 
-	//ctdd_verify(encoder_test);
-	ctdd_verify(metrics_test);
-	ctdd_verify(reed_solomon_api_test);
-	ctdd_verify(reed_solomon_api_heavy_test);
-	ctdd_verify(code_test);
+	//ctdd_verify(reed_solomon_api_test);
+	//ctdd_verify(reed_solomon_api_heavy_test);
+	//ctdd_verify(code_test);
 	// ctdd_verify(rs_encoder_decoder_test);
-	 ctdd_verify(_1_to_10_8_test);
+	//ctdd_verify(_1_to_10_8_test);
+	ctdd_verify(simple_2017_test);
 	//ctdd_verify(_2017_test);
 
 	return 0;

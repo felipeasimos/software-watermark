@@ -13,7 +13,6 @@ typedef struct PSTACK {
 typedef struct HSTACK {
 
 	unsigned long* stack;
-	unsigned long n;
 } HSTACK;
 
 typedef struct STACKS {
@@ -54,7 +53,7 @@ GRAPH* get_next_hamiltonian_node2014(GRAPH* node);
 
 PSTACK* get_parity_stack(STACKS* stacks, uint8_t is_odd);
 
-void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long is_odd);
+void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long h_idx, unsigned long is_odd);
 
 // 0 based idx
 void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx);

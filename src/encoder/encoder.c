@@ -13,22 +13,8 @@ enum FORWARD_STATUS {
 	NONE=0,
 	FORWARD_SOURCE=1,
 	FORWARD_INNER=2,
-	FORWARD_DESTINATION=4,
-	FORWARD_REMOVE_HAMILTONIAN=8
+	FORWARD_DESTINATION=4
 };
-
-#ifdef DEBUG 
-void print_stacks_encoder(ENCODER* encoder) {
-
-	printf("e o h\n");
-	for( unsigned long i=0; i < encoder->stacks.history.n; i++) {
-
-		unsigned long even = i < encoder->stacks.even.n ? (*(unsigned long*)encoder->stacks.even.stack[i]->data) : 0;
-		unsigned long odd = i < encoder->stacks.odd.n ? (*(unsigned long*)encoder->stacks.odd.stack[i]->data) : 0;
-		printf("%lu %lu %lu %s\n", even, odd, encoder->stacks.history.stack[i], encoder->stacks.history.n & 1 ? "(e)" : "(o)");
-	}
-}
-#endif
 
 uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 
@@ -70,7 +56,7 @@ ENCODER* encoder_create(unsigned long n_bits) {
 	// indices are added as we go through the graph
 	unsigned long one = 1;
 	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
-	add_node_to_stacks(&encoder->stacks, encoder->final_node, 1);
+	add_node_to_stacks(&encoder->stacks, encoder->final_node, 0, 1);
 
 	for(unsigned long i = 1; i < n_bits+1; i++) {
 		add_node_to_graph(encoder);
@@ -103,25 +89,25 @@ void encode2014(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 		add_backedge2014( &encoder->stacks, node, bit, is_odd );
 
 		// 3. add node to proper parity stack, and to the history stack
-		add_node_to_stacks( &encoder->stacks, node, is_odd );
+		add_node_to_stacks( &encoder->stacks, node, idx, is_odd );
 		node = get_next_hamiltonian_node2014(node);
 	}
 }
 
-uint8_t prev_has_backedge_at_same_parity_stack(GRAPH* node, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
+uint8_t prev_has_backedge_at_same_parity_stack(unsigned long h_idx, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
 
-	uint8_t is_odd = !((*(unsigned long*)node->data) & 1 );
+	uint8_t is_odd = !(h_idx & 1 );
 
 	return ( ( bit ? !is_odd : is_odd ) == ( last_bit ? is_odd : !is_odd ) ) && get_backedge(last_node);
 }
 
-unsigned long num_possible_backedges(ENCODER* encoder, GRAPH* node, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
+unsigned long num_possible_backedges(ENCODER* encoder, unsigned long h_idx, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
 
-	uint8_t is_odd = !((*(unsigned long*)node->data) & 1 );
+	uint8_t is_odd = !(h_idx & 1 );
 
 	PSTACK* node_stack = get_parity_stack(&encoder->stacks, bit ? !is_odd : is_odd);
 
-	return node_stack->n - prev_has_backedge_at_same_parity_stack(node, last_node, bit, last_bit);
+	return node_stack->n - prev_has_backedge_at_same_parity_stack(h_idx, last_node, bit, last_bit);
 }
 
 uint8_t update_forward_status(enum FORWARD_STATUS status) {
@@ -136,10 +122,9 @@ uint8_t update_forward_status(enum FORWARD_STATUS status) {
 void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node
-	GRAPH* last_node = encoder->graph;
-	uint8_t last_bit = 1;
-	GRAPH* node = get_next_hamiltonian_node2014(encoder->graph);
+	GRAPH* node = encoder->graph->next;
 	enum FORWARD_STATUS forward_status = NONE;
+	unsigned long h_idx = 1;
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
 
 		// 0-based index of the node's position in the hamiltonian path
@@ -147,53 +132,32 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 		uint8_t is_odd = !((idx) & 1);
 		uint8_t bit = get_bit(data, i);
 
-		if( !( forward_status & FORWARD_DESTINATION ) )  add_idx(node, idx);
 		if( forward_status & FORWARD_DESTINATION ) {
 			i--;
-			// remove hamiltonian edge v-1 -> v if necessary
-			if( forward_status & FORWARD_REMOVE_HAMILTONIAN ) {
-
-				graph_oriented_disconnect(last_node, node);
-				forward_status &= ~FORWARD_REMOVE_HAMILTONIAN;
-			}
-			// just to mark that we passed through this node
-			node->data_len = UINT_MAX;
-		// check if there is an backedge available
-		} else if( num_possible_backedges(encoder, node, last_node, bit, last_bit) ) {
+			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
+		} else if(num_possible_backedges(encoder, h_idx, node->prev, bit, get_bit(data, i-1))) {
 
 			if( forward_status & FORWARD_INNER ) {
 
-				// don't add node to stacks
 				if( bit ) {
 
-					// add backedge to v - 1
-					graph_oriented_connect(node, last_node);
-					// ask to remove hamiltonian in the next iteration
-					forward_status |= FORWARD_REMOVE_HAMILTONIAN;
-				} else {
-
-					// nothing
+					graph_oriented_connect(node, node->prev);
+					graph_oriented_disconnect(node, node->next);
 				}
 			} else {
-
-				// add random backedge
-				uint8_t prev_connects_to_same_stack = prev_has_backedge_at_same_parity_stack(node, last_node, bit, last_bit);
-				add_backedge(&encoder->stacks, node, prev_connects_to_same_stack, bit, is_odd);
+				add_backedge(&encoder->stacks, node, prev_has_backedge_at_same_parity_stack(h_idx, node->prev, bit, get_bit(data, i-1)), bit, is_odd);
 			}
 		} else {
-			if( bit ) {
-				// add node to graph and add forward edge
-				forward_status |= FORWARD_SOURCE;
+
+			if(bit) {
 				add_node_to_graph(encoder);
-				// works since untouched nodes are source to only one connection
 				graph_oriented_connect(node, node->next->next);
 			}
-			if( !( forward_status & FORWARD_INNER ) ) add_node_to_stacks(&encoder->stacks, node, is_odd);
+			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
 		}
-
+		add_idx(node, h_idx);
+		h_idx++;
 		forward_status = update_forward_status(forward_status);
-		last_node = node;
-		last_bit = bit;
 		node = node->next;
 	}
 }
