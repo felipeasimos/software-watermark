@@ -41,13 +41,6 @@ void add_node_to_graph(ENCODER* encoder) {
 	encoder->final_node = new_node;
 }
 
-void add_idx(GRAPH* node, unsigned long idx) {
-
-	idx++;
-	graph_alloc(node, sizeof(unsigned long));
-	*((unsigned long*)node->data) = idx;
-}
-
 ENCODER* encoder_create(unsigned long n_bits) {
 
 	ENCODER* encoder = malloc( sizeof(ENCODER) );
@@ -103,7 +96,7 @@ uint8_t prev_has_backedge_at_same_parity_stack(unsigned long h_idx, GRAPH* last_
 
 unsigned long num_possible_backedges(ENCODER* encoder, unsigned long h_idx, GRAPH* last_node, uint8_t bit, uint8_t last_bit) {
 
-	uint8_t is_odd = !(h_idx & 1 );
+	uint8_t is_odd = !(h_idx & 1);
 
 	PSTACK* node_stack = get_parity_stack(&encoder->stacks, bit ? !is_odd : is_odd);
 
@@ -128,8 +121,7 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
 
 		// 0-based index of the node's position in the hamiltonian path
-		unsigned long idx = i-trailing_zeroes;
-		uint8_t is_odd = !((idx) & 1);
+		uint8_t is_odd = !((h_idx) & 1);
 		uint8_t bit = get_bit(data, i);
 
 		if( forward_status & FORWARD_DESTINATION ) {
@@ -152,6 +144,7 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 			if(bit) {
 				add_node_to_graph(encoder);
 				graph_oriented_connect(node, node->next->next);
+				forward_status |= FORWARD_SOURCE;
 			}
 			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
 		}

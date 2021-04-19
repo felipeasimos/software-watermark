@@ -171,7 +171,7 @@ int _2017_test() {
 
 int simple_2017_test() {
 
-	for(uint8_t i=1; i < 29; i++) {
+	for(uint8_t i=30; i < 31; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 		printf("%hhu\n", i);

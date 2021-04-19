@@ -62,4 +62,8 @@ void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t i
 
 void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd);
 
+void add_idx(GRAPH* node, unsigned long idx);
+
+unsigned long get_node_idx(GRAPH* node);
+
 #endif

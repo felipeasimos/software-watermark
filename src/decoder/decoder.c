@@ -123,11 +123,6 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 	return bit_arr;
 }
 
-unsigned long get_node_idx(GRAPH* node) {
-
-	return (*(WM_NODE*)node->data).hamiltonian_idx;
-}
-
 uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
@@ -137,30 +132,23 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	int forward_flag = -1;
 
 	bit_arr[0]=1;
-	graph_alloc(decoder->current_node, sizeof(WM_NODE));
-	WM_NODE wmnode = { 0, 0 };
-	memcpy(decoder->current_node->data, &wmnode, sizeof(WM_NODE));
-	decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
+	add_idx(decoder->current_node, 0);
+
 	unsigned long h_idx=1;
+	
+	decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
 
 	// iterate over every node but the last
 	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
 
 		if( forward_flag != 0 ) {
 
-			fprintf(stderr, "%lu\n", i);
 			if( get_forward_edge(decoder->current_node) ) {
-
-				fprintf(stderr, "has forward edge: %lu\n", h_idx);
 				bit_arr[i] = 1;
 				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && ( (h_idx - get_node_idx(get_backedge(decoder->current_node))) & 1 ) ) {
-
-				fprintf(stderr, "has odd backedge: %lu\n", h_idx);
+			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))) & 1 ) ) {
 				bit_arr[i] = 1;
 			} else {
-
-				fprintf(stderr, "zero bit: %lu\n", h_idx);
 				bit_arr[i] = 0;
 			}
 		} else {
@@ -168,7 +156,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 		}
 
 		if( forward_flag >= 0 ) forward_flag--;
-		label_new_current_node(decoder, h_idx);
+		add_idx(decoder->current_node, h_idx);
 		h_idx++;
 		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
 	}

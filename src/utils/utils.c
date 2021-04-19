@@ -60,9 +60,10 @@ uint8_t is_graph_structure_valid(GRAPH* graph) {
 
 void create_stacks(STACKS* stacks, unsigned long n_bits) {
 
-	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits/2+1));
-	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits/2));
-	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits);
+	// allocate extra space in case of mute nodes in 2017
+	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits));
+	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits));
+	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits * 2);
 	memset(stacks->history.stack, 0x00, sizeof(unsigned long) * n_bits);
 
 	stacks->odd.n = 0;
@@ -156,13 +157,9 @@ GRAPH* get_forward_edge(GRAPH* node) {
 		CONNECTION* conn1 = node->connections;
 		CONNECTION* conn2 = node->connections->next;
 
-		fprintf(stderr, "%u %u\n", conn1->node->data_len, conn2->node->data_len);
-
 		if( is_backedge(conn1->node) || is_backedge(conn2->node) ) {
-			fprintf(stderr, "has backedge\n");
 			return NULL;
 		} else {
-			fprintf(stderr, "has forward edge\n");
 			return find_guaranteed_forward_edge(node);
 		}	
 	}
@@ -255,4 +252,16 @@ void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_
 		graph_oriented_connect(source_node, dest_node);
 		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);
 	}
+}
+
+void add_idx(GRAPH* node, unsigned long idx) {
+
+	idx++;
+	graph_alloc(node, sizeof(unsigned long));
+	*((unsigned long*)node->data) = idx;
+}
+
+unsigned long get_node_idx(GRAPH* node) {
+
+	return (*(unsigned long*)node->data);
 }
