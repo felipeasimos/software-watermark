@@ -161,8 +161,35 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 				forward_flag = 2;
 			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
 				bit_arr[i] = 1;
+				GRAPH* dest_node = get_backedge(decoder->current_node);
+				WM_NODE* dest = dest_node->data;
+
+				// check if it is inner node
+				if( is_inner_node(decoder, dest_node) ) {
+					#ifdef DEBUG
+						fprintf(stderr, "Invalid backedge detected!\n");
+					#endif
+					free(bit_arr);
+					return NULL;
+				}
+
+				pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
 			} else {
 				bit_arr[i] = 0;
+				GRAPH* dest_node = get_backedge(decoder->current_node);
+				if(dest_node) {
+
+					// check if it is inner node
+					if( is_inner_node(decoder, dest_node) ) {
+						#ifdef DEBUG
+							fprintf(stderr, "Invalid backedge detected!\n");
+						#endif
+						free(bit_arr);
+						return NULL;
+					}
+					WM_NODE* dest = dest_node->data;
+					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
+				}
 			}
 		} else {
 			i--;
