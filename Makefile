@@ -115,7 +115,8 @@ folders:
 	@mkdir -p $(TEST_OBJ_DIR)
 
 clean:
-	-@rm -rvf $(BUILD_DIR)
+	# remove $(BUILD_DIR) and $(TEST_TARGET_FINAL)
+	-@rm -rf $(BUILD_DIR)
 	-@rm -vf $(TEST_TARGET_FINAL)
 
 $(TARGET_LIB_FINAL): $(OBJECTS)

@@ -26,7 +26,7 @@ void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx) 
 	uint8_t is_odd = !(h_idx & 1);
 
 	// get indexes
-	unsigned long stack_idx = is_odd ? decoder->stacks.odd.n : decoder->stacks.even.n;
+	unsigned long stack_idx = get_parity_stack(&decoder->stacks, is_odd)->n;
 	WM_NODE wm_node_info = { h_idx, stack_idx };
 
 	add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
@@ -125,7 +125,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 
 unsigned long get_node_idx(GRAPH* node) {
 
-	return (*(unsigned long*)node->data);
+	return ((WM_NODE*)node->data)->hamiltonian_idx;
 }
 
 void _add_idx(GRAPH* node, unsigned long idx) {
@@ -143,11 +143,13 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	int forward_flag = -1;
 
 	bit_arr[0]=1;
-	_add_idx(decoder->current_node, 0);
 
 	unsigned long h_idx=1;
-	
-	decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
+
+	GRAPH* next = get_next_hamiltonian_node(decoder->current_node);	
+	label_new_current_node(decoder, decoder->current_node, 0);
+	//_add_idx(decoder->current_node, 0);
+	decoder->current_node = next;
 
 	// iterate over every node but the last
 	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
@@ -157,7 +159,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 			if( get_forward_edge(decoder->current_node) ) {
 				bit_arr[i] = 1;
 				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))) & 1 ) ) {
+			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
 				bit_arr[i] = 1;
 			} else {
 				bit_arr[i] = 0;
@@ -168,9 +170,10 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 
 		if( forward_flag >= 0 ) forward_flag--;
 
-		GRAPH* tmp = decoder->current_node;
-		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
-		_add_idx(tmp, h_idx);
+		GRAPH* next = get_next_hamiltonian_node(decoder->current_node);	
+		label_new_current_node(decoder, decoder->current_node, h_idx);
+		//_add_idx(decoder->current_node, h_idx);
+		decoder->current_node = next;
 		h_idx++;
 	}
 

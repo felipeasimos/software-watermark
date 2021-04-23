@@ -64,7 +64,6 @@ void create_stacks(STACKS* stacks, unsigned long n_bits) {
 	stacks->odd.stack = malloc(sizeof(GRAPH*) * (n_bits));
 	stacks->even.stack = malloc(sizeof(GRAPH*) * (n_bits));
 	stacks->history.stack = malloc(sizeof(unsigned long) * n_bits * 2);
-	memset(stacks->history.stack, 0x00, sizeof(unsigned long) * n_bits);
 
 	stacks->odd.n = 0;
 	stacks->even.n = 0;
@@ -75,10 +74,6 @@ void free_stacks(STACKS* stacks) {
 	free(stacks->odd.stack);
 	free(stacks->even.stack);
 	free(stacks->history.stack);
-
-	stacks->odd.stack = NULL;
-	stacks->even.stack = NULL;
-	stacks->history.stack = NULL;
 }
 
 uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
