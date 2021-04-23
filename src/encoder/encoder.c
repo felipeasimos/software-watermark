@@ -182,17 +182,17 @@ GRAPH* _watermark_encode(void* data, unsigned long data_len, void (*encode)(ENCO
 GRAPH* _watermark_encode_with_rs(void* data, unsigned long data_len, unsigned long num_rs_bytes, GRAPH* (*watermark)(void*, unsigned long)) {
 
 	uint16_t par[num_rs_bytes];
-	memset(par, 0x00, num_rs_bytes);
+	memset(par, 0x00, num_rs_bytes * sizeof(uint16_t));
 
 	// get parity data
 	rs_encode(data, data_len, par, num_rs_bytes);
 
 	// copy data + parity data
-	uint8_t final_data[data_len + num_rs_bytes];
+	uint8_t final_data[data_len + num_rs_bytes * sizeof(uint16_t)];
 	memcpy(final_data, data, data_len);
-	memcpy(final_data + data_len, par, num_rs_bytes * 2);
+	memcpy(final_data + data_len, par, num_rs_bytes * sizeof(uint16_t));
 
-	return watermark(final_data, data_len);
+	return watermark(final_data, data_len + num_rs_bytes * sizeof(uint16_t));
 }
 
 GRAPH* watermark2014_encode(void* data, unsigned long data_len) {

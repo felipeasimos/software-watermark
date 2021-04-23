@@ -2,23 +2,21 @@
 
 Reed-Solomon library copied from: https://github.com/tierney/reed-solomon.
 
+## Djikstra
+
+* Toda marca d'agua é um grafo de djiktra e todo o grafo de djikstra que não
+tenha estruturas case e if then else, é uma marca d'água válida.
+	* podemos comparar grafos de djikstra ao comparar os bit sequence que
+	eles representam.
+* expansão do gráfico: adicionar comandos estruturados.
+
 ## TODO
 
-* achar biblioteca reed solomon com um bit (se existir)
+* achar código de teste.
 
-* achar repositório de códigos de teste
+* main completo
 
-* métricas para salvar (code done for 2014) (code done for 2017)
-	* complexidade ciclomática (pesquisar) (algumas ferramentas mostram)
-		* sobrecarga de loops
-		* Cyclomatic complexity = # edges - # nodes + 2 * # nodes with exit points
-	* com e sem código de correção
-		* número de arestas que não pertencem ao código hamiltoniano (código precisa levar em conta 2017)
-		* número de nós
-* 2017
-	* implementar encoder
-	* implementar decoder
-	* implementar métricas de 2014 aqui (done)
-	* salvar métricas em arquivo
-
-* rodar teste 10^8 com as métricas para 2017 e 2014
+* comparação: código de teste com marca d'agua embarcada dentro de uma funcão como
+código morto (dummy) e código embarcado (integrado com o grafo existente do código)
+	* comparar complexidade aciclomática
+	* comparar código morto (sonarqube)

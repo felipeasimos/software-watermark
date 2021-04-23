@@ -213,11 +213,12 @@ void* _watermark_decode(GRAPH* graph, unsigned long* num_bytes, unsigned long n_
 
 void* _watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes, void* (*decode_func)(GRAPH*, unsigned long*)) {
 
-	if( num_rs_bytes >= *num_bytes ) return NULL;
-
 	uint8_t* data = decode_func(graph, num_bytes);
 
-	int result = rs_decode(data, *num_bytes, (uint16_t*)( data + (*num_bytes - num_rs_bytes) ), num_rs_bytes);
+	// make num_bytes equal to the actual data payload size
+	*num_bytes -= num_rs_bytes * sizeof(uint16_t);
+	
+	int result = rs_decode(data, *num_bytes, (uint16_t*)( data + *num_bytes ), num_rs_bytes);
 
 	// if there were no errors or they were corrected
 	if( result >= 0 ) return data;

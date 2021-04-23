@@ -25,7 +25,7 @@ void encode_string() {
 	printf("input string to be encoded (max size is %lu): ", (unsigned long) MAX_SIZE);
 	scanf(" %" MAX_SIZE_STR "s", s);
 
-	GRAPH* g = watermark_encode(s, strlen(s));
+	GRAPH* g = watermark2017_encode(s, strlen(s));
 
 	char* code = watermark_get_code(g);
 
@@ -61,7 +61,7 @@ void encode_number() {
 		n = tmp;
 	}
 
-	GRAPH* g = watermark_encode(&n, sizeof(n));
+	GRAPH* g = watermark2017_encode(&n, sizeof(n));
 
 	char* code = watermark_get_code(g);
 

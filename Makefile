@@ -115,9 +115,7 @@ folders:
 	@mkdir -p $(TEST_OBJ_DIR)
 
 clean:
-	-@rm -rvf $(OBJ_DIR)/*
-	-@rm -rvf $(APP_DIR)/*
-	-@rm -rvf $(TEST_OBJ_DIR)/*
+	-@rm -rvf $(BUILD_DIR)
 	-@rm -vf $(TEST_TARGET_FINAL)
 
 $(TARGET_LIB_FINAL): $(OBJECTS)

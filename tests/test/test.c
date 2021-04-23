@@ -14,42 +14,6 @@ void print_node_func(void* data, unsigned int data_len) {
 	}
 }
 
-int reed_solomon_api_test() {
-
-	// RS(255, 223)
-	int symbol_size = 8;
-	int gfpoly = 0x187;
-	int fcr = 0;
-	int prim = 1;
-
-	// also the number of roots in the generator polynomial
-	int parity_len = 32; // 2T
-	int data_len = 223;
-
-	struct rs_control* rs = init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
-	ctdd_assert(rs);
-	srand(time(0));
-
-	uint8_t data[data_len];
-	for(unsigned int i = 0; i < (unsigned int) data_len; i++) data[i] = rand();
-	uint16_t par[parity_len];
-	memset(par, 0x00, parity_len * sizeof(uint16_t));
-
-	encode_rs8(rs, (uint8_t*)&data, data_len, (uint16_t*)&par, 0);
-	
-	uint8_t received_data[data_len];
-	memcpy(received_data, data, data_len);
-	for(unsigned int i = 0; i < 5; i++) received_data[rand() % data_len] = rand();
-
-	decode_rs8(rs, (uint8_t*)&received_data, (uint16_t*)&par, data_len, NULL, 0, NULL, 0, NULL);
-
-	for(unsigned int i=0; i < (unsigned int) data_len; i++) ctdd_assert( received_data[i] == data[i] );
-
-	free_rs(rs);
-
-	return 0;
-}
-
 int reed_solomon_api_heavy_test() {
 
 	srand(time(0));
@@ -58,7 +22,7 @@ int reed_solomon_api_heavy_test() {
 
 		uint8_t data[i];
 		memset(data, 0x00, i);
-		for(unsigned int j=1; j < i; j++) data[j-1] = i;
+		for(unsigned int j=0; j < i; j++) data[j] = i;
 
 		uint16_t par[i];
 		memset(par, 0x00, i*2);
@@ -126,7 +90,7 @@ int rs_encoder_decoder_test() {
 	return 0;
 }
 
-int _1_to_10_8_test() {
+int _2014_test() {
 
 	unsigned long n=100000000;
 	for(unsigned long i=1; i < n; i++) {
@@ -166,18 +130,14 @@ int _2017_test() {
 	return 0;
 }
 
+
 int simple_2017_test() {
 
 	for(uint8_t i=1; i < 255; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
-		printf("%hhu\n", i);
-		graph_print(graph, NULL);
-		fflush(stdout);
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2017_decode(graph, &num_bytes);
-		printf("%hhu\n", *result);
-		fflush(stdout);
 		ctdd_assert( num_bytes );
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
 
@@ -188,13 +148,67 @@ int simple_2017_test() {
 	return 0;
 }
 
+int simple_2014_test() {
+
+	for(uint8_t i=1; i < 255; i++) {
+		GRAPH* graph = watermark2014_encode(&i, sizeof(i));
+		ctdd_assert( graph );
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark2014_decode(graph, &num_bytes);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+	return 0;
+}
+
+int simple_2017_test_with_rs() {
+
+	for(uint8_t i=1; i < 255; i++) {
+		GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 10);
+		ctdd_assert( graph );
+		unsigned long num_bytes=0;
+		uint8_t* result = watermark2017_decode_with_rs(graph, &num_bytes, 10);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+	return 0;
+}
+
+int simple_2014_test_with_rs() {
+
+	for(uint8_t k=8; k < 9; k++) {
+		uint8_t i[k];
+		for(int j=0; j < k; j++) i[j] = ( rand() % 254 ) + 1;
+		GRAPH* graph = watermark2014_encode_with_rs(&i, k, k);
+		ctdd_assert( graph );
+		unsigned long num_bytes = 0;
+		uint8_t* result = watermark2014_decode_with_rs(graph, &num_bytes, k);
+		ctdd_assert( num_bytes );
+		ctdd_assert( check((uint8_t*)&i, result, k, num_bytes ) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+		free(result);
+	}
+	return 0;
+}
+
+
 int code_test() {
 
 	uint8_t n[] = {16};
 	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
-	graph_print(graph, NULL);
+	//graph_print(graph, NULL);
 	char* code = watermark_get_code(graph);
-	printf("'%s'\n", code);
+	//printf("'%s'\n", code);
 	free(code);
 	graph_free(graph);
 
@@ -203,13 +217,16 @@ int code_test() {
 
 int run_tests() {
 
-	//ctdd_verify(reed_solomon_api_test);
-	//ctdd_verify(reed_solomon_api_heavy_test);
-	//ctdd_verify(code_test);
-	// ctdd_verify(rs_encoder_decoder_test);
-	//ctdd_verify(simple_2017_test);
-	ctdd_verify(_2017_test);
-	ctdd_verify(_1_to_10_8_test);
+	ctdd_verify(reed_solomon_api_heavy_test);
+	ctdd_verify(code_test);
+	ctdd_verify(simple_2014_test);
+	ctdd_verify(simple_2017_test);
+	ctdd_verify(simple_2014_test_with_rs);
+	ctdd_verify(simple_2017_test_with_rs);
+
+	//ctdd_verify(_2017_test);
+	//ctdd_verify(_2014_test);
+	//ctdd_verify(rs_encoder_decoder_test);
 
 	return 0;
 }
