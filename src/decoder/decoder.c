@@ -20,7 +20,7 @@ typedef struct DECODER {
 	unsigned long n_bits;
 } DECODER;
 
-void label_new_current_node(DECODER* decoder, unsigned long h_idx) {
+void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx) {
 
 	// get parity	
 	uint8_t is_odd = !(h_idx & 1);
@@ -29,11 +29,11 @@ void label_new_current_node(DECODER* decoder, unsigned long h_idx) {
 	unsigned long stack_idx = is_odd ? decoder->stacks.odd.n : decoder->stacks.even.n;
 	WM_NODE wm_node_info = { h_idx, stack_idx };
 
-	add_node_to_stacks(&decoder->stacks, decoder->current_node, h_idx, is_odd);
+	add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
 
 	// get WM_NODE on the node
-	graph_alloc(decoder->current_node, sizeof(WM_NODE));
-	memcpy(decoder->current_node->data, &wm_node_info, decoder->current_node->data_len);
+	graph_alloc(node, sizeof(WM_NODE));
+	memcpy(node->data, &wm_node_info, node->data_len);
 }
 
 DECODER* decoder_create(GRAPH* graph, unsigned long n_bits) {
@@ -116,7 +116,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 			}
 		}
 
-		label_new_current_node(decoder, i);
+		label_new_current_node(decoder, decoder->current_node, i);
 		decoder->current_node = get_next_hamiltonian_node2014(decoder->current_node);
 	}
 
@@ -128,6 +128,12 @@ unsigned long get_node_idx(GRAPH* node) {
 	return (*(unsigned long*)node->data);
 }
 
+void _add_idx(GRAPH* node, unsigned long idx) {
+
+	idx++;
+	graph_alloc(node, sizeof(unsigned long));
+	*((unsigned long*)node->data) = idx;
+}
 uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
@@ -137,7 +143,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	int forward_flag = -1;
 
 	bit_arr[0]=1;
-	add_idx(decoder->current_node, 0);
+	_add_idx(decoder->current_node, 0);
 
 	unsigned long h_idx=1;
 	
@@ -164,7 +170,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 
 		GRAPH* tmp = decoder->current_node;
 		decoder->current_node = get_next_hamiltonian_node(decoder->current_node);
-		add_idx(tmp, h_idx);
+		_add_idx(tmp, h_idx);
 		h_idx++;
 	}
 
