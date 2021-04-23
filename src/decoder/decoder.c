@@ -123,6 +123,11 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 	return bit_arr;
 }
 
+unsigned long get_node_idx(GRAPH* node) {
+
+	return (*(unsigned long*)node->data);
+}
+
 uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );

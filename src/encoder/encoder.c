@@ -64,6 +64,13 @@ void encoder_free(ENCODER* encoder) {
 	free(encoder);
 }
 
+void add_idx(GRAPH* node, unsigned long idx) {
+
+	idx++;
+	graph_alloc(node, sizeof(unsigned long));
+	*((unsigned long*)node->data) = idx;
+}
+
 void encode2014(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node

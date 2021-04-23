@@ -253,15 +253,3 @@ void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_
 		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);
 	}
 }
-
-void add_idx(GRAPH* node, unsigned long idx) {
-
-	idx++;
-	graph_alloc(node, sizeof(unsigned long));
-	*((unsigned long*)node->data) = idx;
-}
-
-unsigned long get_node_idx(GRAPH* node) {
-
-	return (*(unsigned long*)node->data);
-}
