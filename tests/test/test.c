@@ -217,7 +217,7 @@ int code_test() {
 
 int distortion_test() {
  
-	for(unsigned long i=1; i < 10000; i++) {
+	for(unsigned long i=1; i < 100000000; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
 
@@ -231,35 +231,40 @@ int distortion_test() {
 
             // go through each connection
             unsigned long k=0;
-            for(GRAPH* node = copy; node; node = node->next) {
 
-                for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+            uint8_t found_connection = 0;
+            for(GRAPH* node = copy; !found_connection && node; node = node->next) {
+
+
+                for(CONNECTION* conn = node->connections ? node->connections->next : NULL; conn; conn = conn->next) {
                     if(k==j) {
                         // remove connection and decode
                         graph_oriented_disconnect(node, conn->node);
                         unsigned long num_bytes=0;
                         uint8_t* result = watermark2017_decode(copy, &num_bytes);
-		                if( !check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
-                            printf("number encoded: 0x");
-                            for(uint8_t idx = 0; idx < sizeof(i); idx++) printf("%x", ((uint8_t*)&i)[idx]);
-                            printf("\n");
+                        if( !result || !check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
+                            printf("\x1b[31mERROR:\x1b[0m\n");
+                            printf("\tnumber encoded: %lu\n", i);
+
                             if(result) {
-                                printf("number decoded from new graph: 0x");
+                                printf("\tnumber decoded from new graph: 0x");
                                 for(uint8_t idx = 0; idx < num_bytes; idx++) printf("%x", result[idx]);
                                 printf("\n");
                             } else {
-                                printf("decoding process returned NULL!\n");
+                                printf("\tresult is NULL\n");
                             }
-                            printf("original graph:\n");
-                            graph_print(graph, NULL);
-                            graph_free(graph);
-                            printf("graph without a connection (conn_idx: %lu):\n", j);
-                            graph_print(copy, NULL);
-                            graph_free(copy);
-                            free(result);
-                            ctdd_assert(0);
+                            
+                            printf("\toriginal graph:\n");
+                            //graph_print(graph, NULL);
+                            printf("\tgraph without a connection (conn_idx: %lu):\n", j);
+                            //graph_print(copy, NULL);
+                        } else {
+                        //    printf("successful for number %lu with connection index %lu\n", i, j);
                         }
+
+                        found_connection=1;
                         free(result);
+                        fflush(stdout);
                         break;
                     }
                     k++;

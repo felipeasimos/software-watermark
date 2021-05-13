@@ -154,6 +154,11 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	// iterate over every node but the last
 	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
 
+        if(!decoder->current_node) {
+            free(bit_arr);
+            return NULL;
+        }
+
 		if( forward_flag != 0 ) {
 
 			if( get_forward_edge(decoder->current_node) ) {
