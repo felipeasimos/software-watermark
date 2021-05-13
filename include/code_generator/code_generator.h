@@ -6,6 +6,6 @@
 #include <limits.h>
 
 // return source code corresponding to the graph with encoded key
-char* watermark_get_code(GRAPH* graph);
+char* watermark_get_code2014(GRAPH* graph);
 
 #endif

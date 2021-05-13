@@ -167,7 +167,7 @@ int simple_2014_test() {
 
 int simple_2017_test_with_rs() {
 
-	for(uint8_t i=1; i < 255; i++) {
+	for(uint8_t i=5; i < 127; i++) {
 		GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 10);
 		ctdd_assert( graph );
 		unsigned long num_bytes=0;
@@ -184,7 +184,7 @@ int simple_2017_test_with_rs() {
 
 int simple_2014_test_with_rs() {
 
-	for(uint8_t k=8; k < 9; k++) {
+	for(uint8_t k=5; k < 127; k++) {
 		uint8_t i[k];
 		for(int j=0; j < k; j++) i[j] = ( rand() % 254 ) + 1;
 		GRAPH* graph = watermark2014_encode_with_rs(&i, k, k);
@@ -207,7 +207,7 @@ int code_test() {
 	uint8_t n[] = {16};
 	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
 	//graph_print(graph, NULL);
-	char* code = watermark_get_code(graph);
+	char* code = watermark_get_code2014(graph);
 	//printf("'%s'\n", code);
 	free(code);
 	graph_free(graph);
@@ -215,8 +215,67 @@ int code_test() {
 	return 0;
 }
 
+int distortion_test() {
+ 
+	for(unsigned long i=1; i < 10000; i++) {
+		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+		ctdd_assert( graph );
+
+        // get number of connections
+        unsigned long num_connections = graph_num_connections(graph);
+
+        for(unsigned long j = 0; j < num_connections; j++) {
+
+            GRAPH* copy = graph_copy(graph);
+            ctdd_assert(copy);
+
+            // go through each connection
+            unsigned long k=0;
+            for(GRAPH* node = copy; node; node = node->next) {
+
+                for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+                    if(k==j) {
+                        // remove connection and decode
+                        graph_oriented_disconnect(node, conn->node);
+                        unsigned long num_bytes=0;
+                        uint8_t* result = watermark2017_decode(copy, &num_bytes);
+		                if( !check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
+                            printf("number encoded: 0x");
+                            for(uint8_t idx = 0; idx < sizeof(i); idx++) printf("%x", ((uint8_t*)&i)[idx]);
+                            printf("\n");
+                            if(result) {
+                                printf("number decoded from new graph: 0x");
+                                for(uint8_t idx = 0; idx < num_bytes; idx++) printf("%x", result[idx]);
+                                printf("\n");
+                            } else {
+                                printf("decoding process returned NULL!\n");
+                            }
+                            printf("original graph:\n");
+                            graph_print(graph, NULL);
+                            graph_free(graph);
+                            printf("graph without a connection (conn_idx: %lu):\n", j);
+                            graph_print(copy, NULL);
+                            graph_free(copy);
+                            free(result);
+                            ctdd_assert(0);
+                        }
+                        free(result);
+                        break;
+                    }
+                    k++;
+                }
+            }
+            graph_free(copy);
+        }
+        graph_free(graph); 
+	}
+
+    return 0;
+}
+
 int run_tests() {
 
+    ctdd_verify(distortion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);

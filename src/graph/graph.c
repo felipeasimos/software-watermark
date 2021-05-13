@@ -288,3 +288,127 @@ unsigned int graph_order(GRAPH* graph_root, GRAPH* graph_node){
 	
 	return order;
 }
+
+unsigned long graph_num_nodes(GRAPH* graph) {
+
+    unsigned long i = 0;
+    for(; graph; graph = graph->next)i++;
+    return i;
+}
+
+unsigned long graph_num_connections(GRAPH* graph) {
+
+    unsigned long n=0;
+    for(; graph; graph = graph->next) {
+
+        n += connection_num(graph->connections);
+    }
+    return n;
+}
+
+GRAPH* _graph_get_copy_counter_part(GRAPH** nodes, unsigned long n, GRAPH* cursor) {
+
+    if(!nodes || !n || !cursor) return NULL;
+
+    for(unsigned long i = 0; i < n; i++) {
+        if( nodes[i*2] == cursor ) {
+            return nodes[i*2+1];
+        } else if( nodes[i*2+1] == cursor ) {
+            return nodes[i*2];
+        }
+    }
+    return NULL;
+}
+
+//return deep copy of the graph
+GRAPH* graph_copy(GRAPH* graph) {
+
+    if(!graph) return NULL;
+
+    // get number of nodes
+    unsigned long n = graph_num_nodes(graph);
+    
+    GRAPH* cursor = NULL;
+    GRAPH* nodes[n][2];
+
+    // load nodes into array and create nodes for them, copying the data
+    unsigned long i = 0;
+    for(cursor = graph; cursor; cursor = cursor->next) {
+        nodes[i][0] = cursor;
+        nodes[i][1] = cursor->data ? graph_create(cursor->data, cursor->data_len) : graph_empty();
+        if( i!=0 ) {
+            graph_insert(nodes[i-1][1], nodes[i][1]);
+        }
+        i++;
+    }
+    // iterate over nodes again, this time making connections to correspondent nodes
+    i=0;
+    for(cursor = graph; cursor; cursor = cursor->next) {
+
+        // look for copy counter-part
+        GRAPH* copy = _graph_get_copy_counter_part((GRAPH**)nodes, n, cursor);
+        // iterate over the connections of this node
+        for(CONNECTION* conn = cursor->connections; conn; conn = conn->next) {
+            GRAPH* neighbour = _graph_get_copy_counter_part((GRAPH**)nodes, n, conn->node);
+            if(!neighbour) {
+                graph_free(cursor);
+                return NULL;
+            }
+            graph_oriented_connect(copy, neighbour);
+        }
+        i++;
+    }
+    return nodes[0][1];
+}
+
+uint8_t graph_has_same_structure(GRAPH* graph1, GRAPH* graph2) {
+
+    if(!graph1 || !graph2) return 0;
+
+    GRAPH* cursor1 = graph1;
+    GRAPH* cursor2 = graph2;
+
+    unsigned long n = 0;
+    while(cursor1 && cursor2) {
+
+        cursor1 = cursor1->next;
+        cursor2 = cursor2->next;
+        n++;
+    }
+
+    if( (unsigned long)cursor1 ^ (unsigned long)cursor2 && ( cursor1 || cursor2 ) ) return 0;
+
+    // at this point, the graphs have the same number of nodes
+    GRAPH* nodes[n][2];
+    cursor1=graph1;
+    cursor2=graph2;
+    for(unsigned long i = 0; i < n; i++) {
+
+        nodes[i][0] = cursor1;
+        nodes[i][1] = cursor2;
+
+        cursor1 = cursor1->next;
+        cursor2 = cursor2->next;
+    }
+
+    for(cursor1 = graph1; cursor1; cursor1 = cursor1->next) {
+
+        CONNECTION* conn2 = cursor2->connections;
+        for(CONNECTION* conn = cursor1->connections; conn; conn = conn->next) {
+            if( !conn2 ) return 0;
+
+            if( conn2->node != _graph_get_copy_counter_part((GRAPH**)nodes, n, conn->node) ) {
+                return 0;
+            }
+
+            conn2 = conn2->next;
+        }
+    }
+
+    return 0;
+}
+
+char* graph_serialize(GRAPH* graph) {
+
+    return (char*)graph->data;
+}

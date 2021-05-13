@@ -101,4 +101,19 @@ unsigned int graph_order_from(GRAPH* graph_root, GRAPH* graph_node);
 //return number of neighbors of this node 
 unsigned int graph_order(GRAPH* graph_root, GRAPH* graph_node);
 
+//return number of nodes
+unsigned long graph_num_nodes(GRAPH* graph);
+
+//return number of connections
+unsigned long graph_num_connections(GRAPH* graph);
+
+//return deep copy of the graph
+GRAPH* graph_copy(GRAPH* graph_root);
+
+// check if two graphs have the same structure or not
+uint8_t graph_has_same_structure(GRAPH* graph1, GRAPH* graph2);
+
+// return string representing a graph, it can be used to save it to a file
+char* graph_serialize(GRAPH* graph);
+
 #endif

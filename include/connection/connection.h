@@ -39,4 +39,7 @@ void connection_free(CONNECTION* connection_root); //depends on: connection_dele
 //given print function can be NULL to print unsigned int by default
 void connection_print(CONNECTION* connection, void (*)(void*, unsigned int)); //depends on: graph_print_node()
 
+// return number of connections in this list of connections
+unsigned long connection_num(CONNECTION* connection);
+
 #endif

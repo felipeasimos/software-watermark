@@ -84,3 +84,10 @@ void connection_print(CONNECTION* connection, void(*print_func)(void*,unsigned i
 	//iterate through list and print each node the connections represent
 	for(; connection; connection = connection->next) graph_print_node(connection->node, print_func);
 }
+
+unsigned long connection_num(CONNECTION* connection) {
+
+    unsigned int n=0;
+    for(; connection; connection = connection->next) n++;
+    return n;
+}

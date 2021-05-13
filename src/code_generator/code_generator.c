@@ -441,7 +441,7 @@ void generate_pseudocode(GRAPH* graph) {
 	string_free(tmp);
 }
 
-char* watermark_get_code(GRAPH* graph) {
+char* watermark_get_code2014(GRAPH* graph) {
 
 	free_data_from_nodes(graph);
 
