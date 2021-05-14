@@ -263,16 +263,14 @@ unsigned long graph_order_to(GRAPH* graph_root, GRAPH* graph_node){
 	return order_to;
 }
 
-unsigned long graph_order_from(GRAPH* graph_root, GRAPH* graph_node){
+unsigned long graph_order_from(GRAPH* node){
 
-	if( !graph_root || !graph_node ) return 0;
+	if( !node ) return 0;
 	
 	unsigned order_from=0;
-	
-	for(; graph_root; graph_root = graph_root->next)
-		if( graph_connection( graph_node, graph_root ) )
-			order_from++;
-	
+
+    for(CONNECTION* conn = node->connections; conn; conn = conn->next) order_from++;
+
 	return order_from;
 }
 
@@ -333,10 +331,11 @@ void _graph_load_info(GRAPH* graph, void* info, unsigned long info_len) {
 
 void _graph_unload_info(GRAPH* graph) {
 
-    INFO_NODE info_node = *(INFO_NODE*)graph->data;
+    INFO_NODE* info_node = (INFO_NODE*)graph->data;
 
-    graph->data_len = info_node.data_len;
-    graph->data = info_node.data;
+    graph->data_len = info_node->data_len;
+    graph->data = info_node->data;
+    free(info_node);
 }
 
 void* _graph_get_info(GRAPH* graph) {
@@ -398,7 +397,158 @@ GRAPH* graph_copy(GRAPH* graph) {
     return copy;
 }
 
-char* graph_serialize(GRAPH* graph) {
+void* graph_serialize(GRAPH* graph, unsigned long* num_bytes) {
 
-    return (char*)graph->data;
+    if(!graph) return NULL;
+
+    // load indices to graph (remember to free the indices later!)
+    unsigned long i = 0;
+    for(GRAPH* node = graph; node; i++) {
+
+        unsigned long* i_copy = malloc(sizeof(i));
+        memcpy(i_copy, &i, sizeof(i));
+        _graph_load_info(node, i_copy, sizeof(i));
+        node = node->next;
+    }
+
+    uint8_t* graph_serialized = malloc( sizeof(unsigned long) );
+    *num_bytes = sizeof(unsigned long);
+
+    // write number of nodes
+    memcpy(graph_serialized, &i, sizeof(unsigned long));
+
+    for(GRAPH* node = graph; node; node = node->next) {
+
+        // 1. data_len (unsigned long, 8 bytes)
+        // 2. data (variable length)
+        // 3. number of neighbours (unsigned long)
+        // 4. idx of neighbours (variable length)
+
+        unsigned long num_neighbours = graph_order_from(node);
+
+        unsigned long offset = 
+            sizeof(unsigned long) + // data_len
+            ((INFO_NODE*)node->data)->data_len + // data
+            sizeof(unsigned long) + // num_neighbours
+            sizeof(unsigned long) * num_neighbours; // list of neighbours idxs
+
+        *num_bytes += offset;
+        graph_serialized = realloc(graph_serialized, *num_bytes);
+
+        // 1. data_len
+        memcpy(
+            graph_serialized + ( (*num_bytes) - offset ),
+            &((INFO_NODE*)node->data)->data_len,
+            sizeof(unsigned long)
+        );
+
+        // 2. data
+        if( ((INFO_NODE*)node->data)->data_len ) {
+            memcpy(
+                graph_serialized + ( (*num_bytes) - offset + sizeof(unsigned long) ),
+                    ((INFO_NODE*)node->data)->data,
+                ((INFO_NODE*)node->data)->data_len
+            );
+        }
+
+        // 3. number of neighbours
+        memcpy(
+            graph_serialized + ( (*num_bytes) - sizeof(unsigned long) * (1+num_neighbours) ),
+            &num_neighbours,
+            sizeof(unsigned long)
+        );
+
+        // 4. list of neighbours idxs
+        unsigned long neighbour_pos = 0;
+        for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+            memcpy(
+                graph_serialized + ( (*num_bytes) - sizeof(unsigned long) * (num_neighbours-neighbour_pos) ),
+                _graph_get_info(conn->node),
+                sizeof(unsigned long)
+            );
+            neighbour_pos++;
+        }
+    }
+
+    // unload all nodes
+    for(GRAPH* node=graph; node; node = node->next) {
+
+        void* info = _graph_get_info(node);
+        free(info);
+        _graph_unload_info(node);
+    }
+
+    return graph_serialized;
+}
+
+GRAPH* graph_deserialize(uint8_t* data) {
+
+    if(!data) return NULL;
+
+    // get number of nodes
+    unsigned long n;
+    memcpy( &n, data, sizeof(unsigned long) );
+    data += sizeof(unsigned long);
+
+    // populate the array with empty nodes
+    GRAPH* nodes[n];
+    for(unsigned long i = 0; i < n; i++) {
+        nodes[i] = graph_empty();
+        if(i > 0) {
+            graph_insert(nodes[i-1], nodes[i]);
+        }
+    }
+
+    for(unsigned long i = 0; i < n; i++) {
+
+        // 1. data_len
+        // 2. data
+        // 3. num_neighbours
+        // 4. list of neighbour idxs
+
+        // 1. data_len
+        memcpy(
+            &nodes[i]->data_len,
+            data,
+            sizeof(unsigned long)
+        );
+        data += sizeof(unsigned long);
+        if( nodes[i]->data_len ) {
+            graph_alloc(nodes[i], nodes[i]->data_len);
+
+            // 2. data
+            memcpy(
+                nodes[i]->data,
+                data,
+                nodes[i]->data_len
+            );
+            data += nodes[i]->data_len;
+        }
+
+        // 3. num_neighbours
+        unsigned long num_neighbours;
+        memcpy(
+            &num_neighbours,
+            data,
+            sizeof(unsigned long)
+        );
+        data += sizeof(unsigned long);
+
+        // 4. list of neighbour idxs
+        for(unsigned long j = 0; j < num_neighbours; j++) {
+
+            unsigned long neighbour_idx;
+            memcpy(
+                &neighbour_idx,
+                data,
+                sizeof(unsigned long)
+            );
+            data += sizeof(unsigned long);
+            graph_oriented_connect(
+                    nodes[i],
+                    nodes[neighbour_idx]
+            );
+        }
+    }
+    return nodes[0];
 }

@@ -96,7 +96,7 @@ short graph_check_isolated(GRAPH*);
 unsigned long graph_order_to(GRAPH* graph_root, GRAPH* graph_node);
 
 //how many nodes graph_node points to
-unsigned long graph_order_from(GRAPH* graph_root, GRAPH* graph_node);
+unsigned long graph_order_from(GRAPH* graph_node);
 
 //return number of neighbors of this node 
 unsigned long graph_order(GRAPH* graph_root, GRAPH* graph_node);
@@ -110,7 +110,10 @@ unsigned long graph_num_connections(GRAPH* graph);
 //return deep copy of the graph
 GRAPH* graph_copy(GRAPH* graph_root);
 
-// return string representing a graph, it can be used to save it to a file
-char* graph_serialize(GRAPH* graph);
+// return bytes representing a graph, it can be used to save it to a file
+void* graph_serialize(GRAPH* graph, unsigned long* num_bytes);
+
+// return graph from a given byte sequence with a graph serialized in it
+GRAPH* graph_deserialize(uint8_t* data);
 
 #endif

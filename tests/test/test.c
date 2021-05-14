@@ -166,14 +166,16 @@ int simple_2014_test() {
 }
 
 int simple_2017_test_with_rs() {
-
-	for(uint8_t i=5; i < 127; i++) {
-		GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 10);
+	
+	for(uint8_t k=5; k < 127; k++) {
+		uint8_t i[k];
+		for(int j=0; j < k; j++) i[j] = ( rand() % 254 ) + 1;
+		GRAPH* graph = watermark2017_encode_with_rs(&i, k, k);
 		ctdd_assert( graph );
-		unsigned long num_bytes=0;
-		uint8_t* result = watermark2017_decode_with_rs(graph, &num_bytes, 10);
+		unsigned long num_bytes = 0;
+		uint8_t* result = watermark2017_decode_with_rs(graph, &num_bytes, k);
 		ctdd_assert( num_bytes );
-		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
+		ctdd_assert( check((uint8_t*)&i, result, k, num_bytes ) );
 
 		// 10^8 tests won't be a good idea if we don't deallocate memory
 		graph_free(graph);
@@ -278,15 +280,55 @@ int distortion_test() {
     return 0;
 }
 
+int serialization_test() {
+
+    for(uint8_t i = 1; i < 255; i++) {
+
+        GRAPH* graph = watermark2017_encode(&i, sizeof(uint8_t));
+        
+        unsigned long num_bytes = 0;
+        uint8_t* data = graph_serialize(graph, &num_bytes);
+        ctdd_assert(num_bytes);
+
+        GRAPH* copy = graph_deserialize(data);
+        uint8_t* result = watermark2017_decode(copy, &num_bytes);
+        graph_free(copy);
+        graph_free(graph);
+        free(data);
+        ctdd_assert( *result == i );
+        free(result);
+    }
+    return 0;
+}
+
+int copy_test() {
+
+    for(uint8_t i = 1; i < 255; i++) {
+
+        GRAPH* graph = watermark2017_encode(&i, sizeof(uint8_t));
+        
+        GRAPH* copy = graph_copy(graph);
+        unsigned long num_bytes;
+        uint8_t* result = watermark2017_decode(copy, &num_bytes);
+        graph_free(copy);
+        graph_free(graph);
+        ctdd_assert( *result == i );
+        free(result);
+    }
+    return 0;
+}
+
 int run_tests() {
 
-    ctdd_verify(distortion_test);
+    ctdd_verify(copy_test);
+    ctdd_verify(serialization_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);
 	ctdd_verify(simple_2017_test);
 	ctdd_verify(simple_2014_test_with_rs);
 	ctdd_verify(simple_2017_test_with_rs);
+    // ctdd_verify(distortion_test);
 
 	//ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);
