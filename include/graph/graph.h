@@ -12,7 +12,7 @@ struct CONNECTION; //just so we can point to CONNECTION struct before including 
 typedef struct GRAPH{
 
 	void* data;		
-	unsigned int data_len; //variables that store actual information
+	unsigned long data_len; //variables that store actual information
 
 	struct CONNECTION* connections; //start of simple linked list of connections
 	struct GRAPH* next; //next node in the node double linked list
@@ -25,10 +25,10 @@ typedef struct GRAPH{
 GRAPH* graph_empty();
 
 //allocate memory for graph data
-void graph_alloc(GRAPH*, unsigned int);
+void graph_alloc(GRAPH*, unsigned long);
 
 //create node with data
-GRAPH* graph_create(void* data, unsigned int data_len);
+GRAPH* graph_create(void* data, unsigned long data_len);
 
 //properly deallocate memory of pointers in the struct (except pointer to other nodes)
 //and free given pointer
@@ -40,7 +40,7 @@ void graph_free_node(GRAPH*); //depends on: connection_free()
 void graph_insert(GRAPH* graph_root, GRAPH* graph_to_insert);
 
 //search for graph node with given data in the given GRAPH list
-GRAPH* graph_search(GRAPH*, void* data, unsigned int data_len);
+GRAPH* graph_search(GRAPH*, void* data, unsigned long data_len);
 
 //return connection from graph_from node to graph_to node
 //bascially a wrapper around connection_search()
@@ -81,25 +81,25 @@ void graph_free(GRAPH*); //depends on: graph_delete()
 //print graph node
 //given function takes in 'data' and 'data_len' attributes from node
 //and should print them as you like
-//if no function is given, the data is printed as if it was an unsigned int
-void graph_print_node(GRAPH*, void (*)(void*, unsigned int));
+//if no function is given, the data is printed as if it was an unsigned long
+void graph_print_node(GRAPH*, void (*)(void*, unsigned long));
 
 //print the whole graph
 //basically calls graph_print_node a lot
 //print_func functions as in graph_print_node
-void graph_print(GRAPH*, void (*)(void*, unsigned int)); //depends on: graph_print_node()
+void graph_print(GRAPH*, void (*)(void*, unsigned long)); //depends on: graph_print_node()
 
 //check if graph node is isolated, returns 1 if it is, 0 otherwise
 short graph_check_isolated(GRAPH*);
 
 //how many nodes points to graph_node
-unsigned int graph_order_to(GRAPH* graph_root, GRAPH* graph_node);
+unsigned long graph_order_to(GRAPH* graph_root, GRAPH* graph_node);
 
 //how many nodes graph_node points to
-unsigned int graph_order_from(GRAPH* graph_root, GRAPH* graph_node);
+unsigned long graph_order_from(GRAPH* graph_root, GRAPH* graph_node);
 
 //return number of neighbors of this node 
-unsigned int graph_order(GRAPH* graph_root, GRAPH* graph_node);
+unsigned long graph_order(GRAPH* graph_root, GRAPH* graph_node);
 
 //return number of nodes
 unsigned long graph_num_nodes(GRAPH* graph);
@@ -109,9 +109,6 @@ unsigned long graph_num_connections(GRAPH* graph);
 
 //return deep copy of the graph
 GRAPH* graph_copy(GRAPH* graph_root);
-
-// check if two graphs have the same structure or not
-uint8_t graph_has_same_structure(GRAPH* graph1, GRAPH* graph2);
 
 // return string representing a graph, it can be used to save it to a file
 char* graph_serialize(GRAPH* graph);

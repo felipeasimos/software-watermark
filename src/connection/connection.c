@@ -79,7 +79,7 @@ void connection_free(CONNECTION* connection_root){
 	free( connection_root );
 }
 
-void connection_print(CONNECTION* connection, void(*print_func)(void*,unsigned int)){
+void connection_print(CONNECTION* connection, void(*print_func)(void*,unsigned long)){
 
 	//iterate through list and print each node the connections represent
 	for(; connection; connection = connection->next) graph_print_node(connection->node, print_func);
@@ -87,7 +87,7 @@ void connection_print(CONNECTION* connection, void(*print_func)(void*,unsigned i
 
 unsigned long connection_num(CONNECTION* connection) {
 
-    unsigned int n=0;
+    unsigned long n=0;
     for(; connection; connection = connection->next) n++;
     return n;
 }
