@@ -88,7 +88,7 @@ GRAPH* graph_search(GRAPH* graph, void* data, unsigned long data_len){
 
 CONNECTION* graph_connection(GRAPH* graph_from, GRAPH* graph_to){
 
-	return connection_search(graph_from->connections, graph_to);
+	return connection_search_node(graph_from->connections, graph_to);
 }
 
 void graph_oriented_disconnect(GRAPH* graph_from, GRAPH* graph_to){
@@ -97,7 +97,7 @@ void graph_oriented_disconnect(GRAPH* graph_from, GRAPH* graph_to){
 	if( !graph_from || !graph_to ) return;
 
 	//delete graph_to from graph_from's connection's list
-	connection_delete( graph_from->connections, graph_to );
+	connection_delete_node( graph_from->connections, graph_to );
 
 	/*
 	connection_delete won't delete connection
@@ -119,7 +119,7 @@ void graph_oriented_connect(GRAPH* graph_from, GRAPH* graph_to){
 	if( !graph_from || !graph_to ) return;
 
 	//insert graph_to in graph_from's connections list
-	connection_insert( graph_from->connections, graph_to );
+	connection_insert_node( graph_from->connections, graph_to );
 
 	/*
 	connection_insert() will do nothing if graph->connections is NULL,

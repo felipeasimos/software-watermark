@@ -27,7 +27,7 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	} else {
 		// 2. we have a forward edge and no missing hamiltonian edges, so this means that
 		// one node (the forward edge one) is the next hamiltonian node of the other
-		return connection_search(node1->connections, node2) ? node2 : node1;
+		return connection_search_node(node1->connections, node2) ? node2 : node1;
 	}
 }
 
@@ -52,7 +52,7 @@ uint8_t is_graph_structure_valid(GRAPH* graph) {
 		if( graph->connections && graph->connections->next && graph->connections->next->next ) return 0;
 
 		// 4. no connections to the same node
-		if( connection_search(graph->connections, graph) ) return 0;
+		if( connection_search_node(graph->connections, graph) ) return 0;
 	}
 
 	return 1;

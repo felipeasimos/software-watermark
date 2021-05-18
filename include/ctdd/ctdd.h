@@ -80,3 +80,23 @@ int ctdd_test(int (*test_runner)()){
 }
 
 #endif
+
+// at the end, the test could should look like this
+/*int test1() {
+  // code
+  ctdd_assert( assertion );
+  return 0; // always end with return 0
+}
+...
+int run_tests() {
+  ctdd_verify(test1);
+  ctdd_verify(test2);
+  ctdd_verify(test3);
+  return 0;
+}
+int main(){
+  ctdd_set_quiet(); //optional
+  ctdd_setup_signal_handler(); //optional
+  return ctdd_test(run_tests);
+}
+*/

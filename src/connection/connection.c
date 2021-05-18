@@ -14,7 +14,7 @@ CONNECTION* connection_create(){
 	return connection;
 }
 
-void connection_insert(CONNECTION* connection_root, GRAPH* new_connection){
+void connection_insert_node(CONNECTION* connection_root, GRAPH* new_connection) {
 
 	//if one of the arguments is NULL nothing happens	
 	if( !connection_root || !new_connection ) return;
@@ -29,9 +29,11 @@ void connection_insert(CONNECTION* connection_root, GRAPH* new_connection){
 	//connection_root->next's antecessor
 	new_connection_node->next = connection_root->next;
 	connection_root->next = new_connection_node;
+
+    new_connection_node->prev = connection_root;
 }
 
-CONNECTION* connection_search(CONNECTION* connection_node, GRAPH* graph_node){
+CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_node){
 
 	//if one of the arguments is NULL nothing happens
 	if( !connection_node || !graph_node ) return NULL;
@@ -48,7 +50,7 @@ CONNECTION* connection_search(CONNECTION* connection_node, GRAPH* graph_node){
 	return NULL;
 }
 
-void connection_delete(CONNECTION* connection_node, GRAPH* graph_node){
+void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node){
 
 	//if one of the given arguments is NULL, nothing happens
 	if( !connection_node || !graph_node ) return;
@@ -61,6 +63,7 @@ void connection_delete(CONNECTION* connection_node, GRAPH* graph_node){
 
 			CONNECTION* tmp = connection_node->next; //save found node
 			connection_node->next = tmp->next; //points to found node sucessor
+            if(connection_node->next) connection_node->next->prev = connection_node;
 			free(tmp); //deallocate found node's memory
 			return; //end function here
 		}
@@ -73,7 +76,7 @@ void connection_free(CONNECTION* connection_root){
 	if( !connection_root ) return;
 
 	//delete all nodes after connection_root until there is none left
-	while( connection_root->next ) connection_delete(connection_root, connection_root->next->node);
+	while( connection_root->next ) connection_delete_node(connection_root, connection_root->next->node);
 
 	//free connection_root
 	free( connection_root );

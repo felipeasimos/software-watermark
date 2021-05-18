@@ -9,11 +9,6 @@
 
 uint8_t get_uint8_t() {
 
-	printf("do you want to insert a string or a number?\n");
-	printf("1) string\n");
-	printf("2) number\n");
-	printf("else) exit\n");
-
 	uint8_t n;
 	scanf(" %hhu", &n);
 	return n;
@@ -25,9 +20,9 @@ void encode_string() {
 	printf("input string to be encoded (max size is %lu): ", (unsigned long) MAX_SIZE);
 	scanf(" %" MAX_SIZE_STR "s", s);
 
-	GRAPH* g = watermark2017_encode(s, strlen(s));
+	GRAPH* g = watermark2014_encode(s, strlen(s));
 
-	char* code = watermark_get_code(g);
+	char* code = watermark_get_code2014(g);
 
 	printf("code generated:\n");
 	printf("%s\n", code);
@@ -61,9 +56,9 @@ void encode_number() {
 		n = tmp;
 	}
 
-	GRAPH* g = watermark2017_encode(&n, sizeof(n));
+	GRAPH* g = watermark2014_encode(&n, sizeof(n));
 
-	char* code = watermark_get_code(g);
+	char* code = watermark_get_code2014(g);
 
 	printf("%s\n", code);
 
@@ -73,13 +68,17 @@ void encode_number() {
 
 int main() {
 
+    printf("do you want to insert a string or a number?\n");
+	printf("1) string\n");
+	printf("2) number\n");
+	printf("else) exit\n");
+
 	uint8_t quit=0;
 	while(!quit) {
 		switch( get_uint8_t() ) {
 
 			// string
 			case 1:
-
 				encode_string();
 				break;
 			// number

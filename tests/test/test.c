@@ -217,65 +217,47 @@ int code_test() {
 	return 0;
 }
 
-int distortion_test() {
- 
-	for(unsigned long i=1; i < 100000000; i++) {
-		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
-		ctdd_assert( graph );
+void _save_successfull_distortion_attack(GRAPH* graph, GRAPH* copy, unsigned long number_encoded, unsigned long connection_idx) {
 
-        // get number of connections
-        unsigned long num_connections = graph_num_connections(graph);
+    unsigned long num_bytes_graph=0;
+    uint8_t* data_graph = graph_serialize(graph, &num_bytes_graph);
 
-        for(unsigned long j = 0; j < num_connections; j++) {
+    unsigned long num_bytes_copy=0;
+    uint8_t* data_copy = graph_serialize(copy, &num_bytes_copy);
 
-            GRAPH* copy = graph_copy(graph);
-            ctdd_assert(copy);
+    data_graph = realloc(data_graph, num_bytes_graph + num_bytes_copy);
+    memcpy(data_graph + num_bytes_copy, data_copy, num_bytes_copy);
+    free(data_copy);
 
-            // go through each connection
-            unsigned long k=0;
+    char filename[50]={0};
+    sprintf(filename, "tests/%lu_%lu.dat", number_encoded, connection_idx);
 
-            uint8_t found_connection = 0;
-            for(GRAPH* node = copy; !found_connection && node; node = node->next) {
+    FILE* f = fopen(filename, "wb");
 
+    if(!f || fwrite(data_graph, 1, num_bytes_graph + num_bytes_copy, f) < num_bytes_copy + num_bytes_graph) {
 
-                for(CONNECTION* conn = node->connections ? node->connections->next : NULL; conn; conn = conn->next) {
-                    if(k==j) {
-                        // remove connection and decode
-                        graph_oriented_disconnect(node, conn->node);
-                        unsigned long num_bytes=0;
-                        uint8_t* result = watermark2017_decode(copy, &num_bytes);
-                        if( !result || !check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
-                            printf("\x1b[31mERROR:\x1b[0m\n");
-                            printf("\tnumber encoded: %lu\n", i);
+        fprintf(stderr, "ERROR WHEN WRITING tests/%lu_%lu.dat", number_encoded, connection_idx);
+    }
 
-                            if(result) {
-                                printf("\tnumber decoded from new graph: 0x");
-                                for(uint8_t idx = 0; idx < num_bytes; idx++) printf("%x", result[idx]);
-                                printf("\n");
-                            } else {
-                                printf("\tresult is NULL\n");
-                            }
-                            
-                            printf("\toriginal graph:\n");
-                            //graph_print(graph, NULL);
-                            printf("\tgraph without a connection (conn_idx: %lu):\n", j);
-                            //graph_print(copy, NULL);
-                        } else {
-                        //    printf("successful for number %lu with connection index %lu\n", i, j);
-                        }
+    free(data_graph);
+    fclose(f);
+}
 
-                        found_connection=1;
-                        free(result);
-                        fflush(stdout);
-                        break;
-                    }
-                    k++;
-                }
-            }
-            graph_free(copy);
+int removal_attack_test() {
+
+    double total=0;
+    double error=0;
+
+    for(unsigned long n_removals=0; total == 0 || (error/total) < 0.2; n_removals++) {
+
+        for(unsigned long i=1; i < 100000000 && (total != 0 || (error/total) < 0.2 ); i++) {
+
+            GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+            ctdd_assert( graph );
+
+            graph_free(graph); 
         }
-        graph_free(graph); 
-	}
+    }
 
     return 0;
 }
@@ -320,15 +302,14 @@ int copy_test() {
 
 int run_tests() {
 
-    ctdd_verify(copy_test);
-    ctdd_verify(serialization_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);
 	ctdd_verify(simple_2017_test);
 	ctdd_verify(simple_2014_test_with_rs);
 	ctdd_verify(simple_2017_test_with_rs);
-    // ctdd_verify(distortion_test);
+    ctdd_verify(copy_test);
+    ctdd_verify(serialization_test);
 
 	//ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);

@@ -5,7 +5,7 @@
 CC := clang
 CFLAGS = -pedantic-errors -Wall -Wextra -std=c99 -fPIC -Werror
 
-# extensions and location (since you can use .cpp or .c)
+# extensions and location
 ROOT_DIR :=.
 TEST_FILE_EXTENSION := c
 SRC_FILE_EXTENSION := c
@@ -89,7 +89,7 @@ GCOV_COMMAND:=$(COVERAGE_COMMAND) $(TESTS_OBJ) $(OBJECTS) 2>/dev/null | grep -Eo
 UNTESTED_DETECTOR_COMMAND:=$(GCOV_COMMAND) | grep -v "100.00%" | grep -v "^'tests/" | awk '{ print "\x1b[38;2;255;25;25;1m" $$1 " \x1b[0m\x1b[38;2;255;100;100;1m" $$2 "\x1b[0m" }'
 COVERAGE_COMMAND:=@$(UNTESTED_DETECTOR_COMMAND); $(GCOV_COMMAND) | awk '{ sum += $$2; count[NR] = $$2 } END { if(NR%2) { median=count[(NR+1)/2]; } else { median=count[NR/2]; } if( NR==0 ) { NR=1; } print "\x1b[32mCode Coverage\x1b[0m:\n\t\x1b[33mAverage\x1b[0m: " sum/NR "%\n\x1b[35m\tMedian\x1b[0m: " median  }'
 RUN_TESTS_COMMAND:=@valgrind -q --exit-on-first-error=yes --error-exitcode=1 --tool=memcheck\
-		--show-reachable=yes --leak-check=yes --track-origins=yes $(TEST_TARGET_FINAL) --gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
+		--show-reachable=yes --leak-check=yes --track-origins=yes $(TEST_TARGET_FINAL) #--gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
 STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=naming \
 	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
@@ -109,6 +109,9 @@ help:
 clangd:
 	@echo "-I" > $(ROOT_DIR)/compile_flags.txt
 	@echo "$(INCLUDE_DIR)" >> $(ROOT_DIR)/compile_flags.txt
+	@for opt in $(CFLAGS); do\
+		echo $$opt >> $(ROOT_DIR)/compile_flags.txt;\
+	done
 
 release: CFLAGS += -O2 -fPIC
 release: | clean lib 
@@ -128,6 +131,7 @@ debug: $(TESTS_OBJ) test lib
 
 test: $(TESTS_OBJ) $(OBJECTS) 
 	@$(CC) $(CFLAGS) $(INCLUDE) -o $(TEST_TARGET_FINAL) $^ $(LDFLAGS)
+	@#$(STATIC_ANALYSIS_COMMAND)
 	$(RUN_TESTS_COMMAND)
 	$(COVERAGE_COMMAND)
 
