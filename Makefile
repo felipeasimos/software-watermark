@@ -106,6 +106,15 @@ help:
 	# debug - produce lib with debug info and run tests
 	# clean - clean produced binaries
 	# clangd - generate compile_flags.txt file for clangd
+plot:
+	gnuplot -e "plot '$(TEST_SRC_DIR)/report_rm_1.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_2.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_3.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_4.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_5.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_6.plt' using 1:2 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_7.plt' using 1:2 with lines; pause -1 \"Hit any key to continue\""
+
 clangd:
 	@echo "-I" > $(ROOT_DIR)/compile_flags.txt
 	@echo "$(INCLUDE_DIR)" >> $(ROOT_DIR)/compile_flags.txt
@@ -121,7 +130,7 @@ compilemain: release
 	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
 
 main: release compilemain
-	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) ./$(TARGET)
+	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)
 
 lib: folders $(TARGET_LIB_FINAL)
 
