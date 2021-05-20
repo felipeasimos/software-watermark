@@ -1,0 +1,4 @@
+number of removals: 2
+last correct number evaluated: 52988
+error percentage: 0.200000
+last number evaluated: 52988

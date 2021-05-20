@@ -19,6 +19,17 @@ typedef struct GRAPH{
 	struct GRAPH* prev; //previous node in the node double linked list
 } GRAPH;
 
+typedef struct INFO_NODE {
+
+    // value of data, stored previously in the node
+    void* data;
+    unsigned long data_len;
+
+    // info used in a process
+    void* info;
+    unsigned long info_len;
+} INFO_NODE;
+
 #include "connection/connection.h" //we can't include it before 'struct CONNECTION;'
 
 //creates empty graph
@@ -107,8 +118,24 @@ unsigned long graph_num_nodes(GRAPH* graph);
 //return number of connections
 unsigned long graph_num_connections(GRAPH* graph);
 
-//return deep copy of the graph
+// load data, make current data nested
+void graph_load_info(GRAPH* graph, void* info, unsigned long info_len);
+
+// unload data, make nested data the main one
+void graph_unload_info(GRAPH* graph);
+
+// call 'graph_unload_info' for all nodes
+void graph_unload_all_info(GRAPH* graph);
+
+void* graph_get_info(GRAPH* graph);
+
+unsigned long graph_get_info_len(GRAPH* graph);
+
+// return deep copy of the graph
 GRAPH* graph_copy(GRAPH* graph_root);
+
+// load copy graph in the given graph
+void graph_load_copy(GRAPH* graph);
 
 // return bytes representing a graph, it can be used to save it to a file
 void* graph_serialize(GRAPH* graph, unsigned long* num_bytes);

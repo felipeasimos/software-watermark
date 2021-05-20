@@ -1,6 +1,6 @@
 #include "connection/connection.h"
 
-CONNECTION* connection_create(){
+CONNECTION* connection_create(GRAPH* node){
 
 	//allocate memory for struct
 	CONNECTION* connection = malloc(sizeof(CONNECTION));
@@ -10,6 +10,7 @@ CONNECTION* connection_create(){
 
 	//set weight to one by default
 	connection->weight = 1;
+    connection->parent = node;
 
 	return connection;
 }
@@ -20,7 +21,7 @@ void connection_insert_node(CONNECTION* connection_root, GRAPH* new_connection) 
 	if( !connection_root || !new_connection ) return;
 
 	//create new connection struct
-	CONNECTION* new_connection_node = connection_create();
+	CONNECTION* new_connection_node = connection_create(connection_root->parent);
 
 	//make it point to new_connection
 	new_connection_node->node = new_connection;
@@ -29,8 +30,16 @@ void connection_insert_node(CONNECTION* connection_root, GRAPH* new_connection) 
 	//connection_root->next's antecessor
 	new_connection_node->next = connection_root->next;
 	connection_root->next = new_connection_node;
+}
 
-    new_connection_node->prev = connection_root;
+void connection_insert(CONNECTION* connection, CONNECTION* new_connection) {
+
+    if(!connection || !new_connection) return;
+
+	//set new connection as connection_root's sucessor and
+	//connection_root->next's antecessor
+	new_connection->next = connection->next;
+	connection->next = new_connection;
 }
 
 CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_node){
@@ -55,6 +64,13 @@ void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node){
 	//if one of the given arguments is NULL, nothing happens
 	if( !connection_node || !graph_node ) return;
 
+    if(connection_node->node == graph_node) {
+
+        connection_node->parent->connections = connection_node->next;
+        free(connection_node);
+        return;
+    }
+
 	for(;
 	connection_node->next;	//iterates through connections until current_connection
 	connection_node = connection_node->next ){
@@ -63,11 +79,36 @@ void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node){
 
 			CONNECTION* tmp = connection_node->next; //save found node
 			connection_node->next = tmp->next; //points to found node sucessor
-            if(connection_node->next) connection_node->next->prev = connection_node;
 			free(tmp); //deallocate found node's memory
 			return; //end function here
 		}
 	}
+}
+
+void connection_delete(CONNECTION* connection_node, CONNECTION* conn) {
+ 
+	//if one of the given arguments is NULL, nothing happens
+	if( !connection_node || !conn ) return;
+
+    if(connection_node == conn) {
+
+        connection_node->parent->connections = connection_node->next;
+        free(connection_node);
+        return;
+    }
+
+	for(;
+	connection_node->next;	//iterates through connections until current_connection
+	connection_node = connection_node->next ){
+
+		if( connection_node->next == conn ){
+
+			CONNECTION* tmp = connection_node->next; //save found node
+			connection_node->next = tmp->next; //points to found node sucessor
+			free(tmp); //deallocate found node's memory
+			return; //end function here
+		}
+	}   
 }
 
 void connection_free(CONNECTION* connection_root){
