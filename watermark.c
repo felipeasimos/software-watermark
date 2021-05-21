@@ -66,13 +66,13 @@ void encode_number() {
 	free(code);
 }
 
-uint8_t _check(uint8_t* i, uint8_t* result, unsigned long n, unsigned long i_size) {
+uint8_t check_unsigned_long(unsigned long i, uint8_t* i_inverted, unsigned long n) {
 
-	// start checking i from the end
-	for(unsigned long j=0; j < n; j++) {
-		if( i[i_size - j - 1] != result[n - j - 1] ) return 0;
-	}
-	return 1;
+    for(unsigned long j = 0; j < n; j++) {
+
+        if( ((uint8_t*)&i)[sizeof(i)-j-1] != i_inverted[j] ) return 0;
+    }
+    return 1;
 }
 
 unsigned long invert_unsigned_long(unsigned long n) {
@@ -134,9 +134,11 @@ void _conn_list_free(_CONN_LIST* list) {
     free(list);
 }
 
-void _test_with_removed_connections(double* total, double* error, unsigned long i, GRAPH* graph, _CONN_LIST* conns) {
+int _test_with_removed_connections(double* total, double* error, unsigned long i, GRAPH* graph, _CONN_LIST* conns) {
 
-    (*total)++;
+    //(*total)++;
+    total++;
+    error++;
     graph_load_copy(graph);
 
     for(_CONN_LIST* l = conns; l; l = l->next) {
@@ -153,20 +155,24 @@ void _test_with_removed_connections(double* total, double* error, unsigned long 
     unsigned long num_bytes=0;
     uint8_t* result = watermark2017_decode(copy, &num_bytes);
 
-    if( !result || !_check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
-
-        (*error)++;
-        //_save_successfull_attack(copy, i, (*error)/(*total));
-    }
     graph_free(copy);
-    free(result);
+    if( !result || !check_unsigned_long(i, result, num_bytes) ) {
+
+        //(*error)++;
+        free(result);
+        //_save_successfull_attack(copy, i, (*error)/(*total));
+        return 0;
+    } else {
+        free(result);
+        return 1;
+    }
 }
 
-void _multiple_removal_test(unsigned long n_removals, double* total, double* error, unsigned long i, GRAPH* root, GRAPH* graph, CONNECTION* conn, _CONN_LIST* l) {
+int _multiple_removal_test(unsigned long n_removals, double* total, double* error, unsigned long i, GRAPH* root, GRAPH* graph, CONNECTION* conn, _CONN_LIST* l) {
 
     if(!n_removals) {
 
-        _test_with_removed_connections(total, error, i, root, l);
+        return _test_with_removed_connections(total, error, i, root, l);
     } else {
 
         uint8_t first=1;
@@ -183,11 +189,18 @@ void _multiple_removal_test(unsigned long n_removals, double* total, double* err
                 for(c = c->node == graph->next ? c->next : c; c; c = c->next) {
 
                     _CONN_LIST* list = _conn_list_create(l, c);
-                    _multiple_removal_test(n_removals-1, total, error, i, root, graph, c->next, list);
-                    _conn_list_free(list);
+                    if(_multiple_removal_test(n_removals-1, total, error, i, root, graph, c->next, list)) {
+
+                        _conn_list_free(list);
+                        return 1;
+                    } else {
+                        _conn_list_free(list);
+                        return 0;
+                    }
                 }
             }
         }
+        return 1;
     }
 }
 
@@ -206,13 +219,15 @@ void removal_attack() {
         printf("number of removals: %lu\n", n_removals);
         for(unsigned long i = 1; i < 100000000 && (!total || (error/total) < 0.2); i++) {
 
-            GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+            total++;
+            unsigned long inverse_i = invert_unsigned_long(i);
+            GRAPH* graph = watermark2017_encode(&inverse_i, sizeof(inverse_i));
 
-            _multiple_removal_test(n_removals, &total, &error, i, graph, graph, NULL, NULL);
+            error += !_multiple_removal_test(n_removals, &total, &error, i, graph, graph, NULL, NULL);
 
             if((total && last_error != error) || i==1) {
 
-                printf("%lu %F\n", i, error/total);
+                printf("%lu %F %F %F\n", i, error/total ,error, total);
                 fprintf(report, "%lu %F\n", i, error/total);
                 fflush(report);
             }
@@ -268,10 +283,10 @@ void _test_with_added_connections(double* total, double* error, unsigned long i,
     unsigned long num_bytes=0;
     uint8_t* result = watermark2017_decode(copy, &num_bytes);
 
-    if( !result || !_check((uint8_t*)&i, result, num_bytes, sizeof(i) ) ) {
+    if( !result || !check_unsigned_long(i, result, num_bytes ) ) {
 
         (*error)++;
-        //_save_successfull_attack(copy, i, (*error)/(*total));
+        //_save_successfull_attack(copy, invert_unsigned_long(i), (*error)/(*total));
     }
     graph_free(copy);
     free(result);
@@ -284,9 +299,9 @@ void _multiple_addition_test(GRAPH* graph, _CONN_LIST* l, double* total, double*
         _test_with_added_connections(total, error, i, graph, l);
     } else {
 
-        l = _conn_list_create(l, _graph_create_random_connection(graph, num_nodes));
-        _multiple_addition_test(graph, l, total, error, num_nodes, i, n_additions-1);
-        _conn_list_free(l);
+        _CONN_LIST* list = _conn_list_create(l, _graph_create_random_connection(graph, num_nodes));
+        _multiple_addition_test(graph, list, total, error, num_nodes, i, n_additions-1);
+        _conn_list_free(list);
     }
 }
 
@@ -304,7 +319,9 @@ void addition_random_attack() {
 
         for(unsigned long i = 1; i < 100000000 && (!total || (error/total) < 0.2 ); i++) {
 
-            GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+            unsigned long inverse_i = invert_unsigned_long(i);
+
+            GRAPH* graph = watermark2017_encode(&inverse_i, sizeof(inverse_i));
 
             unsigned long num_nodes = graph_num_nodes(graph);
 

@@ -194,7 +194,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 					}
 					WM_NODE* dest = dest_node->data;
 					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-				}
+				} 
 			}
 		} else {
 			i--;
