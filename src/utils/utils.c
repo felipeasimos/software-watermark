@@ -132,12 +132,27 @@ unsigned long get_num_bits(GRAPH* graph) {
 // the nodes we passed througth must be marked with an data_len != 0
 GRAPH* get_backedge(GRAPH* node) {
 
+    if(!node) return NULL;
+
 	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
 
 		if( is_backedge(conn->node) ) return conn->node;
 	}
 	return NULL;
 }
+
+// the nodes we passed througth must be marked with info
+GRAPH* get_backedge_with_info(GRAPH* node) {
+
+    if(!node) return NULL;
+
+	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+
+		if( conn->node->data_len == sizeof(INFO_NODE) && conn->node->data && graph_get_info(conn->node) ) return conn->node;
+	}
+	return NULL;
+}
+
 
 GRAPH* get_forward_edge(GRAPH* node) {
 
@@ -247,4 +262,20 @@ void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_
 		graph_oriented_connect(source_node, dest_node);
 		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);
 	}
+}
+
+unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
+
+	// praticamente python
+	for(unsigned long i = 0; i < data_len; i++) {
+		if(data[i]) {
+			for(uint8_t j = 0; j < 8; j++) {
+				if(get_bit(data, i*8+j)) {
+					return i*8 + j;
+				}
+			}
+		}
+	}
+
+	return data_len*8;
 }

@@ -43,6 +43,8 @@ unsigned long get_num_bits(GRAPH* graph);
 
 GRAPH* get_backedge(GRAPH* node);
 
+GRAPH* get_backedge_with_info(GRAPH* node);
+
 GRAPH* get_forward_edge(GRAPH* node);
 
 CONNECTION* get_hamiltonian_connection(GRAPH* node);
@@ -61,5 +63,7 @@ void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long back
 void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd);
 
 void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd);
+
+unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len);
 
 #endif

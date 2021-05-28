@@ -118,6 +118,7 @@ plot:
 clangd:
 	@echo "-I" > $(ROOT_DIR)/compile_flags.txt
 	@echo "$(INCLUDE_DIR)" >> $(ROOT_DIR)/compile_flags.txt
+	@echo "-DDEBUG" >> $(ROOT_DIR)/compile_flags.txt
 	@for opt in $(CFLAGS); do\
 		echo $$opt >> $(ROOT_DIR)/compile_flags.txt;\
 	done

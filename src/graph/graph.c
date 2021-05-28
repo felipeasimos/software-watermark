@@ -307,6 +307,8 @@ void graph_load_info(GRAPH* graph, void* info, unsigned long info_len) {
 
 void graph_unload_info(GRAPH* graph) {
 
+    if(!graph || !graph->data) return;
+
     INFO_NODE* info_node = (INFO_NODE*)graph->data;
 
     graph->data_len = info_node->data_len;

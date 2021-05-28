@@ -56,14 +56,16 @@ void encode_number() {
 		n = tmp;
 	}
 
-	GRAPH* g = watermark2014_encode(&n, sizeof(n));
+	GRAPH* g = watermark2017_encode(&n, sizeof(n));
 
-	char* code = watermark_get_code2014(g);
+    graph_print(g, NULL);
+	
+    //char* code = watermark_get_code2014(g);
 
-	printf("%s\n", code);
+	//printf("%s\n", code);
 
 	graph_free(g);
-	free(code);
+	//free(code);
 }
 
 uint8_t check_unsigned_long(unsigned long i, uint8_t* i_inverted, unsigned long n) {
@@ -217,7 +219,7 @@ void removal_attack() {
         FILE* report = fopen(filename, "w");
 
         printf("number of removals: %lu\n", n_removals);
-        for(unsigned long i = 1; i < 100000000 && (!total || (error/total) < 0.2); i++) {
+        for(unsigned long i = 1; i < 100000000 && (!total || (error/total) < 0.2 || i < 1000); i++) {
 
             total++;
             unsigned long inverse_i = invert_unsigned_long(i);
@@ -227,9 +229,11 @@ void removal_attack() {
 
             if((total && last_error != error) || i==1) {
 
-                printf("%lu %F %F %F\n", i, error/total ,error, total);
+                //printf("%lu %F %F %F\n", i, error/total ,error, total);
                 fprintf(report, "%lu %F\n", i, error/total);
                 fflush(report);
+            } else {
+                printf("%lu\n", i);
             }
 
             graph_free(graph);

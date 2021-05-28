@@ -16,22 +16,6 @@ enum FORWARD_STATUS {
 	FORWARD_DESTINATION=4
 };
 
-uint8_t get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
-
-	// praticamente python
-	for(unsigned long i = 0; i < data_len; i++) {
-		if(data[i]) {
-			for(uint8_t j = 0; j < 8; j++) {
-				if(get_bit(data, i*8+j)) {
-					return i*8 + j;
-				}
-			}
-		}
-	}
-
-	return data_len*8;
-}
-
 void add_node_to_graph(ENCODER* encoder) {
 
 	GRAPH* new_node = graph_empty();
@@ -151,6 +135,9 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 			if(bit) {
 				add_node_to_graph(encoder);
 				graph_oriented_connect(node, node->next->next);
+                if( node->next->next == encoder->final_node ) {
+                    add_idx(node->next, h_idx+1);
+                }
 				forward_status |= FORWARD_SOURCE;
 			}
 			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);

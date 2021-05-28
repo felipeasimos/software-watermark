@@ -1,5 +1,6 @@
 -I
 ./include
+-DDEBUG
 -pedantic-errors
 -Wall
 -Wextra

@@ -4,6 +4,7 @@
 #include "rs_api/rs.h"
 #include "code_generator/code_generator.h"
 #include "metrics/metrics.h"
+#include "check/check.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -136,6 +137,7 @@ int simple_2017_test() {
 	for(uint8_t i=1; i < 255; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
+
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2017_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
@@ -255,6 +257,19 @@ int copy_test() {
     return 0;
 }
 
+int simple_checker_test() {
+
+    for(uint8_t i=1; i < 255; i++) {
+		GRAPH* graph = watermark2017_encode(&i, sizeof(uint8_t));
+		ctdd_assert( graph );
+		ctdd_assert( watermark_check(graph, &i, sizeof(uint8_t)) );
+
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
+	}
+	return 0;
+}
+
 int run_tests() {
 
 	ctdd_verify(reed_solomon_api_heavy_test);
@@ -265,8 +280,9 @@ int run_tests() {
 	ctdd_verify(simple_2017_test_with_rs);
     ctdd_verify(copy_test);
     ctdd_verify(serialization_test);
+    ctdd_verify(simple_checker_test);
 
-	//ctdd_verify(_2017_test);
+    //ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);
 	//ctdd_verify(rs_encoder_decoder_test);
 

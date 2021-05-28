@@ -134,6 +134,7 @@ void _add_idx(GRAPH* node, unsigned long idx) {
 	graph_alloc(node, sizeof(unsigned long));
 	*((unsigned long*)node->data) = idx;
 }
+
 uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
@@ -146,9 +147,8 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	unsigned long h_idx=1;
 
-	GRAPH* next = get_next_hamiltonian_node(decoder->current_node);	
+	GRAPH* next = decoder->current_node->next;
 	label_new_current_node(decoder, decoder->current_node, 0);
-	//_add_idx(decoder->current_node, 0);
 	decoder->current_node = next;
 
 	// iterate over every node but the last
@@ -194,7 +194,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 					}
 					WM_NODE* dest = dest_node->data;
 					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-				} 
+				}
 			}
 		} else {
 			i--;
@@ -202,7 +202,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 
 		if( forward_flag >= 0 ) forward_flag--;
 
-		GRAPH* next = get_next_hamiltonian_node(decoder->current_node);	
+		GRAPH* next = decoder->current_node->next;	
 		label_new_current_node(decoder, decoder->current_node, h_idx);
 		//_add_idx(decoder->current_node, h_idx);
 		decoder->current_node = next;
