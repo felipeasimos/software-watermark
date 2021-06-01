@@ -126,7 +126,7 @@ unsigned long get_num_bits(GRAPH* graph) {
 	// make data_len = 0 again
 	for(GRAPH* node = graph; node; node = node->next) node->data_len = 0;
 
-	return i-1; // ignore final node (don't represent any bits)
+	return i-2; // ignore final 2 nodes (don't represent any bits)
 }
 
 // the nodes we passed througth must be marked with an data_len != 0

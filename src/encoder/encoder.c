@@ -105,6 +105,9 @@ uint8_t update_forward_status(enum FORWARD_STATUS status) {
 
 void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
+    // +1 mute node at the end, compared to 2014
+    add_node_to_graph(encoder);
+
 	//start from second node
 	GRAPH* node = encoder->graph->next;
 	enum FORWARD_STATUS forward_status = NONE;

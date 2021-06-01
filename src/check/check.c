@@ -97,6 +97,31 @@ uint8_t _checker_is_inner_node(CHECKER* decoder, GRAPH* node) {
 	return !( node_info->stack_idx < stack->n && stack->stack[node_info->stack_idx] == node );
 }
 
+uint8_t _is_mute_until_end(GRAPH* node) {
+
+    for(; node; node = node->next) {
+
+        // check if it has a connection that isn't the hamiltonian edge
+        for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+            if( conn->node != node->next ) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+GRAPH* _get_fourth_last(GRAPH* last) {
+
+    for(uint8_t i=0; i < 3; i++) {
+
+        if(!last->prev) return NULL;
+        last = last->prev;
+    }
+
+    return _is_mute_until_end(last) ? last : NULL;
+}
+
 uint8_t _watermark_check(CHECKER* checker) {
 
 	// if positive, decrement it, if it is zero the current node is a forward destination
@@ -104,7 +129,12 @@ uint8_t _watermark_check(CHECKER* checker) {
 
 	unsigned long h_idx=1;
 
+    unsigned long max_n_forward_edges = get_num_bits(checker->graph) - checker->n_bits;
+    unsigned long current_n_forward_edges = 0;
+
     _checker_register_node(checker, 0);
+
+    GRAPH* fourth_last = _get_fourth_last(checker->final_node);
 
 	// iterate over every node but the last
 	for(unsigned long i=1; i < checker->n_bits; i++ ) {
@@ -118,6 +148,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 		if( forward_flag != 0 ) {
 
 			if( get_forward_edge(checker->node) ) {
+                current_n_forward_edges++;
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
                         graph_print(checker->graph, NULL);
@@ -184,6 +215,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                 } else if ( checker->node->next && checker->node->next->next &&
                         !connection_search_node(checker->node->next->connections, checker->node->next->next) ) {
 
+                    current_n_forward_edges++;
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
                             graph_print(checker->graph, NULL);
@@ -192,6 +224,32 @@ uint8_t _watermark_check(CHECKER* checker) {
                         return 0;
                     }
                     forward_flag=2;
+                // if the fourth last nodes are mute, there is a forward edge that was removed, so the bit must be 1
+                } else if( fourth_last == checker->node && current_n_forward_edges < max_n_forward_edges ) {
+
+                    if(!checker->bit_arr[i]) {
+                        #ifdef DEBUG
+                            graph_print(checker->graph, NULL);
+                            fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed forward edge here\n", i);
+                        #endif
+                        return 0;
+                    }
+
+                    if( ++current_n_forward_edges != max_n_forward_edges ) {
+                        #ifdef DEBUG
+                            graph_print(checker->graph, NULL);
+                            fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: not enough forward edges were detected, something went wrong\n", i);
+                        #endif
+                        return 0;
+                    }
+                } else {
+                    if(checker->bit_arr[i]) {
+                        #ifdef DEBUG
+                            graph_print(checker->graph, NULL);
+                            fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: mute node should 0\n", i);
+                        #endif
+                        return 0;
+                    }
                 }
 			}
 		} else {
@@ -217,15 +275,7 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long data_len) {
 
     CHECKER* checker = _checker_create(graph, data, data_len);
 
-    if(get_num_bits(graph) != checker->n_bits) {
-        #ifdef DEBUG
-            fprintf(stderr, "check failed:\n\treason: number of bits doesn't match with identifier\n");
-        #endif
-        return 0;
-    }
     uint8_t result = _watermark_check(checker);
-
-    graph_unload_all_info(graph);
 
     _checker_free(checker);
     return result;
