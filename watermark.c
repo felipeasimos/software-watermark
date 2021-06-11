@@ -17,16 +17,21 @@ uint8_t get_uint8_t() {
 void encode_string() {
 
 	char s[MAX_SIZE+1]={0};
-	printf("input string to be encoded (max size is %lu): ", (unsigned long) MAX_SIZE);
+	printf("input numeric string to be encoded (max size is %lu): ", (unsigned long) MAX_SIZE);
 	scanf(" %" MAX_SIZE_STR "s", s);
 
-	GRAPH* g = watermark2014_encode(s, strlen(s));
+    unsigned long data_len;
+    void* data = encode_numeric_string(s, &data_len);
 
+	GRAPH* g = watermark2017_encode(data, data_len);
+
+    graph_print(g, NULL);
 	char* code = watermark_get_code2014(g);
 
 	printf("code generated:\n");
 	printf("%s\n", code);
 
+    free(data);
 	graph_free(g);
 	free(code);
 }
@@ -58,11 +63,13 @@ void encode_number() {
 
 	GRAPH* g = watermark2017_encode(&n, sizeof(n));
 
+    GRAPH* _2014 = watermark2014_encode(&n, sizeof(n));
+
     graph_print(g, NULL);
 	
-    //char* code = watermark_get_code2014(g);
+    char* code = watermark_get_code2014(_2014);
 
-	//printf("%s\n", code);
+    printf("%s\n", code);
 
 	graph_free(g);
 	//free(code);
@@ -129,9 +136,9 @@ void _conn_list_free(_CONN_LIST* list) {
 
 int _test_with_removed_connections(double* total, double* error, unsigned long i, GRAPH* graph, _CONN_LIST* conns) {
 
-    //(*total)++;
-    total++;
-    error++;
+    (*total)++;
+    //total++;
+    //error++;
     graph_load_copy(graph);
 
     for(_CONN_LIST* l = conns; l; l = l->next) {
@@ -147,10 +154,18 @@ int _test_with_removed_connections(double* total, double* error, unsigned long i
 
     uint8_t result = watermark_check(copy, &i, sizeof(unsigned long));
 
-    graph_free(copy);
     if( !result ) {
 
-        //(*error)++;
+        (*error)++;
+        /*unsigned int u=1;
+        for(GRAPH* node = copy; node; node = node->next) {
+            graph_alloc(node, sizeof(unsigned int));
+            memcpy(node->data, &u, sizeof(unsigned int));
+            u++;
+        }*/
+        //graph_print(copy, NULL);
+
+        graph_free(copy);
         //_save_successfull_attack(copy, i, (*error)/(*total));
         return 0;
     } else {
@@ -182,10 +197,10 @@ int _multiple_removal_test(unsigned long n_removals, double* total, double* erro
                     if(_multiple_removal_test(n_removals-1, total, error, i, root, graph, c->next, list)) {
 
                         _conn_list_free(list);
-                        return 1;
+                        // return 1;
                     } else {
                         _conn_list_free(list);
-                        return 0;
+                        // return 0;
                     }
                 }
             }
@@ -196,7 +211,7 @@ int _multiple_removal_test(unsigned long n_removals, double* total, double* erro
 
 void removal_attack() {
 
-    for(unsigned long n_removals = 1; n_removals < 8; n_removals++) {
+    for(unsigned long n_removals = 1; n_removals < 2; n_removals++) {
 
         double total = 0;
         double error = 0;
@@ -207,17 +222,20 @@ void removal_attack() {
         FILE* report = fopen(filename, "w");
 
         printf("number of removals: %lu\n", n_removals);
-        for(unsigned long i = 1; i < 100000000 && (!total || (error/total) < 0.2); i++) {
+        for(unsigned long i = 10000000; i < 100000000 && (!total || (error/total) < 0.2 || i < 100000000 ); i++) {
 
-            total++;
+            //total++;
             unsigned long inverse_i = invert_unsigned_long(i);
             GRAPH* graph = watermark2017_encode(&inverse_i, sizeof(inverse_i));
+            //graph_print(graph, NULL);
 
-            error += !_multiple_removal_test(n_removals, &total, &error, i, graph, graph, NULL, NULL);
+            // error += !_multiple_removal_test(n_removals, &total, &error, i, graph, graph, NULL, NULL);
+
+            _multiple_removal_test(n_removals, &total, &error, inverse_i, graph, graph, NULL, NULL);
 
             if((total && last_error != error) || i==1) {
 
-                //printf("%lu %F %F %F\n", i, error/total ,error, total);
+                printf("%lu %F %F %F\n", i, error/total ,error, total);
                 fprintf(report, "%lu %F\n", i, error/total);
                 fflush(report);
             } else {

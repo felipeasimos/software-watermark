@@ -270,8 +270,29 @@ int simple_checker_test() {
 	return 0;
 }
 
+int ascii_numbers_test() {
+
+    for(unsigned long i=1; i < 10000000; i*=2) {
+
+        char str[10]={0};
+        sprintf(str, "%lu", i);
+
+        unsigned long data_len = 0;
+        void* data = encode_numeric_string(str, &data_len);
+
+        char* new_str = decode_numeric_string(data, data_len);
+        ctdd_assert(!strcmp( str, new_str ));
+
+        free(data);
+        free(new_str);
+    } 
+
+    return 0;
+}
+
 int run_tests() {
 
+    ctdd_verify(ascii_numbers_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);

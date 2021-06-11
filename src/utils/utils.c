@@ -31,6 +31,15 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	}
 }
 
+BIT_ARR* bit_arr_create(unsigned long n) {
+
+    BIT_ARR* bits = malloc(sizeof(BIT_ARR) + n);
+    memset(bits, 0x00, sizeof(BIT_ARR) + n);
+    bits->n = n;
+
+    return bits;
+}
+
 uint8_t is_graph_structure_valid(GRAPH* graph) {
 
 	if( !graph ) return 0;
@@ -266,7 +275,6 @@ void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_
 
 unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 
-	// praticamente python
 	for(unsigned long i = 0; i < data_len; i++) {
 		if(data[i]) {
 			for(uint8_t j = 0; j < 8; j++) {
@@ -278,4 +286,51 @@ unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len) {
 	}
 
 	return data_len*8;
+}
+
+void* encode_numeric_string(char* string, unsigned long* data_len) {
+
+    if( !string ) return NULL;
+
+    unsigned long size = strlen(string);
+
+    // if any of these isn't a number, return NULL;
+    for(unsigned long i = 0; i < size; i++) if( string[i] < '0' || string[i] > '9' ) return NULL;
+
+    unsigned long offset = size % 4;
+    *data_len = 3 * (size/4) + ( offset ? offset: 1);
+    uint8_t* data = malloc(*data_len);
+    memset(data, 0x00, *data_len);
+
+    unsigned long data_idx = offset == 1 ? 2 : 4;
+
+    for(unsigned long i = 0; i < size; i++) {
+
+        if( string[i] ) {
+            for(unsigned long j = 2; j < 8; j++) {
+
+                set_bit(data, data_idx++, get_bit((uint8_t*)string, i*8+j));
+            }
+        }
+    }
+    return data;
+}
+
+char* decode_numeric_string(void* data, unsigned long data_len) {
+
+    unsigned long num_bits = data_len * 8;
+    uint8_t offset = get_trailing_zeroes(data, data_len);
+    unsigned long str_size = 4 * (data_len/3) + (data_len % 3) + 1;
+    char* str = malloc(str_size);
+    memset(str, 0x00, str_size);
+
+    unsigned long str_idx = 0;
+
+    for(unsigned long i = offset; i < num_bits; i++) {
+
+        if( !(str_idx % 8) ) str_idx+=2;
+
+        set_bit((uint8_t*)str, str_idx++, get_bit(data, i));
+    }
+    return str;
 }

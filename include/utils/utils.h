@@ -22,6 +22,12 @@ typedef struct STACKS {
 	HSTACK history;
 } STACKS;
 
+typedef struct BIT_ARR {
+
+    unsigned long n;
+    char arr[];
+} BIT_ARR;
+
 // 1. first node has only a hamiltonian edge, and no less
 // 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
 // 3. every node has less than three outgoing connections
@@ -65,5 +71,9 @@ void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t i
 void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd);
 
 unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len);
+
+void* encode_numeric_string(char* string, unsigned long* data_len);
+
+char* decode_numeric_string(void* data, unsigned long data_len);
 
 #endif

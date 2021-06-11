@@ -20,3 +20,10 @@ tenha estruturas case e if then else, é uma marca d'água válida.
 código morto (dummy) e código embarcado (integrado com o grafo existente do código)
 	* comparar complexidade aciclomática
 	* comparar código morto (sonarqube)
+
+* i < 100
+    * 65% de erro (por combinações totais)
+    * 98% de erro (por número) (2 e 14 dão certo)
+* 10⁷ < i < 10⁸
+    * 55% de error (por combinações totais)
+    * 100% de erro (por número)
