@@ -128,13 +128,6 @@ unsigned long get_node_idx(GRAPH* node) {
 	return ((WM_NODE*)node->data)->hamiltonian_idx;
 }
 
-void _add_idx(GRAPH* node, unsigned long idx) {
-
-	idx++;
-	graph_alloc(node, sizeof(unsigned long));
-	*((unsigned long*)node->data) = idx;
-}
-
 uint8_t* get_bit_array2017(DECODER* decoder) {
 
 	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
@@ -204,7 +197,6 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 
 		GRAPH* next = decoder->current_node->next;	
 		label_new_current_node(decoder, decoder->current_node, h_idx);
-		//_add_idx(decoder->current_node, h_idx);
 		decoder->current_node = next;
 		h_idx++;
 	}
@@ -212,85 +204,6 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	return bit_arr;
 
 }
-
-uint8_t* get_bit_array2017_percentage(DECODER* decoder) {
-
-	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
-	memset(bit_arr, 0x00, sizeof(uint8_t) * decoder->n_bits);
-
-	// if positive, decrement it, if it is zero the current node is a forward destination
-	int forward_flag = -1;
-
-	bit_arr[0]=1;
-
-	unsigned long h_idx=1;
-
-	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0);
-	decoder->current_node = next;
-
-	// iterate over every node but the last
-	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
-
-        if(!decoder->current_node) {
-            free(bit_arr);
-            return NULL;
-        }
-
-		if( forward_flag != 0 ) {
-
-			if( get_forward_edge(decoder->current_node) ) {
-				bit_arr[i] = 1;
-				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
-				bit_arr[i] = 1;
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				WM_NODE* dest = dest_node->data;
-
-				// check if it is inner node
-				if( is_inner_node(decoder, dest_node) ) {
-					#ifdef DEBUG
-						fprintf(stderr, "Invalid backedge detected!\n");
-					#endif
-					free(bit_arr);
-					return NULL;
-				}
-
-				pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-			} else {
-				bit_arr[i] = 0;
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				if(dest_node) {
-
-					// check if it is inner node
-					if( is_inner_node(decoder, dest_node) ) {
-						#ifdef DEBUG
-							fprintf(stderr, "Invalid backedge detected!\n");
-						#endif
-						free(bit_arr);
-						return NULL;
-					}
-					WM_NODE* dest = dest_node->data;
-					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-				}
-			}
-		} else {
-			i--;
-		}
-
-		if( forward_flag >= 0 ) forward_flag--;
-
-		GRAPH* next = decoder->current_node->next;	
-		label_new_current_node(decoder, decoder->current_node, h_idx);
-		//_add_idx(decoder->current_node, h_idx);
-		decoder->current_node = next;
-		h_idx++;
-	}
-
-	return bit_arr;
-
-}
-
 
 uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
 
@@ -373,14 +286,95 @@ void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsig
 	return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode);
 }
 
-void* watermark2017_decode_percentage(GRAPH* graph, unsigned long* num_bytes) {
+void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 
-    return _watermark_decode(graph, num_bytes, get_num_bits(graph), get_bit_array2017_percentage);
+	if( !is_graph_structure_valid(graph) || !num_bytes ) return NULL;
+
+    unsigned long n_bits = get_num_bits(graph);
+
+	// 1. get size of bit_arr array and set nodes to null
+	*num_bytes = n_bits;
+
+	// 2. create decoder struct
+	DECODER* decoder = decoder_create(graph, n_bits);
+
+	uint8_t* bit_arr = malloc( sizeof(char) * decoder->n_bits );
+	memset(bit_arr, 0x00, sizeof(char) * decoder->n_bits);
+
+	// if positive, decrement it, if it is zero the current node is a forward destination
+	int forward_flag = -1;
+
+	bit_arr[0]='1';
+
+	unsigned long h_idx=1;
+
+	GRAPH* next = decoder->current_node->next;
+	label_new_current_node(decoder, decoder->current_node, 0);
+	decoder->current_node = next;
+
+	// iterate over every node but the last
+	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
+
+        if(!decoder->current_node) {
+            free(bit_arr);
+            return NULL;
+        }
+
+		if( forward_flag != 0 ) {
+
+			if( get_forward_edge(decoder->current_node) ) {
+				bit_arr[i] = '1';
+				forward_flag = 2;
+			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
+				bit_arr[i] = '1';
+				GRAPH* dest_node = get_backedge(decoder->current_node);
+				WM_NODE* dest = dest_node->data;
+
+				// check if it is inner node
+				if( is_inner_node(decoder, dest_node) ) {
+					#ifdef DEBUG
+						fprintf(stderr, "Invalid backedge detected!\n");
+					#endif
+					free(bit_arr);
+					bit_arr[i]='x';
+				} else {
+				    pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
+                }
+
+			} else {
+				bit_arr[i] = '0';
+				GRAPH* dest_node = get_backedge(decoder->current_node);
+				if(dest_node) {
+
+					// check if it is inner node
+					if( is_inner_node(decoder, dest_node) ) {
+						#ifdef DEBUG
+							fprintf(stderr, "Invalid backedge detected!\n");
+						#endif
+						free(bit_arr);
+						bit_arr[i]='x';
+					}
+					WM_NODE* dest = dest_node->data;
+					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
+				}
+			}
+		} else {
+			i--;
+		}
+
+		if( forward_flag >= 0 ) forward_flag--;
+
+		GRAPH* next = decoder->current_node->next;	
+		label_new_current_node(decoder, decoder->current_node, h_idx);
+		decoder->current_node = next;
+		h_idx++;
+	}
+    decoder_free(decoder);
+
+	return bit_arr;
 }
 
-void* watermark2017_decode_percentage_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
 
-    return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode_percentage);
+    return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode_analysis);
 }
-
-

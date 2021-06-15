@@ -290,9 +290,83 @@ int ascii_numbers_test() {
     return 0;
 }
 
+int decoder_analysis_test() {
+
+    for(uint8_t i = 1; i < 255; i++) {
+
+        GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+
+        unsigned long num_bytes = 0;
+        uint8_t* bit_arr = watermark2017_decode_analysis(graph, &num_bytes);
+
+        for(uint8_t j = 0; j < num_bytes; j++) {
+
+            if( bit_arr[num_bytes - j -1] != ('0' + !!get_bit(&i, 7 - j)) ) {
+                fprintf(stderr, "i: %hhu, idx: %d, decoder: %c, reality: %d, num_bytes: %lu\n", i, 7 - j, bit_arr[num_bytes - j - 1], !!get_bit(&i, 7 - j), num_bytes);
+                ctdd_assert(0);
+            } else {
+                ctdd_assert(1);
+            }
+        }
+        free(bit_arr);
+        graph_free(graph);
+    }
+
+    return 0;
+}
+
+int decoder_analysis_test_with_rs() {
+
+    for(uint8_t i = 1; i < 255; i++) {
+
+        GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 1);
+
+        unsigned long num_bytes = 0;
+        uint8_t* bit_arr = watermark2017_decode_analysis_with_rs(graph, &num_bytes, 1);
+
+        for(uint8_t j = 0; j < num_bytes; j++) {
+
+            if( bit_arr[num_bytes - j -1] != ('0' + !!get_bit(&i, 7 - j)) ) {
+                fprintf(stderr, "i: %hhu, idx: %d, decoder: %c, reality: %d, num_bytes: %lu\n", i, 7 - j, bit_arr[num_bytes - j - 1], !!get_bit(&i, 7 - j), num_bytes);
+                ctdd_assert(0);
+            } else {
+                ctdd_assert(1);
+            }
+        }
+        free(bit_arr);
+        graph_free(graph);
+    }
+
+    return 0;
+}
+
+int checker_analysis_test() {
+
+    for(uint8_t i = 1; i < 255; i++) {
+
+        GRAPH* graph = watermark2017_encode(&i, sizeof(i));
+
+        unsigned long num_bytes = sizeof(i);
+        uint8_t* bit_arr = watermark_check_analysis(graph, &i, &num_bytes);
+
+        for(uint8_t j = 0; j < num_bytes; j++) {
+
+            if( bit_arr[num_bytes - j -1] != ('0' + !!get_bit(&i, 7 - j)) ) {
+                fprintf(stderr, "i: %hhu, idx: %d, decoder: %c, reality: %d, num_bytes: %lu\n", i, 7 - j, bit_arr[num_bytes - j - 1], !!get_bit(&i, 7 - j), num_bytes);
+                ctdd_assert(0);
+            } else {
+                ctdd_assert(1);
+            }
+        }
+        free(bit_arr);
+        graph_free(graph);
+    }
+
+    return 0;
+}
+
 int run_tests() {
 
-    ctdd_verify(ascii_numbers_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);
@@ -302,6 +376,10 @@ int run_tests() {
     ctdd_verify(copy_test);
     ctdd_verify(serialization_test);
     ctdd_verify(simple_checker_test);
+    ctdd_verify(ascii_numbers_test);
+    ctdd_verify(decoder_analysis_test);
+    ctdd_verify(decoder_analysis_test_with_rs);
+    ctdd_verify(checker_analysis_test);
 
     //ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);
