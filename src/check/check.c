@@ -574,8 +574,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
 uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_rs_bytes) {
 
-    unsigned long data_num_bytes = *num_bytes;
-    unsigned long data_total_n_bits = data_num_bytes * 8;
+    unsigned long data_total_n_bits = (*num_bytes) * 8;
 
     uint8_t* result = watermark_check_analysis(graph, data, num_bytes);
 
@@ -606,13 +605,14 @@ uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned lon
 	// if there were no errors or they were corrected
 	if( res >= 0 ) {
 
-        // convert 'final_result' values array of bits
+        // convert 'final_result' values into array of bits
         free(result);
         unsigned long payload_total_n_bits = payload_num_bytes * 8;
-        unsigned long payload_n_bits = payload_total_n_bits - get_trailing_zeroes(data, data_total_n_bits/8);
+        unsigned long payload_n_bits = payload_total_n_bits - get_trailing_zeroes(final_result, payload_total_n_bits/8);
         *num_bytes = payload_n_bits;
         result = malloc( sizeof(uint8_t) * payload_n_bits );
         for(unsigned long i = 0; i < payload_n_bits; i++) result[ payload_n_bits - i - 1 ] = '0' + !!get_bit(final_result, payload_total_n_bits - i - 1);
+        free(final_result);
     } else {
         // an error happened
         free(final_result);

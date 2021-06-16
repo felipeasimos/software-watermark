@@ -4,6 +4,7 @@
 #include "utils/utils.h"
 #include <stdint.h>
 #include "rs_api/rs.h"
+#include "time.h"
 
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes);
 

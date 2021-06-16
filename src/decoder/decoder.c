@@ -376,5 +376,47 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 
 void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
 
-    return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode_analysis);
+    uint8_t* result = watermark2017_decode_analysis(graph, num_bytes);
+
+    unsigned long result_n_bits = *num_bytes;
+    unsigned long result_num_bytes = result_n_bits / 8 + !!(result_n_bits % 8);
+    unsigned long result_total_n_bits = result_num_bytes * 8;
+    uint8_t* final_result = malloc(sizeof(uint8_t) * result_num_bytes);
+    memset(final_result, 0x00, result_num_bytes);
+
+    // turn 'result' into an actual bit sequence, turn 'x' into a random bit value
+    srand(time(NULL));
+    for(unsigned long i = 0; i < result_n_bits; i++) {
+
+        if( result[ result_n_bits - i - 1 ] == 'x' ) {
+
+            // set to wrong bit
+            set_bit(final_result, result_total_n_bits - i - 1, rand() & 1);
+        } else {
+            // set to result bit
+            set_bit(final_result, result_total_n_bits - i - 1, result[ result_n_bits - i - 1 ] - '0');
+        }
+    }
+
+    // use reed solomon on 'final_result'
+    unsigned long payload_num_bytes = result_num_bytes - num_rs_bytes * sizeof(uint16_t);
+
+	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_bytes);
+
+	// if there were no errors or they were corrected
+	if( res >= 0 ) {
+
+        // convert 'final_result' values into array of bits
+        free(result);
+        unsigned long payload_total_n_bits = payload_num_bytes * 8;
+        unsigned long payload_n_bits = payload_total_n_bits - get_trailing_zeroes(final_result, payload_total_n_bits/8);
+        *num_bytes = payload_n_bits;
+        result = malloc( sizeof(uint8_t) * payload_n_bits );
+        for(unsigned long i = 0; i < payload_n_bits; i++) result[ payload_n_bits - i - 1 ] = '0' + !!get_bit(final_result, payload_total_n_bits - i - 1);
+        free(final_result);
+    } else {
+        // an error happened
+        free(final_result);
+    }
+    return result;   
 }

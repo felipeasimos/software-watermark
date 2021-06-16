@@ -1,6 +1,7 @@
 #include "encoder/encoder.h"
 #include "check/check.h"
 #include "code_generator/code_generator.h"
+#include "utils/utils.h"
 
 #define MAX_SIZE 4095
 #define STRINGIFY_(x) #x
@@ -134,11 +135,24 @@ void _conn_list_free(_CONN_LIST* list) {
     free(list);
 }
 
-int _test_with_removed_connections(double* total, double* error, unsigned long i, GRAPH* graph, _CONN_LIST* conns) {
+double _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bit_arr, unsigned long bit_arr_size) {
 
-    (*total)++;
-    //total++;
-    //error++;
+    unsigned long correct = 0;
+    unsigned long bit_seq_num_bits = bit_seq_size * 8;
+    for(unsigned long i = 0; i < bit_arr_size; i++) {
+
+        if(bit_arr[bit_arr_size -i - 1] == 'x') continue;
+
+        uint8_t arr_value = !!(bit_arr[bit_arr_size - i - 1] - '0');
+        uint8_t seq_value = !!get_bit(bit_sequence, bit_seq_num_bits - i - 1);
+        if(  seq_value != arr_value ) continue;
+        correct++;
+    }
+    return ((double)correct)/bit_arr_size;
+}
+
+double _test_with_removed_connections(unsigned long i, GRAPH* graph, _CONN_LIST* conns) {
+
     graph_load_copy(graph);
 
     for(_CONN_LIST* l = conns; l; l = l->next) {
@@ -152,11 +166,17 @@ int _test_with_removed_connections(double* total, double* error, unsigned long i
     GRAPH* copy = graph_get_info(graph);
     graph_unload_all_info(graph);
 
-    uint8_t result = watermark_check(copy, &i, sizeof(unsigned long));
+    unsigned long num_bytes = sizeof(unsigned long);
+    uint8_t* result = watermark_check_analysis(copy, &i, &num_bytes);
 
-    if( !result ) {
+    double correct = 0.0;
 
-        (*error)++;
+    if(result) correct = _check(&i, sizeof(unsigned long), result, num_bytes);
+
+    if( correct ) {
+
+        //for(unsigned long j = 0; j < num_bytes; j++) fprintf(stderr, "%c ", result[j]);
+        //fprintf(stderr, "\n");
         /*unsigned int u=1;
         for(GRAPH* node = copy; node; node = node->next) {
             graph_alloc(node, sizeof(unsigned int));
@@ -164,48 +184,37 @@ int _test_with_removed_connections(double* total, double* error, unsigned long i
             u++;
         }*/
         //graph_print(copy, NULL);
-
-        graph_free(copy);
-        //_save_successfull_attack(copy, i, (*error)/(*total));
-        return 0;
     } else {
-        return 1;
+        //_save_successfull_attack(copy, i, (*error)/(*total));
     }
+    graph_free(copy);
+    return correct;
 }
 
-int _multiple_removal_test(unsigned long n_removals, double* total, double* error, unsigned long i, GRAPH* root, GRAPH* graph, CONNECTION* conn, _CONN_LIST* l) {
+void _multiple_removal_test(unsigned long n_removals, double* total, double* correct, unsigned long i, GRAPH* root, GRAPH* node, CONNECTION* conn, _CONN_LIST* l) {
 
+    (*total)++;
     if(!n_removals) {
 
-        return _test_with_removed_connections(total, error, i, root, l);
+        (*correct) += _test_with_removed_connections(i, root, l);
     } else {
 
-        uint8_t first=1;
-        for(; graph; graph = graph->next) {
+        GRAPH* initial_node = node;
+        for(; node; node = node->next) {
 
-            if(graph->connections) {
+            if(node->connections) {
 
-                CONNECTION* c = graph->connections;
-                if(first) {
-                    first=0;
-                    c = conn ? conn : c;
-                }
+                CONNECTION* c = node->connections;
+                if(node == initial_node) c = conn ? conn : c;
                  
-                for(c = c->node == graph->next ? c->next : c; c; c = c->next) {
+                for(c = c->node == node->next ? c->next : c; c; c = c->next) {
 
                     _CONN_LIST* list = _conn_list_create(l, c);
-                    if(_multiple_removal_test(n_removals-1, total, error, i, root, graph, c->next, list)) {
-
-                        _conn_list_free(list);
-                        // return 1;
-                    } else {
-                        _conn_list_free(list);
-                        // return 0;
-                    }
+                    _multiple_removal_test(n_removals-1, total, correct, i, root, node, c->next, list);
+                    _conn_list_free(list);
                 }
             }
         }
-        return 1;
     }
 }
 
@@ -213,39 +222,26 @@ void removal_attack() {
 
     for(unsigned long n_removals = 1; n_removals < 2; n_removals++) {
 
-        double total = 0;
-        double error = 0;
-        double last_error = 0;
-
-        char filename[50] = {0};
-        sprintf(filename, "tests/report_rm_%lu.plt", n_removals);
-        FILE* report = fopen(filename, "w");
+        double identifiers_evaluated = 0;
+        double correct_mean_sum = 0;
 
         printf("number of removals: %lu\n", n_removals);
-        for(unsigned long i = 10000000; i < 100000000 && (!total || (error/total) < 0.2 || i < 100000000 ); i++) {
+        for(unsigned long i = 1; i < 100000000; i++) {
 
-            //total++;
+            double total = 0;
+            double correct = 0;
+
             unsigned long inverse_i = invert_unsigned_long(i);
             GRAPH* graph = watermark2017_encode(&inverse_i, sizeof(inverse_i));
-            //graph_print(graph, NULL);
 
-            // error += !_multiple_removal_test(n_removals, &total, &error, i, graph, graph, NULL, NULL);
-
-            _multiple_removal_test(n_removals, &total, &error, inverse_i, graph, graph, NULL, NULL);
-
-            if((total && last_error != error) || i==1) {
-
-                printf("%lu %F %F %F\n", i, error/total ,error, total);
-                fprintf(report, "%lu %F\n", i, error/total);
-                fflush(report);
-            } else {
-                printf("%lu\n", i);
-            }
-
+            _multiple_removal_test(n_removals, &total, &correct, inverse_i, graph, graph, NULL, NULL);
             graph_free(graph);
-            last_error = error;
+            identifiers_evaluated++;
+
+            correct_mean_sum += correct/total;
+
+            printf("%lu %F %F\n", i, correct_mean_sum/identifiers_evaluated, total);
         }
-        fclose(report);
     }
 }
 
