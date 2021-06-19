@@ -156,6 +156,7 @@ GRAPH* _watermark_encode(void* data, unsigned long data_len, void (*encode)(ENCO
 
 	if( !data || !data_len ) return NULL;
 
+    // for 'add_backedge'
 	srand(time(0));
 
 	unsigned long trailing_zeroes = get_trailing_zeroes(data, data_len);

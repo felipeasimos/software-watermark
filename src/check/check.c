@@ -139,7 +139,7 @@ GRAPH** _get_possibly_removed_forward_edges(GRAPH* graph, unsigned long* n) {
     *n=0;
     for(; graph && graph->next && graph->next->next; graph = graph->next) {
 
-        if( !connection_search_node(graph->connections, graph->next->next) &&
+        if(
             _is_mute(graph) &&
             _is_mute(graph->next) &&
             _is_mute(graph->next->next) ) {
@@ -356,13 +356,6 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long data_len) {
 
 uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes) {
 
-    if(!is_graph_structure_valid(graph)) {
-        #ifdef DEBUG
-            fprintf(stderr, "check failed:\n\treason: invalid graph structure\n");
-        #endif
-        return 0;
-    }
-
     CHECKER* checker = _checker_create(graph, data, *num_bytes);
 
     uint8_t* bit_arr = malloc( sizeof(char) * checker->n_bits );
@@ -531,6 +524,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
                     current_n_forward_edges++;
                     checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
+                    bit_arr[i] = '1';
                     if(checker->bit_arr[i+1]) {
                         #ifdef DEBUG
                             graph_print(checker->graph, NULL);

@@ -27,3 +27,16 @@ código morto (dummy) e código embarcado (integrado com o grafo existente do c�
 * 10⁷ < i < 10⁸
     * 55% de error (por combinações totais)
     * 100% de erro (por número)
+
+## Tabelas
+
+* Original
+* Melhorado
+* Melhorado com Reed-Solomon
+
+## Gráficos
+
+* Original
+* Original com Reed-Solomon
+* Melhorado
+* Melhorado com Reed-Solomon

@@ -108,12 +108,9 @@ help:
 	# clangd - generate compile_flags.txt file for clangd
 plot:
 	gnuplot -e "plot '$(TEST_SRC_DIR)/report_rm_1.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_2.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_3.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_4.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_5.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_6.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_7.plt' using 1:2 with lines; pause -1 \"Hit any key to continue\""
+		'$(TEST_SRC_DIR)/report_rm_1.plt' using 1:3 with lines,\
+		'$(TEST_SRC_DIR)/report_rm_1.plt' using 1:4 with lines;\
+		pause -1 \"Hit any key to continue\""
 
 clangd:
 	@echo "-I" > $(ROOT_DIR)/compile_flags.txt
