@@ -30,7 +30,6 @@ CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
     checker->graph = checker->node = graph;
 
     unsigned long trailing_zeros = get_trailing_zeroes(data, data_len);
-
     checker->n_bits = data_len * 8 - trailing_zeros;
 
     checker->bit_arr = malloc(checker->n_bits);
@@ -139,8 +138,7 @@ GRAPH** _get_possibly_removed_forward_edges(GRAPH* graph, unsigned long* n) {
     *n=0;
     for(; graph && graph->next && graph->next->next; graph = graph->next) {
 
-        if(
-            _is_mute(graph) &&
+        if( _is_mute(graph) &&
             _is_mute(graph->next) &&
             _is_mute(graph->next->next) ) {
 
@@ -359,7 +357,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     CHECKER* checker = _checker_create(graph, data, *num_bytes);
 
     uint8_t* bit_arr = malloc( sizeof(char) * checker->n_bits );
-    memset(bit_arr, 0x00, checker->n_bits * sizeof(char));
+    memset(bit_arr, 'x', checker->n_bits * sizeof(char));
 
     *num_bytes = checker->n_bits;
 
@@ -386,8 +384,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                 graph_print(checker->graph, NULL);
                 fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: end of graph reached too early\n", i);
             #endif
-            // fill the rest of the bits with 'x'
-            for(unsigned long j=i+1; j < checker->n_bits; j++) bit_arr[j] = 'x';
             break;
         }
 		if( forward_flag != 0 ) {
@@ -399,7 +395,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                         graph_print(checker->graph, NULL);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with outgoing forward edge\n", i);
                     #endif
-                    bit_arr[i] = 'x';
                 } else {
 				    forward_flag = 2;
                     bit_arr[i] = '1';
@@ -410,7 +405,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                         graph_print(checker->graph, NULL);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with backedge with odd index difference\n", i);
                     #endif
-                    bit_arr[i] = 'x';
                 } else {
                     GRAPH* dest_node = get_backedge_with_info(checker->node);
 
@@ -420,7 +414,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: backedge goes to an inner node\n", i);
                         #endif
-                        bit_arr[i] = 'x';
                     } else {
                         bit_arr[i] = '1';
                     }
@@ -447,7 +440,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                                 graph_print(checker->graph, NULL);
                                 fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1 for even backedge\n", i);
                             #endif
-                            bit_arr[i] = 'x';
                         } else {
                             bit_arr[i] = '0';
                         }
@@ -462,7 +454,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path\n", i);
                         #endif
-                        bit_arr[i] = 'x';
                     } else {
                         bit_arr[i] = '1';
                     }
@@ -476,7 +467,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path in the next node\n", i);
                         #endif
-                        bit_arr[i] = 'x';
                     } else {
                         bit_arr[i] = '1';
                         forward_flag=2;
@@ -489,7 +479,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed forward edge here\n", i);
                         #endif
-                        bit_arr[i] = 'x';
                     } else {
                         bit_arr[i] = '1';
                     }
@@ -498,7 +487,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1, but the second mute node in a tail sequence must be 0\n", i+1);
                         #endif
-                        bit_arr[i+1] = 'x';
                     } else {
                         bit_arr[i+1] = '0';
                     }
@@ -508,14 +496,12 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: not enough forward edges were detected, something went wrong\n", i);
                         #endif
-                        for(unsigned long j=i+1; j < checker->n_bits; j++) bit_arr[j] = 'x';
                         break;
                     }
-                    _checker_register_node(checker, h_idx);
                     break;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
                 } else if( checker->n_possible_removed_forward_edges &&
-                        checker->possible_removed_forward_edges[0] &&
+                        checker->possible_removed_forward_edges[0] == checker->node &&
                         (h_idx & 1) && 
                         get_parity_stack(&checker->stacks, h_idx & 1)->n == 1 &&
                         connection_search_node(checker->node->prev->connections, checker->graph) &&
@@ -525,20 +511,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     current_n_forward_edges++;
                     checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
                     bit_arr[i] = '1';
-                    if(checker->bit_arr[i+1]) {
-                        #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
-                            fprintf(stderr, "checker failed:\n\tidx: %lu\n\treason: second node in a 3 mute intter sequence must be 0\n", i+1);
-                        #endif
-                        bit_arr[i+1] = 'x';
-                    } else {
-                        bit_arr[i+1] = '1';
-                    }
-
-                    _checker_register_node(checker, h_idx);
-                    i++;
-                    h_idx++;
-                    forward_flag=1;
+                    forward_flag=2;
                 
                 } else {
                     if(checker->bit_arr[i]) {
@@ -546,7 +519,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             graph_print(checker->graph, NULL);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: mute node should be 0\n", i);
                         #endif
-                        bit_arr[i] = 'x';
                     } else {
                         bit_arr[i] = '0';
                     }
@@ -566,7 +538,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     return bit_arr;
 }
 
-uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_rs_parity_symbols) {
 
     unsigned long data_total_n_bits = (*num_bytes) * 8;
 
@@ -592,9 +564,9 @@ uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned lon
     }
 
     // use reed solomon on 'final_result'
-    unsigned long payload_num_bytes = result_num_bytes - num_rs_bytes * sizeof(uint16_t);
+    unsigned long payload_num_bytes = result_num_bytes - num_rs_parity_symbols * sizeof(uint16_t);
 
-	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_bytes);
+	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_parity_symbols);
 
 	// if there were no errors or they were corrected
 	if( res >= 0 ) {

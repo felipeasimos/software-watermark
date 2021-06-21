@@ -374,7 +374,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 	return bit_arr;
 }
 
-void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_parity_symbols) {
 
     uint8_t* result = watermark2017_decode_analysis(graph, num_bytes);
 
@@ -399,9 +399,9 @@ void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_byt
     }
 
     // use reed solomon on 'final_result'
-    unsigned long payload_num_bytes = result_num_bytes - num_rs_bytes * sizeof(uint16_t);
+    unsigned long payload_num_bytes = result_num_bytes - num_rs_parity_symbols * sizeof(uint16_t);
 
-	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_bytes);
+	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_parity_symbols);
 
 	// if there were no errors or they were corrected
 	if( res >= 0 ) {

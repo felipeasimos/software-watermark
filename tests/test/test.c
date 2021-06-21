@@ -370,7 +370,7 @@ int checker_analysis_with_rs_test() {
     for(uint8_t i = 1; i < 255; i++) {
 
         GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 1);
-
+        graph_print(graph, NULL);
         unsigned long num_bytes = sizeof(i);
         uint8_t* bit_arr = watermark_check_analysis_with_rs(graph, &i, &num_bytes, 1);
 
@@ -405,6 +405,7 @@ int run_tests() {
     ctdd_verify(decoder_analysis_test);
     ctdd_verify(decoder_analysis_with_rs_test);
     ctdd_verify(checker_analysis_test);
+    //ctdd_verify(checker_analysis_with_rs_test);
 
     //ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);
