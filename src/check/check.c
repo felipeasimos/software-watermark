@@ -540,11 +540,18 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
 uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_rs_parity_symbols) {
 
-    unsigned long data_total_n_bits = (*num_bytes) * 8;
+    //unsigned long payload_total_n_bits = (*num_bytes) * 8;
+    unsigned long data_total_n_bytes = *num_bytes + num_rs_parity_symbols * sizeof(uint16_t);
+    unsigned long data_total_n_bits = data_total_n_bytes*8;
 
-    uint8_t* result = watermark_check_analysis(graph, data, num_bytes);
+    // generate parity bytes again and add them to 'data', resulting in 'final_data'
+    uint8_t final_data[data_total_n_bytes];
+    memcpy(final_data, data, *num_bytes);
+    rs_encode(final_data, *num_bytes, (uint16_t*)(&final_data[*num_bytes]), num_rs_parity_symbols);
 
-    unsigned long result_n_bits = *num_bytes;
+    uint8_t* result = watermark_check_analysis(graph, final_data, &data_total_n_bytes);
+
+    unsigned long result_n_bits = data_total_n_bytes;
     unsigned long result_num_bytes = result_n_bits / 8 + !!(result_n_bits % 8);
     unsigned long result_total_n_bits = result_num_bytes * 8;
     uint8_t* final_result = malloc(sizeof(uint8_t) * result_num_bytes);
@@ -553,10 +560,17 @@ uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned lon
     // turn 'result' into an actual bit sequence, turn 'x' into the wrong bit of the sequence
     for(unsigned long i = 0; i < result_n_bits; i++) {
 
+        // if this is true, the result is too small
+        if( data_total_n_bits == i ) {
+
+            free(result);
+            return NULL;
+        }
+
         if( result[ result_n_bits - i - 1 ] == 'x' ) {
 
             // set to wrong bit
-            set_bit(final_result, result_total_n_bits - i - 1, !get_bit(data, data_total_n_bits - i -1));
+            set_bit(final_result, result_total_n_bits - i - 1, !get_bit(final_data, data_total_n_bits - i -1));
         } else {
             // set to result bit
             set_bit(final_result, result_total_n_bits - i - 1, result[ result_n_bits - i - 1 ] - '0');

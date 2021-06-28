@@ -8,6 +8,8 @@
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
+#define MAX_N_BITS 25
+
 uint8_t get_uint8_t() {
 
 	uint8_t n;
@@ -66,6 +68,12 @@ void encode_number() {
 
     GRAPH* _2014 = watermark2014_encode(&n, sizeof(n));
 
+    unsigned long i = 0;
+    for(GRAPH* node = g; node; node = node->next) {
+        i++;
+        graph_alloc(node, sizeof(unsigned long));
+        memcpy(node->data, &i, sizeof(unsigned long));
+    }
     graph_print(g, NULL);
 	
     char* code = watermark_get_code2014(_2014);
@@ -151,7 +159,14 @@ unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bi
     return correct;
 }
 
-unsigned long _test_with_removed_connections(unsigned long i, unsigned long* worst_case, GRAPH* graph, _CONN_LIST* conns) {
+unsigned long _test_with_removed_connections(
+        void* identifier,
+        unsigned long identifier_len,
+        unsigned long* worst_case, 
+        unsigned long* matrix,
+        unsigned long n_bits,
+        GRAPH* graph, 
+        _CONN_LIST* conns) {
 
     graph_load_copy(graph);
 
@@ -166,12 +181,14 @@ unsigned long _test_with_removed_connections(unsigned long i, unsigned long* wor
     GRAPH* copy = graph_get_info(graph);
     graph_unload_all_info(graph);
 
-    unsigned long num_bytes = sizeof(unsigned long);
-    uint8_t* result = watermark_check_analysis(copy, &i, &num_bytes);
+    unsigned long num_bytes = identifier_len;
+    uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
 
     unsigned long correct = 0;
 
-    correct = _check(&i, sizeof(unsigned long), result, num_bytes);
+    correct = _check(identifier, identifier_len, result, num_bytes);
+
+    (&matrix[n_bits - correct])[n_bits]++;
 
     if( correct ) {
 
@@ -198,7 +215,10 @@ void _multiple_removal_test(
         unsigned long* total,
         unsigned long* correct,
         unsigned long* worst_case,
-        unsigned long i,
+        unsigned long* matrix,
+        unsigned long n_bits,
+        void* identifier,
+        unsigned long identifier_len,
         GRAPH* root,
         GRAPH* node,
         CONNECTION* conn,
@@ -207,7 +227,7 @@ void _multiple_removal_test(
     if(!n_removals) {
 
         (*total)++;
-        (*correct) += _test_with_removed_connections(i, worst_case, root, l);
+        (*correct) += _test_with_removed_connections(identifier, identifier_len, worst_case, matrix, n_bits, root, l);
     } else {
 
         GRAPH* initial_node = node;
@@ -221,7 +241,7 @@ void _multiple_removal_test(
                 for(c = c->node == node->next ? c->next : c; c; c = c->next) {
 
                     _CONN_LIST* list = _conn_list_create(l, c);
-                    _multiple_removal_test(n_removals-1, total, correct, worst_case, i, root, node, c->next, list);
+                    _multiple_removal_test(n_removals-1, total, correct, worst_case, matrix, n_bits, identifier, identifier_len, root, node, c->next, list);
                     _conn_list_free(list);
                 }
             }
@@ -248,7 +268,10 @@ void removal_attack() {
         FILE* file = fopen(filename, "w");
 
         printf("number of removals: %lu\n", n_removals);
-        for(unsigned long n_bits = 1; n_bits < 24; n_bits++) {
+
+        unsigned long matrix[MAX_N_BITS][MAX_N_BITS] = {{0}};
+
+        for(unsigned long n_bits = 1; n_bits < MAX_N_BITS; n_bits++) {
 
             printf("\tnumber of bits: %lu\n", n_bits);
             unsigned long lower_bound = get_lower_bound(n_bits);
@@ -263,13 +286,20 @@ void removal_attack() {
 
                 unsigned long total = 0;
                 unsigned long correct = 0;
-                unsigned long worst_case = n_bits-1;
+                unsigned long worst_case = n_bits;
 
-                unsigned long inverse_i = invert_unsigned_long(i);
-                GRAPH* graph = watermark2017_encode(&inverse_i, sizeof(inverse_i));
+                //char i_str[50]={0};
+                //sprintf(i_str, "%lu", i);
+                //unsigned long identifier_len = 0;
+                //void* identifier = encode_numeric_string(i_str, &identifier_len);
+                unsigned long identifier = invert_unsigned_long(i);
+                unsigned long identifier_len = sizeof(unsigned long);
 
-                _multiple_removal_test(n_removals, &total, &correct, &worst_case, inverse_i, graph, graph, NULL, NULL);
+                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+
+                _multiple_removal_test(n_removals, &total, &correct, &worst_case, (unsigned long*)matrix, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
                 graph_free(graph);
+                //free(identifier);
                 identifiers_evaluated++;
 
                 correct_mean_sum += total ? ((double)correct)/total : n_bits;
@@ -279,7 +309,39 @@ void removal_attack() {
             fflush(file);
         }
         fclose(file);
+
+        FILE* matrix_file = fopen("tests/report_matrix.plt", "wb");
+        unsigned long max_n_bits = MAX_N_BITS;
+        fwrite(&max_n_bits, sizeof(unsigned long), 1, matrix_file);
+        for(unsigned long i = 0; i < MAX_N_BITS; i++)
+            for(unsigned long j = 0; j < MAX_N_BITS; j++)
+                fwrite(&matrix, sizeof(unsigned long), MAX_N_BITS * MAX_N_BITS, matrix_file);
+        fclose(matrix_file);
     }
+}
+
+void show_report_matrix() {
+    
+    char filename[MAX_SIZE]={0};
+
+    printf("Insert the filepath of the matrix you want to read: ");
+    scanf(" %s", filename);
+
+    FILE* file = fopen(filename, "rb");
+
+    unsigned long max_n_bits;
+    fread(&max_n_bits, sizeof(unsigned long), 1, file);
+
+    for(unsigned long i = 0; i < max_n_bits; i++) {
+        for(unsigned long j = 0; j < max_n_bits; j++) {
+            unsigned long n;
+            fread(&n, sizeof(unsigned long), 1, file);
+            printf("%lu ", n);
+        }
+        printf("\n");
+    }
+
+    fclose(file);
 }
 
 int main() {
@@ -287,6 +349,7 @@ int main() {
     printf("1) encode string\n");
     printf("2) encode number\n");
     printf("3) run removal test\n");
+    printf("4) show report matrix\n");
     printf("else) exit\n");
     switch( get_uint8_t() ) {
 
@@ -300,6 +363,9 @@ int main() {
             break;
         case 3:
             removal_attack();
+            break;
+        case 4:
+            show_report_matrix();
             break;
     }
 }
