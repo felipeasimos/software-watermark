@@ -120,15 +120,17 @@ clangd:
 		echo $$opt >> $(ROOT_DIR)/compile_flags.txt;\
 	done
 
-release: CFLAGS += -O2 -fPIC
+release: CFLAGS += -O0 -g
 release: | clean lib 
 
 compilemain: LDFLAGS = $(MAIN_LIBS)
 compilemain: release
-	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
+	@$(CC) $(CFLAGS) -g -O0 $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
 
 main: release compilemain
-	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)
+	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) valgrind \
+	--show-reachable=yes --leak-check=yes \
+	--track-origins=yes --exit-on-first-error=yes  $(TARGET)
 
 lib: folders $(TARGET_LIB_FINAL)
 
@@ -149,7 +151,7 @@ folders:
 
 clean:
 	# removed build/ directory, $(TEST_TARGET_FINAL) and $(TARGET)
-	-@rm -rf $(BUILD_DIR)/*
+	-@rm -rf $(BUILD_DIR)
 	-@rm -f $(TEST_TARGET_FINAL)
 	-@rm -f $(TARGET)
 

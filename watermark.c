@@ -10,6 +10,8 @@
 
 #define MAX_N_BITS 25
 
+#define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
+
 uint8_t get_uint8_t() {
 
 	uint8_t n;
@@ -149,7 +151,7 @@ unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bi
     unsigned long bit_seq_num_bits = bit_seq_size * 8;
     for(unsigned long i = 0; i < bit_arr_size; i++) {
 
-        if(bit_arr[bit_arr_size -i - 1] == 'x') continue;
+        if(bit_arr[bit_arr_size - i - 1] == 'x') continue;
 
         uint8_t arr_value = !!(bit_arr[bit_arr_size - i - 1] - '0');
         uint8_t seq_value = !!get_bit(bit_sequence, bit_seq_num_bits - i - 1);
@@ -162,33 +164,37 @@ unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bi
 unsigned long _test_with_removed_connections(
         void* identifier,
         unsigned long identifier_len,
-        unsigned long* worst_case, 
+        unsigned long* worst_case,
         unsigned long* matrix,
         unsigned long n_bits,
-        GRAPH* graph, 
+        GRAPH* graph,
         _CONN_LIST* conns) {
 
     graph_load_copy(graph);
 
     for(_CONN_LIST* l = conns; l; l = l->next) {
-
         GRAPH* copy_node_from = graph_get_info(l->conn->parent);
         GRAPH* copy_node_to = graph_get_info(l->conn->node);
 
         graph_oriented_disconnect(copy_node_from, copy_node_to);
-    }
+    }    GRAPH* copy = graph_get_info(graph);
 
-    GRAPH* copy = graph_get_info(graph);
     graph_unload_all_info(graph);
 
+
     unsigned long num_bytes = identifier_len;
-    uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
+
+    uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, n_bits/8 + !!(n_bits%8));
+    //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
 
     unsigned long correct = 0;
 
     correct = _check(identifier, identifier_len, result, num_bytes);
 
-    (&matrix[n_bits - correct])[n_bits]++;
+    fprintf(stderr, "%lu\n", correct);
+    fprintf(stderr, "%lu\n", num_bytes);
+    matrix[(n_bits - correct)*MAX_N_BITS + n_bits]++;
+    //matrix[n_bits - correct][n_bits]++;
 
     if( correct ) {
 
@@ -204,9 +210,18 @@ unsigned long _test_with_removed_connections(
     } else {
         //_save_successfull_attack(copy, i, (*error)/(*total));
     }
+    //debug;
     graph_free(copy);
+    //fprintf(stderr, "%p\n", (void*)result);
+    //fprintf(stderr, "%lu\n", num_bytes);
+    //for(unsigned long i = 0; i < num_bytes; i++) {
+    //    fprintf(stderr, "%lu: %x\n", i, result[i]);
+    //}
+    //fprintf(stderr, "\n");
     free(result);
+
     if( correct < *worst_case ) *worst_case = correct;
+
     return correct;
 }
 
@@ -228,24 +243,50 @@ void _multiple_removal_test(
 
         (*total)++;
         (*correct) += _test_with_removed_connections(identifier, identifier_len, worst_case, matrix, n_bits, root, l);
+ 
     } else {
-
         GRAPH* initial_node = node;
+        unsigned long i = 1;
+
         for(; node; node = node->next) {
 
+            printf("%lu\n", i++);
+            printf("node: %p\n", (void*)node);
+            fflush(stdout);
+            printf("before removal:\n");
+            graph_print(root, NULL);
+            unsigned long tmp = 29;
+            printf("search: %p\n", (void*) graph_search(root, &tmp, sizeof(tmp)));
+            fflush(stdout);
+            /*printf("next: %p\n", (void*)node->next);
+            fflush(stdout);
+            if(node->next) printf("next->next: %p\n", (void*)node->next->next);
+            fflush(stdout);*/
             if(node->connections) {
 
-                CONNECTION* c = node->connections;
-                if(node == initial_node) c = conn ? conn : c;
+                CONNECTION* c = ( node->connections->node == node->next ? node->connections->next : node->connections );
+                if(node == initial_node) c = (conn ? conn : c);
                  
-                for(c = c->node == node->next ? c->next : c; c; c = c->next) {
+                for(; c; c = c->next) {
 
                     _CONN_LIST* list = _conn_list_create(l, c);
+
+                    printf("BEFORE: node: %p, next: %p\n", (void*)node, (void*)node->next);
+                    fflush(stdout);
                     _multiple_removal_test(n_removals-1, total, correct, worst_case, matrix, n_bits, identifier, identifier_len, root, node, c->next, list);
-                    _conn_list_free(list);
+
+                    printf("AFTER: node: %p, next: %p\n", (void*)node, (void*)node->next);
+                    fflush(stdout);
+                   _conn_list_free(list);
                 }
             }
+
         }
+    }
+    if(node) {
+
+        printf("BEFORE EXITING TO GO TO 'AFTER': node: %p, next: %p\n", (void*)node, (void*)node->next);
+        fflush(stdout);
     }
 }
 
@@ -271,9 +312,9 @@ void removal_attack() {
 
         unsigned long matrix[MAX_N_BITS][MAX_N_BITS] = {{0}};
 
-        for(unsigned long n_bits = 1; n_bits < MAX_N_BITS; n_bits++) {
-
+        for(unsigned long n_bits = 17; n_bits < MAX_N_BITS; n_bits++) {
             printf("\tnumber of bits: %lu\n", n_bits);
+
             unsigned long lower_bound = get_lower_bound(n_bits);
 
             unsigned long higher_bound = get_higher_bound(n_bits);
@@ -282,6 +323,7 @@ void removal_attack() {
             double correct_mean_sum = 0;
             double worst_case_mean_sum = 0;
 
+            lower_bound = 65582;
             for(unsigned long i = lower_bound; i < higher_bound; i++) {
 
                 unsigned long total = 0;
@@ -295,8 +337,10 @@ void removal_attack() {
                 unsigned long identifier = invert_unsigned_long(i);
                 unsigned long identifier_len = sizeof(unsigned long);
 
-                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
-
+                GRAPH* graph = watermark2017_encode_with_rs(&identifier, identifier_len, n_bits/8 + !!(n_bits%8));
+                printf("%lu\n", i);
+                graph_print(graph, NULL);
+                //GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
                 _multiple_removal_test(n_removals, &total, &correct, &worst_case, (unsigned long*)matrix, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
                 graph_free(graph);
                 //free(identifier);
@@ -313,9 +357,7 @@ void removal_attack() {
         FILE* matrix_file = fopen("tests/report_matrix.plt", "wb");
         unsigned long max_n_bits = MAX_N_BITS;
         fwrite(&max_n_bits, sizeof(unsigned long), 1, matrix_file);
-        for(unsigned long i = 0; i < MAX_N_BITS; i++)
-            for(unsigned long j = 0; j < MAX_N_BITS; j++)
-                fwrite(&matrix, sizeof(unsigned long), MAX_N_BITS * MAX_N_BITS, matrix_file);
+        fwrite(&matrix, sizeof(unsigned long), MAX_N_BITS * MAX_N_BITS, matrix_file);
         fclose(matrix_file);
     }
 }

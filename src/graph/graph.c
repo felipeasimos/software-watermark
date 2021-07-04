@@ -30,10 +30,10 @@ GRAPH* graph_create(void* data, unsigned long data_len) {
 
 	GRAPH* graph = graph_empty();
 
-	graph_alloc(graph, data_len);
-
-	memcpy(graph->data, data, data_len);
-
+    if(data && data_len) {
+        graph_alloc(graph, data_len);
+        memcpy(graph->data, data, data_len);
+    }
 	return graph;
 }
 
@@ -302,7 +302,7 @@ void graph_load_info(GRAPH* graph, void* info, unsigned long info_len) {
 
     graph->data_len = sizeof(INFO_NODE);
     graph->data = malloc( graph->data_len );
-    memcpy(graph->data, &info_node, sizeof(INFO_NODE));
+    memcpy(graph->data, &info_node, graph->data_len);
 }
 
 void graph_unload_info(GRAPH* graph) {
@@ -346,21 +346,27 @@ void graph_load_copy(GRAPH* graph) {
 
     if(!graph) return;
 
-    for(GRAPH* cursor = graph; cursor; cursor = cursor->next) {
+    //get root
+    for(; graph->prev; graph = graph->prev);
+
+    for(GRAPH* node = graph; node; node = node->next) {
 
         // load copy of this node
         graph_load_info(
-                cursor,
+                node,
                 graph_create(
-                    cursor->data,
-                    cursor->data_len
+                    node->data,
+                    node->data_len
                 ), // create copy
                 sizeof(GRAPH)
             );
         // link the copied nodes
-        if( cursor->prev ) {
+        if( node->prev ) {
 
-            graph_insert(graph_get_info(cursor->prev), graph_get_info(cursor));
+            GRAPH* current_copy = graph_get_info(node);
+            GRAPH* prev_copy = graph_get_info(node->prev);
+            prev_copy->next = current_copy;
+            current_copy->prev = prev_copy;
         }
     }
     // iterate over nodes again, this time making connections to correspondent nodes

@@ -367,25 +367,27 @@ int checker_analysis_test() {
 
 int checker_analysis_with_rs_test() {
 
-    for(uint8_t i = 1; i < 255; i++) {
+    for(uint8_t k=5; k < 127; k++) {
+		uint8_t i[k];
+		for(int j=0; j < k; j++) i[j] = ( rand() % 254 ) + 1;
+		GRAPH* graph = watermark2017_encode_with_rs(&i, k, k);
+		ctdd_assert( graph );
+		unsigned long num_bytes = k;
+        uint8_t* bit_arr = watermark_check_analysis_with_rs(graph, i, &num_bytes, k);
 
-        GRAPH* graph = watermark2017_encode_with_rs(&i, sizeof(i), 1);
-        unsigned long num_bytes = sizeof(i);
-        uint8_t* bit_arr = watermark_check_analysis_with_rs(graph, &i, &num_bytes, 1);
-
-        for(uint8_t j = 0; j < num_bytes; j++) {
-
-            if( bit_arr[num_bytes - j -1] != ('0' + !!get_bit(&i, 7 - j)) ) {
-                fprintf(stderr, "i: %hhu, idx: %d, decoder: %c, reality: %d, num_bytes: %lu\n", i, 7 - j, bit_arr[num_bytes - j - 1], !!get_bit(&i, 7 - j), num_bytes);
+        for(unsigned long j = 0; j < num_bytes; j++) {
+    
+            if( bit_arr[num_bytes - j - 1] != ('0' + !!get_bit(i, k*8 - j - 1)) ) {
+                fprintf(stderr, "idx: %lu, decoder: %c, reality: %d, num_bytes: %lu\n", num_bytes - j, bit_arr[num_bytes - j - 1], !!get_bit(i, k*8 - j - 1), num_bytes);
                 ctdd_assert(0);
             } else {
                 ctdd_assert(1);
             }
         }
+		// 10^8 tests won't be a good idea if we don't deallocate memory
+		graph_free(graph);
         free(bit_arr);
-        graph_free(graph);
-    }
-
+	}
     return 0;
 }
 

@@ -296,8 +296,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                         checker->possible_removed_forward_edges[0] &&
                         (h_idx & 1) && 
                         get_parity_stack(&checker->stacks, h_idx & 1)->n == 1 &&
-                        connection_search_node(checker->node->prev->connections, checker->graph) &&
-                        checker->bit_arr[i]
+                        connection_search_node(checker->node->prev->connections, checker->graph)
                         ) {
 
                     current_n_forward_edges++;
@@ -399,7 +398,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 				    forward_flag = 2;
                     bit_arr[i] = '1';
                 }
-			} else if( get_backedge_with_info(checker->node) && !( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))-1) & 1 ) ) {
+			} else if( get_backedge_with_info(checker->node) && ( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))) & 1 ) ) {
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
                         graph_print(checker->graph, NULL);
@@ -504,14 +503,13 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                         checker->possible_removed_forward_edges[0] == checker->node &&
                         (h_idx & 1) && 
                         get_parity_stack(&checker->stacks, h_idx & 1)->n == 1 &&
-                        connection_search_node(checker->node->prev->connections, checker->graph) &&
-                        checker->bit_arr[i]
+                        connection_search_node(checker->node->prev->connections, checker->graph)
                         ) {
 
                     current_n_forward_edges++;
                     checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
                     bit_arr[i] = '1';
-                    forward_flag=2;
+                    forward_flag = 2;
                 
                 } else {
                     if(checker->bit_arr[i]) {
@@ -527,7 +525,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 		} else {
 			i--;
 		}
-
 		if( forward_flag >= 0 ) forward_flag--;
 
         _checker_register_node(checker, h_idx);
@@ -535,22 +532,24 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 	}
 
     _checker_free(checker);
+
     return bit_arr;
 }
 
 uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_rs_parity_symbols) {
 
     //unsigned long payload_total_n_bits = (*num_bytes) * 8;
-    unsigned long data_total_n_bytes = *num_bytes + num_rs_parity_symbols * sizeof(uint16_t);
+    unsigned long data_total_n_bytes = (*num_bytes) + num_rs_parity_symbols * sizeof(uint16_t);
     unsigned long data_total_n_bits = data_total_n_bytes*8;
 
     // generate parity bytes again and add them to 'data', resulting in 'final_data'
     uint8_t final_data[data_total_n_bytes];
+    memset(final_data, 0x00, data_total_n_bytes);
     memcpy(final_data, data, *num_bytes);
+
     rs_encode(final_data, *num_bytes, (uint16_t*)(&final_data[*num_bytes]), num_rs_parity_symbols);
 
     uint8_t* result = watermark_check_analysis(graph, final_data, &data_total_n_bytes);
-
     unsigned long result_n_bits = data_total_n_bytes;
     unsigned long result_num_bytes = result_n_bits / 8 + !!(result_n_bits % 8);
     unsigned long result_total_n_bits = result_num_bytes * 8;
@@ -577,10 +576,12 @@ uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned lon
         }
     }
 
-    // use reed solomon on 'final_result'
-    unsigned long payload_num_bytes = result_num_bytes - num_rs_parity_symbols * sizeof(uint16_t);
+    // since we know the true parity bits, we can use them to correct the payload
 
-	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_parity_symbols);
+    // use reed solomon on 'final_result'
+    unsigned long payload_num_bytes = result_num_bytes - ( num_rs_parity_symbols * sizeof(uint16_t) );
+
+	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)&final_data[*num_bytes] ), num_rs_parity_symbols);
 
 	// if there were no errors or they were corrected
 	if( res >= 0 ) {
@@ -594,6 +595,7 @@ uint8_t* watermark_check_analysis_with_rs(GRAPH* graph, void* data, unsigned lon
         for(unsigned long i = 0; i < payload_n_bits; i++) result[ payload_n_bits - i - 1 ] = '0' + !!get_bit(final_result, payload_total_n_bits - i - 1);
         free(final_result);
     } else {
+
         // an error happened
         free(final_result);
     }
