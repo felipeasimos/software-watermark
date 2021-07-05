@@ -120,17 +120,15 @@ clangd:
 		echo $$opt >> $(ROOT_DIR)/compile_flags.txt;\
 	done
 
-release: CFLAGS += -O0 -g
+release: CFLAGS += -O2
 release: | clean lib 
 
 compilemain: LDFLAGS = $(MAIN_LIBS)
 compilemain: release
-	@$(CC) $(CFLAGS) -g -O0 $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
+	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
 
 main: release compilemain
-	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) valgrind \
-	--show-reachable=yes --leak-check=yes \
-	--track-origins=yes --exit-on-first-error=yes  $(TARGET)
+	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)
 
 lib: folders $(TARGET_LIB_FINAL)
 

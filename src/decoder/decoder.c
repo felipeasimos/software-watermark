@@ -288,7 +288,7 @@ void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsig
 
 void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 
-	if( !is_graph_structure_valid(graph) || !num_bytes ) return NULL;
+	if( !num_bytes ) return NULL;
 
     unsigned long n_bits = get_num_bits(graph);
 
@@ -299,7 +299,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 	DECODER* decoder = decoder_create(graph, n_bits);
 
 	uint8_t* bit_arr = malloc( sizeof(char) * decoder->n_bits );
-	memset(bit_arr, 0x00, sizeof(char) * decoder->n_bits);
+	memset(bit_arr, 'x', sizeof(char) * decoder->n_bits);
 
 	// if positive, decrement it, if it is zero the current node is a forward destination
 	int forward_flag = -1;
@@ -316,8 +316,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
 
         if(!decoder->current_node) {
-            free(bit_arr);
-            return NULL;
+            break;
         }
 
 		if( forward_flag != 0 ) {

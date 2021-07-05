@@ -1,4 +1,5 @@
 #include "encoder/encoder.h"
+#include "decoder/decoder.h"
 #include "check/check.h"
 #include "code_generator/code_generator.h"
 #include "utils/utils.h"
@@ -177,22 +178,22 @@ unsigned long _test_with_removed_connections(
         GRAPH* copy_node_to = graph_get_info(l->conn->node);
 
         graph_oriented_disconnect(copy_node_from, copy_node_to);
-    }    GRAPH* copy = graph_get_info(graph);
+    }
+    GRAPH* copy = graph_get_info(graph);
 
     graph_unload_all_info(graph);
 
 
     unsigned long num_bytes = identifier_len;
 
-    uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, n_bits/8 + !!(n_bits%8));
+    //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, n_bits/8 + !!(n_bits%8));
     //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
+    uint8_t* result = watermark2017_decode_analysis(copy, &num_bytes);
 
     unsigned long correct = 0;
 
     correct = _check(identifier, identifier_len, result, num_bytes);
 
-    fprintf(stderr, "%lu\n", correct);
-    fprintf(stderr, "%lu\n", num_bytes);
     matrix[(n_bits - correct)*MAX_N_BITS + n_bits]++;
     //matrix[n_bits - correct][n_bits]++;
 
@@ -246,18 +247,9 @@ void _multiple_removal_test(
  
     } else {
         GRAPH* initial_node = node;
-        unsigned long i = 1;
 
         for(; node; node = node->next) {
 
-            printf("%lu\n", i++);
-            printf("node: %p\n", (void*)node);
-            fflush(stdout);
-            printf("before removal:\n");
-            graph_print(root, NULL);
-            unsigned long tmp = 29;
-            printf("search: %p\n", (void*) graph_search(root, &tmp, sizeof(tmp)));
-            fflush(stdout);
             /*printf("next: %p\n", (void*)node->next);
             fflush(stdout);
             if(node->next) printf("next->next: %p\n", (void*)node->next->next);
@@ -271,22 +263,13 @@ void _multiple_removal_test(
 
                     _CONN_LIST* list = _conn_list_create(l, c);
 
-                    printf("BEFORE: node: %p, next: %p\n", (void*)node, (void*)node->next);
-                    fflush(stdout);
                     _multiple_removal_test(n_removals-1, total, correct, worst_case, matrix, n_bits, identifier, identifier_len, root, node, c->next, list);
 
-                    printf("AFTER: node: %p, next: %p\n", (void*)node, (void*)node->next);
-                    fflush(stdout);
-                   _conn_list_free(list);
+                    _conn_list_free(list);
                 }
             }
 
         }
-    }
-    if(node) {
-
-        printf("BEFORE EXITING TO GO TO 'AFTER': node: %p, next: %p\n", (void*)node, (void*)node->next);
-        fflush(stdout);
     }
 }
 
@@ -312,7 +295,7 @@ void removal_attack() {
 
         unsigned long matrix[MAX_N_BITS][MAX_N_BITS] = {{0}};
 
-        for(unsigned long n_bits = 17; n_bits < MAX_N_BITS; n_bits++) {
+        for(unsigned long n_bits = 1; n_bits < MAX_N_BITS; n_bits++) {
             printf("\tnumber of bits: %lu\n", n_bits);
 
             unsigned long lower_bound = get_lower_bound(n_bits);
@@ -323,7 +306,6 @@ void removal_attack() {
             double correct_mean_sum = 0;
             double worst_case_mean_sum = 0;
 
-            lower_bound = 65582;
             for(unsigned long i = lower_bound; i < higher_bound; i++) {
 
                 unsigned long total = 0;
@@ -337,10 +319,8 @@ void removal_attack() {
                 unsigned long identifier = invert_unsigned_long(i);
                 unsigned long identifier_len = sizeof(unsigned long);
 
-                GRAPH* graph = watermark2017_encode_with_rs(&identifier, identifier_len, n_bits/8 + !!(n_bits%8));
-                printf("%lu\n", i);
-                graph_print(graph, NULL);
-                //GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+                //GRAPH* graph = watermark2017_encode_with_rs(&identifier, identifier_len, n_bits/8 + !!(n_bits%8));
+                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
                 _multiple_removal_test(n_removals, &total, &correct, &worst_case, (unsigned long*)matrix, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
                 graph_free(graph);
                 //free(identifier);
@@ -373,15 +353,29 @@ void show_report_matrix() {
 
     unsigned long max_n_bits;
     fread(&max_n_bits, sizeof(unsigned long), 1, file);
+    unsigned long sums[max_n_bits];
+    memset(sums, 0x00, sizeof(sums));
 
     for(unsigned long i = 0; i < max_n_bits; i++) {
+        printf("%lu & ", i);
         for(unsigned long j = 0; j < max_n_bits; j++) {
             unsigned long n;
             fread(&n, sizeof(unsigned long), 1, file);
-            printf("%lu ", n);
+            sums[j]+=n;
+            printf("%lu", n);
+            if(j != max_n_bits-1) printf(" & ");
         }
-        printf("\n");
+        printf("\\\\ \\hline\n");
     }
+    printf("Total & ");
+    for(unsigned long i = 0; i < max_n_bits; i++) {
+
+        printf("%lu", sums[i]);
+        if( i != max_n_bits - 1 ) {
+            printf(" & ");
+        }
+    }
+    printf("\\\\ \\hline\n");
 
     fclose(file);
 }
