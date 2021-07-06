@@ -1,11 +1,18 @@
 #include "decoder/decoder.h"
 
-typedef struct WM_NODE {
+typedef struct DECODER_NODE {
 
 	// both 0 based idx, ready to use
 	unsigned long hamiltonian_idx;
 	unsigned long stack_idx;
-} WM_NODE;
+
+    // idx of the bit represented by this node
+    unsigned long bit_idx;
+
+    // the bit represented by this node
+    // follows the values in include/utils/utils.h
+    char bit;
+} DECODER_NODE;
 
 typedef struct DECODER {
 
@@ -20,19 +27,42 @@ typedef struct DECODER {
 	unsigned long n_bits;
 } DECODER;
 
-void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx) {
+void decoder_graph_to_utils_nodes(GRAPH* graph) {
+
+    for(GRAPH* node = graph; node; node = node->next) {
+
+        if(node->data && node->data_len) {
+
+            DECODER_NODE* decoder_node = node->data;
+            UTILS_NODE utils_node = {
+                .h_idx = decoder_node->hamiltonian_idx+1,
+                .bit_idx = decoder_node->bit_idx,
+                .bit = decoder_node->bit
+            };
+            graph_alloc(node, sizeof(utils_node));
+            memcpy(node->data, &utils_node, node->data_len);
+        }
+    }
+}
+
+void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit) {
 
 	// get parity	
 	uint8_t is_odd = !(h_idx & 1);
 
 	// get indexes
 	unsigned long stack_idx = get_parity_stack(&decoder->stacks, is_odd)->n;
-	WM_NODE wm_node_info = { h_idx, stack_idx };
+	DECODER_NODE wm_node_info = {
+        .hamiltonian_idx = h_idx,
+        .stack_idx = stack_idx,
+        .bit_idx = bit_idx,
+        .bit = bit
+    };
 
 	add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
 
-	// get WM_NODE on the node
-	graph_alloc(node, sizeof(WM_NODE));
+	// get DECODER_NODE on the node
+	graph_alloc(node, sizeof(DECODER_NODE));
 	memcpy(node->data, &wm_node_info, node->data_len);
 }
 
@@ -54,7 +84,7 @@ DECODER* decoder_create(GRAPH* graph, unsigned long n_bits) {
 
 uint8_t is_inner_node(DECODER* decoder, GRAPH* node) {
 
-	WM_NODE* node_info = node->data;
+	DECODER_NODE* node_info = node->data;
 	uint8_t is_odd = !(node_info->hamiltonian_idx & 1);
 
 	PSTACK* stack = get_parity_stack(&decoder->stacks, is_odd);
@@ -73,7 +103,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 		GRAPH* dest_node = get_backedge(decoder->current_node);
 		if( dest_node ) {
 
-			WM_NODE* dest = ((WM_NODE*)dest_node->data);
+			DECODER_NODE* dest = ((DECODER_NODE*)dest_node->data);
 
 			// check if it is inner node
 			if( is_inner_node(decoder, dest_node) ) {
@@ -92,7 +122,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 		// hamiltonian node as the first node in the list)
 		} else if( !decoder->current_node->prev ) {
 
-			bit_arr[0]=1;
+			bit_arr[i]=1;
 
 		// else the node could always have connected to the first node (since it is
 		// never an inner vertex). Since it didn't, it means it has the value inverse
@@ -116,8 +146,8 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 			}
 		}
 
-		label_new_current_node(decoder, decoder->current_node, i);
-		decoder->current_node = get_next_hamiltonian_node2014(decoder->current_node);
+		label_new_current_node(decoder, decoder->current_node, i, i, bit_arr[i] + '0');
+        decoder->current_node = decoder->current_node->next;
 	}
 
 	return bit_arr;
@@ -125,7 +155,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 
 unsigned long get_node_idx(GRAPH* node) {
 
-	return ((WM_NODE*)node->data)->hamiltonian_idx;
+	return ((DECODER_NODE*)node->data)->hamiltonian_idx;
 }
 
 uint8_t* get_bit_array2017(DECODER* decoder) {
@@ -141,18 +171,14 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	unsigned long h_idx=1;
 
 	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0);
+	label_new_current_node(decoder, decoder->current_node, 0, 0, '1');
 	decoder->current_node = next;
 
 	// iterate over every node but the last
 	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
 
-        if(!decoder->current_node) {
-            free(bit_arr);
-            return NULL;
-        }
-
-		if( forward_flag != 0 ) {
+        // if 'forward_flag' == 0, this is the destination of a forward edge
+        if( forward_flag != 0 ) {
 
 			if( get_forward_edge(decoder->current_node) ) {
 				bit_arr[i] = 1;
@@ -160,7 +186,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
 				bit_arr[i] = 1;
 				GRAPH* dest_node = get_backedge(decoder->current_node);
-				WM_NODE* dest = dest_node->data;
+				DECODER_NODE* dest = dest_node->data;
 
 				// check if it is inner node
 				if( is_inner_node(decoder, dest_node) ) {
@@ -185,7 +211,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 						free(bit_arr);
 						return NULL;
 					}
-					WM_NODE* dest = dest_node->data;
+					DECODER_NODE* dest = dest_node->data;
 					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
 				}
 			}
@@ -193,12 +219,12 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 			i--;
 		}
 
-		if( forward_flag >= 0 ) forward_flag--;
-
-		GRAPH* next = decoder->current_node->next;	
-		label_new_current_node(decoder, decoder->current_node, h_idx);
+		GRAPH* next = decoder->current_node->next;
+		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : '0' + bit_arr[i]);
 		decoder->current_node = next;
 		h_idx++;
+
+		if( forward_flag >= 0 ) forward_flag--;
 	}
 
 	return bit_arr;
@@ -309,7 +335,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 	unsigned long h_idx=1;
 
 	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0);
+	label_new_current_node(decoder, decoder->current_node, 0, 0, '1');
 	decoder->current_node = next;
 
 	// iterate over every node but the last
@@ -327,7 +353,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
 				bit_arr[i] = '1';
 				GRAPH* dest_node = get_backedge(decoder->current_node);
-				WM_NODE* dest = dest_node->data;
+				DECODER_NODE* dest = dest_node->data;
 
 				// check if it is inner node
 				if( is_inner_node(decoder, dest_node) ) {
@@ -353,7 +379,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 						free(bit_arr);
 						bit_arr[i]='x';
 					}
-					WM_NODE* dest = dest_node->data;
+					DECODER_NODE* dest = dest_node->data;
 					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
 				}
 			}
@@ -361,12 +387,12 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 			i--;
 		}
 
-		if( forward_flag >= 0 ) forward_flag--;
-
 		GRAPH* next = decoder->current_node->next;	
-		label_new_current_node(decoder, decoder->current_node, h_idx);
+		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i]);
 		decoder->current_node = next;
 		h_idx++;
+
+		if( forward_flag >= 0 ) forward_flag--;
 	}
     decoder_free(decoder);
 

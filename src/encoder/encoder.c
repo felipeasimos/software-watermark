@@ -31,8 +31,12 @@ ENCODER* encoder_create(unsigned long n_bits) {
 	create_stacks(&encoder->stacks, n_bits);
 	// create graph (all nodes are created without an index, except for the first one)
 	// indices are added as we go through the graph
-	unsigned long one = 1;
-	encoder->final_node = encoder->graph = graph_create(&one, sizeof(unsigned long));
+	UTILS_NODE utils_node = {
+        .h_idx=1,
+        .bit_idx=0,
+        .bit='1'
+    };
+	encoder->final_node = encoder->graph = graph_create(&utils_node, sizeof(UTILS_NODE));
 	add_node_to_stacks(&encoder->stacks, encoder->final_node, 0, 1);
 
 	for(unsigned long i = 1; i < n_bits+1; i++) {
@@ -48,13 +52,6 @@ void encoder_free(ENCODER* encoder) {
 	free(encoder);
 }
 
-void add_idx(GRAPH* node, unsigned long idx) {
-
-	idx++;
-	graph_alloc(node, sizeof(unsigned long));
-	*((unsigned long*)node->data) = idx;
-}
-
 void encode2014(ENCODER* encoder, void* data, unsigned long total_bits, unsigned long trailing_zeroes) {
 
 	//start from second node
@@ -67,7 +64,7 @@ void encode2014(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 		uint8_t bit = get_bit(data, i);
 
 		// 1. add index to node
-		add_idx(node, idx);
+		add_idx(node, idx, idx, bit);
 
 		// 2. if bit is 1, connect to a different parity bit, otherwise connect to same parity
 		add_backedge2014( &encoder->stacks, node, bit, is_odd );
@@ -139,13 +136,13 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 				add_node_to_graph(encoder);
 				graph_oriented_connect(node, node->next->next);
                 if( node->next->next == encoder->final_node ) {
-                    add_idx(node->next, h_idx+1);
+                    add_idx(node->next, h_idx+1, i-trailing_zeroes-1, 'x');
                 }
 				forward_status |= FORWARD_SOURCE;
 			}
 			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
 		}
-		add_idx(node, h_idx);
+		add_idx(node, h_idx, i-trailing_zeroes-1, bit ? '1' : '0');
 		h_idx++;
 		forward_status = update_forward_status(forward_status);
 		node = node->next;

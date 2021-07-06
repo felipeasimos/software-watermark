@@ -137,7 +137,6 @@ int simple_2017_test() {
 	for(uint8_t i=1; i < 255; i++) {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(i));
 		ctdd_assert( graph );
-
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2017_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
@@ -158,6 +157,7 @@ int simple_2014_test() {
 		unsigned long num_bytes=0;
 		uint8_t* result = watermark2014_decode(graph, &num_bytes);
 		ctdd_assert( num_bytes );
+        ctdd_assert( result );
 		ctdd_assert( check((uint8_t*)&i, result, num_bytes, sizeof(i) ) );
 
 		// 10^8 tests won't be a good idea if we don't deallocate memory
@@ -263,7 +263,6 @@ int simple_checker_test() {
 		GRAPH* graph = watermark2017_encode(&i, sizeof(uint8_t));
 		ctdd_assert( graph );
 		ctdd_assert( watermark_check(graph, &i, sizeof(uint8_t)) );
-
 		// 10^8 tests won't be a good idea if we don't deallocate memory
 		graph_free(graph);
 	}
@@ -393,6 +392,7 @@ int checker_analysis_with_rs_test() {
 
 int run_tests() {
 
+    ctdd_verify(simple_checker_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);

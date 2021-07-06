@@ -146,7 +146,7 @@ void _conn_list_free(_CONN_LIST* list) {
     free(list);
 }
 
-unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bit_arr, unsigned long bit_arr_size) {
+/*unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bit_arr, unsigned long bit_arr_size) {
 
     unsigned long correct = 0;
     unsigned long bit_seq_num_bits = bit_seq_size * 8;
@@ -160,13 +160,12 @@ unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bi
         correct++;
     }
     return correct;
-}
+}*/
 
 unsigned long _test_with_removed_connections(
         void* identifier,
         unsigned long identifier_len,
         unsigned long* worst_case,
-        unsigned long* matrix,
         unsigned long n_bits,
         GRAPH* graph,
         _CONN_LIST* conns) {
@@ -183,18 +182,20 @@ unsigned long _test_with_removed_connections(
 
     graph_unload_all_info(graph);
 
-
     unsigned long num_bytes = identifier_len;
-
-    //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, n_bits/8 + !!(n_bits%8));
+    n_bits++;
+    //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
     //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
     uint8_t* result = watermark2017_decode_analysis(copy, &num_bytes);
+    decoder_graph_to_utils_nodes(copy);
+    identifier++;
+    //char* result_final = decode_numeric_string(result, num_bytes);
+    //free(result);
+    //result = (uint8_t*)result_final;
+    //num_bytes = strlen((char*)result);
 
-    unsigned long correct = 0;
+    unsigned long correct = _check(graph, copy);
 
-    correct = _check(identifier, identifier_len, result, num_bytes);
-
-    matrix[(n_bits - correct)*MAX_N_BITS + n_bits]++;
     //matrix[n_bits - correct][n_bits]++;
 
     if( correct ) {
@@ -231,7 +232,6 @@ void _multiple_removal_test(
         unsigned long* total,
         unsigned long* correct,
         unsigned long* worst_case,
-        unsigned long* matrix,
         unsigned long n_bits,
         void* identifier,
         unsigned long identifier_len,
@@ -243,7 +243,7 @@ void _multiple_removal_test(
     if(!n_removals) {
 
         (*total)++;
-        (*correct) += _test_with_removed_connections(identifier, identifier_len, worst_case, matrix, n_bits, root, l);
+        (*correct) += _test_with_removed_connections(identifier, identifier_len, worst_case, n_bits, root, l);
  
     } else {
         GRAPH* initial_node = node;
@@ -263,7 +263,7 @@ void _multiple_removal_test(
 
                     _CONN_LIST* list = _conn_list_create(l, c);
 
-                    _multiple_removal_test(n_removals-1, total, correct, worst_case, matrix, n_bits, identifier, identifier_len, root, node, c->next, list);
+                    _multiple_removal_test(n_removals-1, total, correct, worst_case, n_bits, identifier, identifier_len, root, node, c->next, list);
 
                     _conn_list_free(list);
                 }
@@ -296,6 +296,7 @@ void removal_attack() {
         unsigned long matrix[MAX_N_BITS][MAX_N_BITS] = {{0}};
 
         for(unsigned long n_bits = 1; n_bits < MAX_N_BITS; n_bits++) {
+
             printf("\tnumber of bits: %lu\n", n_bits);
 
             unsigned long lower_bound = get_lower_bound(n_bits);
@@ -312,22 +313,23 @@ void removal_attack() {
                 unsigned long correct = 0;
                 unsigned long worst_case = n_bits;
 
-                //char i_str[50]={0};
-                //sprintf(i_str, "%lu", i);
+                char i_str[50]={0};
+                sprintf(i_str, "%lu", i);
                 //unsigned long identifier_len = 0;
                 //void* identifier = encode_numeric_string(i_str, &identifier_len);
-                unsigned long identifier = invert_unsigned_long(i);
-                unsigned long identifier_len = sizeof(unsigned long);
+                void* identifier = &i_str[0];
+                unsigned long identifier_len = strlen(i_str);
 
-                //GRAPH* graph = watermark2017_encode_with_rs(&identifier, identifier_len, n_bits/8 + !!(n_bits%8));
-                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
-                _multiple_removal_test(n_removals, &total, &correct, &worst_case, (unsigned long*)matrix, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
+                GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len);
+                //GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+                _multiple_removal_test(n_removals, &total, &correct, &worst_case, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
                 graph_free(graph);
                 //free(identifier);
                 identifiers_evaluated++;
 
                 correct_mean_sum += total ? ((double)correct)/total : n_bits;
                 worst_case_mean_sum += worst_case;
+                matrix[worst_case][n_bits]++;
             }
             fprintf(file, "%lu %F %F\n", n_bits, correct_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
             fflush(file);

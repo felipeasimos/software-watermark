@@ -31,13 +31,20 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	}
 }
 
-BIT_ARR* bit_arr_create(unsigned long n) {
+void utils_print_node(void* data, unsigned long data_len) {
 
-    BIT_ARR* bits = malloc(sizeof(BIT_ARR) + n);
-    memset(bits, 0x00, sizeof(BIT_ARR) + n);
-    bits->n = n;
+    if(!data) {
+		printf("\x1b[33m null \x1b[0m");
+    } else if( data_len == sizeof(UTILS_NODE) ) {
 
-    return bits;
+        char bit = ((UTILS_NODE*)data)->bit;
+        if( bit == UTILS_MUTE_NODE ) {
+
+            printf("\x1b[33m %lu[%c] \x1b[0m", ((UTILS_NODE*)data)->h_idx, bit);
+        } else { 
+            printf("\x1b[33m %lu[%lu|%c] \x1b[0m", ((UTILS_NODE*)data)->h_idx, ((UTILS_NODE*)data)->bit_idx, bit);
+        }
+    }
 }
 
 uint8_t is_graph_structure_valid(GRAPH* graph) {
@@ -47,16 +54,8 @@ uint8_t is_graph_structure_valid(GRAPH* graph) {
 	// 1. first node has only a hamiltonian edge, and no less
 	if( !graph->connections || graph->connections->next ) return 0;
 
-	uint8_t node_without_connections_found=0;
-
 	for(; graph; graph = graph->next) {
 	
-		// 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
-		if( !graph->connections ) {
-			if( node_without_connections_found ) return 0;
-			else node_without_connections_found++;
-		}
-
 		// 3. every node has less than three outgoing connections
 		if( graph->connections && graph->connections->next && graph->connections->next->next ) return 0;
 
@@ -269,7 +268,7 @@ void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_
 		unsigned long dest_idx = rand() % (dest_stack->n - prev_has_backedge_in_this_stack);	
 		GRAPH* dest_node = dest_stack->stack[ dest_idx ];	
 		graph_oriented_connect(source_node, dest_node);
-		pop_stacks(stacks, dest_idx, (*(unsigned long*)dest_node->data) - 1);
+		pop_stacks(stacks, dest_idx, ((UTILS_NODE*)dest_node->data)->h_idx - 1);
 	}
 }
 
@@ -334,3 +333,13 @@ char* decode_numeric_string(void* data, unsigned long data_len) {
     }
     return str;
 }
+
+void add_idx(GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit) {
+
+	h_idx++;
+	graph_alloc(node, sizeof(UTILS_NODE));
+	((UTILS_NODE*)node->data)->h_idx = h_idx;
+    ((UTILS_NODE*)node->data)->bit_idx = bit_idx;
+	((UTILS_NODE*)node->data)->bit = bit;
+}
+

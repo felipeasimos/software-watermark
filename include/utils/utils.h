@@ -22,11 +22,23 @@ typedef struct STACKS {
 	HSTACK history;
 } STACKS;
 
-typedef struct BIT_ARR {
+// keep some information about the node that can
+// be used by tests
+typedef struct UTILS_NODE {
 
-    unsigned long n;
-    char arr[];
-} BIT_ARR;
+    // hamiltonian idx 1-based
+    unsigned long h_idx;
+
+    // bit arr idx 0-based
+    unsigned long bit_idx;
+
+    // '1'/'0' or 'm' if mute or 'x' if unknown
+    char bit;
+} UTILS_NODE;
+#define UTILS_MUTE_NODE 'm'
+#define UTILS_UNKNOWN_NODE 'x'
+
+void utils_print_node(void* data, unsigned long data_len);
 
 // 1. first node has only a hamiltonian edge, and no less
 // 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
@@ -75,5 +87,7 @@ unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len);
 void* encode_numeric_string(char* string, unsigned long* data_len);
 
 char* decode_numeric_string(void* data, unsigned long data_len);
+
+void add_idx(GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit);
 
 #endif
