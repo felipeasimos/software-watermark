@@ -42,6 +42,8 @@ void utils_print_node(void* data, unsigned long data_len);
 
 void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned long data_len));
 
+unsigned long invert_unsigned_long(unsigned long i);
+
 // 1. first node has only a hamiltonian edge, and no less
 // 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
 // 3. every node has less than three outgoing connections

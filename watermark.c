@@ -87,15 +87,7 @@ void encode_number() {
 	//free(code);
 }
 
-unsigned long invert_unsigned_long(unsigned long n) {
 
-    unsigned long tmp = n;
-    for(uint8_t i=0; i < sizeof(n); i++) {
-
-        ((uint8_t*)&n)[i] = ((uint8_t*)&tmp)[sizeof(n)-i-1];
-    }
-    return n;
-}
 
 void _save_successfull_distortion_attack(GRAPH* copy, unsigned long number_encoded, double error_percentage) {
 
@@ -229,11 +221,11 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
             copy_node = copy_node->next;
         }*/
     }
-    if(errors > 5) {
+    /*if(errors > 5) {
         graph_print(graph, utils_print_node);
         graph_print(copy, utils_print_node);
         printf("%lu\n", errors);
-    }
+    }*/
     return errors;
 }
 
@@ -442,20 +434,6 @@ void show_report_matrix() {
 }
 
 int main() {
-
-    unsigned long identifier = invert_unsigned_long(6005);
-    unsigned long identifier_len = sizeof(identifier);
-
-    GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
-    graph_print(graph, utils_print_node);
-    // disconnect forward edge
-    graph_oriented_disconnect(graph->next->next->next->next, graph->next->next->next->next->connections->next->node);
-    graph_print(graph, utils_print_node);
-    free(watermark_check_analysis(graph, &identifier, &identifier_len));
-    checker_graph_to_utils_nodes(graph);
-    graph_print(graph, utils_print_node);
-    graph_free(graph);
-
     printf("1) encode string\n");
     printf("2) encode number\n");
     printf("3) run removal test\n");

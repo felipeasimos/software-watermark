@@ -200,7 +200,8 @@ GRAPH** _remove_first_node(GRAPH** nodes, unsigned long* n) {
 
         nodes[i-1] = nodes[i];
     }
-    return realloc(nodes, --(*n));
+    (*n)--;
+    return realloc(nodes, *n);
 }
 
 uint8_t _watermark_check(CHECKER* checker) {
@@ -226,7 +227,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 	for(unsigned long i=1; i < checker->n_bits; i++ ) {
         if(!checker->node) {
             #ifdef DEBUG
-                graph_print(checker->graph, NULL);
+                graph_print(checker->graph, checker_print_node);
                 fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: end of graph reached too early\n", i);
             #endif
             return 0;
@@ -237,7 +238,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                 current_n_forward_edges++;
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
-                        graph_print(checker->graph, NULL);
+                        graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with outgoing forward edge\n", i);
                     #endif
                     return 0;
@@ -247,7 +248,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 			} else if( get_backedge_with_info(checker->node) && !( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))-1) & 1 ) ) {
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
-                        graph_print(checker->graph, NULL);
+                        graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with backedge with odd index difference\n", i);
                     #endif
                     return 0;
@@ -257,7 +258,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 				// check if it is inner node
 				if( _checker_is_inner_node(checker, dest_node) ) {
                     #ifdef DEBUG
-                        graph_print(checker->graph, NULL);
+                        graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: backedge goes to an inner node\n", i);
                     #endif
 					return 0;
@@ -274,7 +275,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 					// check if it is inner node
 					if( _checker_is_inner_node(checker, dest_node) ) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit 0 backedge goes to an inner node\n", i);
                         #endif
 						return 0;
@@ -282,7 +283,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 
                     if(checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1 for even backedge\n", i);
                         #endif
                         return 0;
@@ -295,7 +296,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                     
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path\n", i);
                         #endif
                         return 0;
@@ -308,7 +309,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                     current_n_forward_edges++;
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path in the next node\n", i);
                         #endif
                         return 0;
@@ -320,14 +321,14 @@ uint8_t _watermark_check(CHECKER* checker) {
 
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed forward edge here\n", i);
                         #endif
                         return 0;
                     }
                     if(checker->bit_arr[i+1]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1, but the second mute node in a tail sequence must be 0\n", i+1);
                         #endif
                         return 0;
@@ -335,7 +336,7 @@ uint8_t _watermark_check(CHECKER* checker) {
 
                     if( ++current_n_forward_edges != max_n_forward_edges ) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: not enough forward edges were detected, something went wrong\n", i);
                         #endif
                         return 0;
@@ -364,7 +365,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                     checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
                     if(checker->bit_arr[i+1]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "checker failed:\n\tidx: %lu\n\treason: ", i+1);
                         #endif
                     }
@@ -377,7 +378,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                 } else {
                     if(checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: mute node should 0\n", i);
                         #endif
                         return 0;
@@ -443,7 +444,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 	for(unsigned long i=1; i < checker->n_bits; i++ ) {
         if(!checker->node) {
             #ifdef DEBUG
-                graph_print(checker->graph, NULL);
+                graph_print(checker->graph, checker_print_node);
                 fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: end of graph reached too early\n", i);
             #endif
             break;
@@ -454,7 +455,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                 current_n_forward_edges++;
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
-                        graph_print(checker->graph, NULL);
+                        graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with outgoing forward edge\n", i);
                     #endif
                 } else {
@@ -464,7 +465,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 			} else if( get_backedge_with_info(checker->node) && ( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))) & 1 ) ) {
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
-                        graph_print(checker->graph, NULL);
+                        graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with backedge with odd index difference\n", i);
                     #endif
                 } else {
@@ -473,7 +474,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     // check if it is inner node
                     if( _checker_is_inner_node(checker, dest_node) ) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: backedge goes to an inner node\n", i);
                         #endif
                     } else {
@@ -490,7 +491,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 					// check if it is inner node
 					if( _checker_is_inner_node(checker, dest_node) ) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit 0 backedge goes to an inner node\n", i);
                         #endif
 						bit_arr[i] = 'x';
@@ -498,7 +499,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
                         if(checker->bit_arr[i]) {
                             #ifdef DEBUG
-                                graph_print(checker->graph, NULL);
+                                graph_print(checker->graph, checker_print_node);
                                 fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1 for even backedge\n", i);
                             #endif
                         } else {
@@ -512,7 +513,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path\n", i);
                         #endif
                     } else {
@@ -525,7 +526,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     current_n_forward_edges++;
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed hamiltonian path in the next node\n", i);
                         #endif
                     } else {
@@ -537,7 +538,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
                     if(!checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0, but there is a removed forward edge here\n", i);
                         #endif
                     } else {
@@ -545,7 +546,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     }
                     if(checker->bit_arr[i+1]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 1, but the second mute node in a tail sequence must be 0\n", i+1);
                         #endif
                     } else {
@@ -554,7 +555,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 
                     if( ++current_n_forward_edges != max_n_forward_edges ) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: not enough forward edges were detected, something went wrong\n", i);
                         #endif
                         break;
@@ -584,7 +585,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                 } else {
                     if(checker->bit_arr[i]) {
                         #ifdef DEBUG
-                            graph_print(checker->graph, NULL);
+                            graph_print(checker->graph, checker_print_node);
                             fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: mute node should be 0\n", i);
                         #endif
                     } else {

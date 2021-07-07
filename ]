@@ -110,6 +110,9 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 	enum FORWARD_STATUS forward_status = NONE;
 	unsigned long h_idx = 1;
 	for(unsigned long i = trailing_zeroes+1; i < total_bits; i++) {
+        printf("%lu:\n", h_idx+1);
+        utils_print_stacks(&encoder->stacks, NULL);
+
 		// 0-based index of the node's position in the hamiltonian path
 		uint8_t is_odd = !((h_idx) & 1);
 		uint8_t bit = get_bit(data, i);
@@ -134,15 +137,12 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 			if(bit) {
 				add_node_to_graph(encoder);
 				graph_oriented_connect(node, node->next->next);
-                if( node->next->next == encoder->final_node->prev ) {
-                    add_idx(node->next, h_idx+1, i-trailing_zeroes+1, 'x');
+                if( node->next->next == encoder->final_node ) {
+                    add_idx(node->next, h_idx+1, i-trailing_zeroes-1, 'x');
                 }
 				forward_status |= FORWARD_SOURCE;
 			}
-
-            if( !( forward_status & FORWARD_INNER ) ) {
-			    add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
-            }
+			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
 		}
 		add_idx(node, h_idx, i-trailing_zeroes, forward_status & FORWARD_DESTINATION ? UTILS_MUTE_NODE : bit + '0');
 		h_idx++;

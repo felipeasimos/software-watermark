@@ -86,13 +86,16 @@ void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned 
         printf("\t");
     }
     printf("\n");
-    printf("\thistory:\n\t\t");
-    unsigned long history_size = stacks->odd.n > stacks->even.n ? stacks->odd.n : stacks->even.n;
-    for(unsigned long i = 0; i < history_size; i++) {
-        printf("%lu", stacks->history.stack[i]);
-        printf("\t");
+}
+
+unsigned long invert_unsigned_long(unsigned long n) {
+
+    unsigned long tmp = n;
+    for(uint8_t i=0; i < sizeof(n); i++) {
+
+        ((uint8_t*)&n)[i] = ((uint8_t*)&tmp)[sizeof(n)-i-1];
     }
-    printf("\n");
+    return n;
 }
 
 uint8_t is_graph_structure_valid(GRAPH* graph) {

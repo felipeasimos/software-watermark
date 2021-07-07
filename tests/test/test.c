@@ -390,8 +390,42 @@ int checker_analysis_with_rs_test() {
     return 0;
 }
 
+GRAPH* get_nth_node(GRAPH* g, unsigned long i) {
+
+    unsigned long a=1;
+    for(; a < i && g; a++) {
+        g = g->next;
+    }
+    return a < i ? NULL : g;
+}
+
+int tmp_test() {
+    /*
+    unsigned long identifier = invert_unsigned_long(47254);
+    unsigned long identifier_len = sizeof(identifier);
+
+    GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+    printf("original:\n");
+    graph_print(graph, utils_print_node);
+    // disconnect forward edge
+    GRAPH* node = get_nth_node(graph, 5);
+    ctdd_assert(node);
+    graph_oriented_disconnect(node, node->connections->next->node);
+    printf("after removal:\n");
+    graph_print(graph, utils_print_node);
+    free(watermark_check_analysis(graph, &identifier, &identifier_len));
+    checker_graph_to_utils_nodes(graph);
+    printf("after checker:\n");
+    graph_print(graph, utils_print_node);
+    graph_free(graph);*/
+
+
+    return 0;
+}
+
 int run_tests() {
 
+    ctdd_verify(tmp_test);
     ctdd_verify(simple_checker_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
