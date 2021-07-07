@@ -42,7 +42,7 @@ void utils_print_node(void* data, unsigned long data_len) {
 
             printf("\x1b[33m %lu[%c] \x1b[0m", ((UTILS_NODE*)data)->h_idx, bit);
         } else { 
-            printf("\x1b[33m %lu[%lu|%c] \x1b[0m", ((UTILS_NODE*)data)->h_idx, ((UTILS_NODE*)data)->bit_idx, bit);
+            printf("\x1b[33m %lu(bit_arr[%lu] = '%c']) \x1b[0m", ((UTILS_NODE*)data)->h_idx, ((UTILS_NODE*)data)->bit_idx, bit);
         }
     }
 }
@@ -88,7 +88,7 @@ uint8_t get_bit(uint8_t* data, unsigned long bit_idx) {
 
 	// 0x80 = 0b1000_0000
 	uint8_t byte = data[bit_idx/8];
-	return byte & ( 0x80 >> (bit_idx % 8));
+	return !!(byte & ( 0x80 >> (bit_idx % 8)));
 }
 
 void set_bit( uint8_t* data, unsigned long i, uint8_t value ) {

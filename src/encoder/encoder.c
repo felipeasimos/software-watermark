@@ -142,7 +142,7 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 			}
 			add_node_to_stacks(&encoder->stacks, node, h_idx, is_odd);
 		}
-		add_idx(node, h_idx, i-trailing_zeroes-1, bit ? '1' : '0');
+		add_idx(node, h_idx, i-trailing_zeroes, forward_status & FORWARD_DESTINATION ? UTILS_MUTE_NODE : bit + '0');
 		h_idx++;
 		forward_status = update_forward_status(forward_status);
 		node = node->next;
