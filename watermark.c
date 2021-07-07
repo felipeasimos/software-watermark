@@ -172,22 +172,67 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
         UTILS_NODE* graph_utils = graph_node->data;
         UTILS_NODE* copy_utils = copy_node->data;
 
-        // skip mute nodes
-        if( graph_utils->bit == UTILS_MUTE_NODE || graph_utils->bit_idx < copy_utils->bit_idx ) {
+        // if one of them if mute, skip it
+        if(graph_utils->bit == UTILS_MUTE_NODE) {
             graph_node = graph_node->next;
-        } else if( copy_utils->bit == UTILS_MUTE_NODE || copy_utils->bit_idx < graph_utils->bit_idx ) {
+        } else if(copy_utils->bit == UTILS_MUTE_NODE) {
             copy_node = copy_node->next;
+        // make sure they point to the same bit index
+        } else if( copy_utils->bit_idx < graph_utils->bit_idx ) {
+            copy_node = copy_node->next;
+        } else if( graph_utils->bit_idx < copy_utils->bit_idx ) {
+            graph_node = graph_node->next;
+        // at this point on, they are pointing to the same index, so they must always both skip
         } else {
-            errors += !( graph_utils->bit == copy_utils->bit && graph_utils->bit != UTILS_UNKNOWN_NODE );
+            // if one of them is unknown, increment error
+            if(graph_utils->bit == UTILS_UNKNOWN_NODE || graph_utils->bit == UTILS_UNKNOWN_NODE) {
+                errors++;
+            // if they are different, increment error
+            } else if( graph_utils->bit != copy_utils->bit ) {
+                errors++;
+            }
             graph_node = graph_node->next;
             copy_node = copy_node->next;
+            
         }
-    }
-    if( errors > 10) {
 
+        /*// if one is mute and the other isn't, skip both and increment 'errors'
+        if( (graph_utils->bit == UTILS_MUTE_NODE) ^ (copy_utils->bit == UTILS_MUTE_NODE) ) {
+
+            if(graph_utils->bit == UTILS_MUTE_NODE) {
+                mute_offset_graph++;
+            } else {
+                mute_offset_copy++;
+            }
+            graph_node = graph_node->next;
+            copy_node = copy_node->next;
+            errors++;
+        // if only one is mute, then both of them are (due to the XOR), so skip both
+        } else if( graph_utils->bit == UTILS_MUTE_NODE ) {
+            graph_node = graph_node->next;
+            copy_node = copy_node->next;
+        // check if the bit indexes match, if they don't, skip the lower one
+        } else if( copy_utils->bit_idx + mute_offset_copy < graph_utils->bit_idx ) {
+            copy_node = copy_node->next;
+        } else if( graph_utils->bit_idx + mute_offset_graph < copy_utils->bit_idx ) {
+            graph_node = graph_node->next;
+        // at this point, the bit indexes always match, so we can skip both
+        } else {
+            // if one of them is unknown, increment errors
+            if( copy_utils->bit == UTILS_UNKNOWN_NODE || graph_utils->bit == UTILS_UNKNOWN_NODE ) {
+                errors++;
+            // if they are different, increment errors and skip both
+            } else if( copy_utils->bit != graph_utils->bit ) {
+                errors++;
+            }
+            graph_node = graph_node->next;
+            copy_node = copy_node->next;
+        }*/
+    }
+    if(errors > 5) {
         graph_print(graph, utils_print_node);
         graph_print(copy, utils_print_node);
-        printf("number of errors: %lu", errors);
+        printf("%lu\n", errors);
     }
     return errors;
 }
@@ -215,9 +260,9 @@ unsigned long _test_with_removed_connections(
     unsigned long num_bytes = identifier_len;
     n_bits++;
     //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
-    //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
-    uint8_t* result = watermark2017_decode_analysis(copy, &num_bytes);
-    decoder_graph_to_utils_nodes(copy);
+    uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
+    //uint8_t* result = watermark2017_decode_analysis(copy, &num_bytes);
+    checker_graph_to_utils_nodes(copy);
     identifier = NULL;
     //char* result_final = decode_numeric_string(result, num_bytes);
     //free(result);
@@ -397,6 +442,19 @@ void show_report_matrix() {
 }
 
 int main() {
+
+    unsigned long identifier = invert_unsigned_long(6005);
+    unsigned long identifier_len = sizeof(identifier);
+
+    GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+    graph_print(graph, utils_print_node);
+    // disconnect forward edge
+    graph_oriented_disconnect(graph->next->next->next->next, graph->next->next->next->next->connections->next->node);
+    graph_print(graph, utils_print_node);
+    free(watermark_check_analysis(graph, &identifier, &identifier_len));
+    checker_graph_to_utils_nodes(graph);
+    graph_print(graph, utils_print_node);
+    graph_free(graph);
 
     printf("1) encode string\n");
     printf("2) encode number\n");

@@ -40,6 +40,8 @@ typedef struct UTILS_NODE {
 
 void utils_print_node(void* data, unsigned long data_len);
 
+void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned long data_len));
+
 // 1. first node has only a hamiltonian edge, and no less
 // 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
 // 3. every node has less than three outgoing connections
@@ -63,7 +65,10 @@ GRAPH* get_backedge(GRAPH* node);
 
 GRAPH* get_backedge_with_info(GRAPH* node);
 
+
 GRAPH* get_forward_edge(GRAPH* node);
+
+GRAPH* get_forward_edge_with_info(GRAPH* node);
 
 CONNECTION* get_hamiltonian_connection(GRAPH* node);
 

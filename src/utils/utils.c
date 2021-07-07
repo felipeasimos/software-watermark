@@ -4,6 +4,10 @@ uint8_t is_backedge(GRAPH* node) {
 	return node->data_len;
 }
 
+uint8_t is_backedge_with_info(GRAPH* node) {
+    return node->data_len == sizeof(INFO_NODE) && node->data && graph_get_info(node);
+}
+
 void pop_all(PSTACK* stack, unsigned long idx) {
 
 	stack->n = idx+1;
@@ -31,6 +35,24 @@ GRAPH* find_guaranteed_forward_edge(GRAPH* node) {
 	}
 }
 
+GRAPH* find_guaranteed_forward_edge_with_info(GRAPH* node) {
+	// if we have a forward edge, we have two nodes connected:
+	GRAPH* node1 = node->connections->node;
+	GRAPH* node2 = node->connections->next->node;
+
+	// in this case we have, for sure, a forward edge among us, and two possibilities:
+	// 1. we have a removed hamiltonian edge afterwards, which means that both nodes
+	// have only one connection: one has a backedge and the other has a hamiltonian edge.
+	if( ( node1->connections && is_backedge_with_info(node1->connections->node) ) || ( node2->connections && is_backedge_with_info(node2->connections->node) ) ) {
+		return ( node1->connections && is_backedge(node1->connections->node) ) ? node2 : node1;
+	} else {
+		// 2. we have a forward edge and no missing hamiltonian edges, so this means that
+		// one node (the forward edge one) is the next hamiltonian node of the other
+		return connection_search_node(node1->connections, node2) ? node2 : node1;
+	}
+}
+
+
 void utils_print_node(void* data, unsigned long data_len) {
 
     if(!data) {
@@ -45,6 +67,32 @@ void utils_print_node(void* data, unsigned long data_len) {
             printf("\x1b[33m %lu(bit_arr[%lu] = '%c']) \x1b[0m", ((UTILS_NODE*)data)->h_idx, ((UTILS_NODE*)data)->bit_idx, bit);
         }
     }
+}
+
+void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned long data_len)) {
+
+    print_func = print_func ? print_func : utils_print_node;
+
+    printf("stacks:\n");
+    printf("\todd:\n\t\t");
+    for(unsigned long i = 0; i < stacks->odd.n; i++) {
+        print_func(stacks->odd.stack[i]->data, stacks->odd.stack[i]->data_len);
+        printf("\t");
+    }
+    printf("\n");
+    printf("\teven:\n\t\t");
+    for(unsigned long i = 0; i < stacks->even.n; i++) {
+        print_func(stacks->even.stack[i]->data, stacks->even.stack[i]->data_len);
+        printf("\t");
+    }
+    printf("\n");
+    printf("\thistory:\n\t\t");
+    unsigned long history_size = stacks->odd.n > stacks->even.n ? stacks->odd.n : stacks->even.n;
+    for(unsigned long i = 0; i < history_size; i++) {
+        printf("%lu", stacks->history.stack[i]);
+        printf("\t");
+    }
+    printf("\n");
 }
 
 uint8_t is_graph_structure_valid(GRAPH* graph) {
@@ -156,7 +204,7 @@ GRAPH* get_backedge_with_info(GRAPH* node) {
 
 	for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
 
-		if( conn->node->data_len == sizeof(INFO_NODE) && conn->node->data && graph_get_info(conn->node) ) return conn->node;
+		if( is_backedge_with_info(conn->node) ) return conn->node;
 	}
 	return NULL;
 }
@@ -171,7 +219,7 @@ GRAPH* get_forward_edge(GRAPH* node) {
 		return NULL;
 	} else {
 		// if we have 2 connections, one is hamiltonian path and the other
-		// is a forward edge of backedge
+		// is a forward edge or backedge
 		CONNECTION* conn1 = node->connections;
 		CONNECTION* conn2 = node->connections->next;
 
@@ -179,6 +227,27 @@ GRAPH* get_forward_edge(GRAPH* node) {
 			return NULL;
 		} else {
 			return find_guaranteed_forward_edge(node);
+		}	
+	}
+}
+
+GRAPH* get_forward_edge_with_info(GRAPH* node) {
+
+	if( !node ) return NULL;
+
+	// if we have only one connection or less, there is no forward edge
+	if( !node->connections || !node->connections->next ) {
+		return NULL;
+	} else {
+		// if we have 2 connections, one is hamiltonian path and the other
+		// is a forward edge or backedge
+		CONNECTION* conn1 = node->connections;
+		CONNECTION* conn2 = node->connections->next;
+
+		if( is_backedge_with_info(conn1->node) || is_backedge_with_info(conn2->node) ) {
+			return NULL;
+		} else {
+			return find_guaranteed_forward_edge_with_info(node);
 		}	
 	}
 }

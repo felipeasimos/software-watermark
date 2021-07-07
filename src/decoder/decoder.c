@@ -4,7 +4,6 @@ typedef struct DECODER_NODE {
 
 	// both 0 based idx, ready to use
 	unsigned long hamiltonian_idx;
-	unsigned long stack_idx;
 
     // idx of the bit represented by this node
     unsigned long bit_idx;
@@ -12,6 +11,8 @@ typedef struct DECODER_NODE {
     // the bit represented by this node
     // follows the values in include/utils/utils.h
     char bit;
+	unsigned long stack_idx;
+
 } DECODER_NODE;
 
 typedef struct DECODER {
@@ -45,7 +46,7 @@ void decoder_graph_to_utils_nodes(GRAPH* graph) {
     }
 }
 
-void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit) {
+void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit, uint8_t is_2017) {
 
 	// get parity	
 	uint8_t is_odd = !(h_idx & 1);
@@ -59,7 +60,9 @@ void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx, 
         .bit = bit
     };
 
-	add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
+    // node that are origin of a backedge can't be backedge destinations
+    // but this restriction only applies to 2017
+	if( !is_2017 || !get_backedge(node) ) add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
 
 	// get DECODER_NODE on the node
 	graph_alloc(node, sizeof(DECODER_NODE));
@@ -146,7 +149,7 @@ uint8_t* get_bit_array2014(DECODER* decoder) {
 			}
 		}
 
-		label_new_current_node(decoder, decoder->current_node, i, i, bit_arr[i] + '0');
+		label_new_current_node(decoder, decoder->current_node, i, i, bit_arr[i] + '0', 0);
         decoder->current_node = decoder->current_node->next;
 	}
 
@@ -171,7 +174,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 	unsigned long h_idx=1;
 
 	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0, 0, '1');
+	label_new_current_node(decoder, decoder->current_node, 0, 0, '1', 1);
 	decoder->current_node = next;
 
 	// iterate over every node but the last
@@ -220,7 +223,7 @@ uint8_t* get_bit_array2017(DECODER* decoder) {
 		}
 
 		GRAPH* next = decoder->current_node->next;
-		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : '0' + bit_arr[i]);
+		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : '0' + bit_arr[i], 1);
 		decoder->current_node = next;
 		h_idx++;
 
@@ -335,7 +338,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 	unsigned long h_idx=1;
 
 	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0, 0, '1');
+	label_new_current_node(decoder, decoder->current_node, 0, 0, '1', 1);
 	decoder->current_node = next;
 
 	// iterate over every node but the last
@@ -388,7 +391,7 @@ void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
 		}
 
 		GRAPH* next = decoder->current_node->next;	
-		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i]);
+		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i], 1);
 		decoder->current_node = next;
 		h_idx++;
 
