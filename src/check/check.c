@@ -57,10 +57,8 @@ void checker_graph_to_utils_nodes(GRAPH* graph) {
 
 void checker_print_node(void* data, unsigned long data_len) {
 
-    if(data && data_len == sizeof(INFO_NODE)) {
-        ((INFO_NODE*)data)->info_len = sizeof(UTILS_NODE);
-        utils_print_node(((INFO_NODE*)data)->info, ((INFO_NODE*)data)->info_len);
-        ((INFO_NODE*)data)->info_len = sizeof(CHECKER_NODE);
+    if(data && data_len == sizeof(CHECKER_NODE)) {
+        utils_print_node(data, sizeof(UTILS_NODE));
     } else {
         printf("\x1b[33m null \x1b[0m");
     }
@@ -79,7 +77,9 @@ uint8_t _is_mute(GRAPH* node) {
 
 void _get_possibly_removed_forward_edges(CHECKER* checker) {
 
+    unsigned long i=0;
     for(GRAPH* node = checker->graph; node && node->next && node->next->next && node->next->next->next; node = node->next) {
+        i++;
         if( _is_mute(node) &&
             _is_mute(node->next) &&
             _is_mute(node->next->next) ) {
@@ -87,8 +87,10 @@ void _get_possibly_removed_forward_edges(CHECKER* checker) {
             checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
                     (++checker->possible_removed_forward_edges.n) * sizeof(GRAPH*));
             checker->possible_removed_forward_edges.nodes[checker->possible_removed_forward_edges.n-1] = node;
+            printf("%lu ", i);
         }
     }
+    printf("\n");
 }
 
 CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
@@ -118,7 +120,7 @@ CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
     return checker;
 }
 
-void _checker_register_node(CHECKER* checker, unsigned long h_idx, unsigned long bit_idx, char bit) {
+void _checker_register_node(CHECKER* checker, unsigned long h_idx, unsigned long bit_idx, char bit, int forward_flag) {
 
 	// get parity	
 	uint8_t is_odd = !(h_idx & 1);
@@ -126,38 +128,26 @@ void _checker_register_node(CHECKER* checker, unsigned long h_idx, unsigned long
 	// get indexes
 	unsigned long stack_idx = get_parity_stack(&checker->stacks, is_odd)->n;
 
-    GRAPH* backedge = get_backedge_with_info(checker->node);
+    GRAPH* backedge = get_backedge(checker->node);
 
     CHECKER_NODE checker_node = {
         .hamiltonian_idx = h_idx,
         .stack_idx = stack_idx,
-        .backedge_to_idx = backedge ? ((CHECKER_NODE*)graph_get_info(backedge))->hamiltonian_idx : 0,
+        .backedge_to_idx = backedge ? ((CHECKER_NODE*)backedge->data)->hamiltonian_idx : 0,
         .has_backedge = !!backedge,
         .bit_idx = bit_idx,
         .bit = bit
     };
-    CHECKER_NODE* checker_node_cpy = malloc(sizeof(CHECKER_NODE));
-    memcpy(checker_node_cpy, &checker_node, sizeof(CHECKER_NODE));
+    graph_alloc(checker->node, sizeof(CHECKER_NODE));
+    memcpy(checker->node->data, &checker_node, sizeof(CHECKER_NODE));
 
     // backedge origin can't be used as backedge destination
-	if(!backedge) add_node_to_stacks(&checker->stacks, checker->node, h_idx, is_odd);
+	if(!backedge && forward_flag != 1) add_node_to_stacks(&checker->stacks, checker->node, h_idx, is_odd);
 
-    graph_load_info(checker->node, checker_node_cpy, sizeof(CHECKER_NODE));
     checker->node = checker->node->next;
 }
 
 void _checker_free(CHECKER* checker) {
-
-    for(GRAPH* node = checker->graph; node; node = node->next) {
-        if( node->data_len == sizeof(INFO_NODE) && node->data ) {
-            free(((INFO_NODE*)node->data)->data);
-            node->data_len = graph_get_info_len(node);
-            void* tmp = graph_get_info(node);
-            free(node->data);
-            node->data = tmp;
-        }
-    }
-
     free(checker->possible_removed_forward_edges.nodes);
     free(checker->bit_arr);
     free_stacks(&checker->stacks);
@@ -166,17 +156,17 @@ void _checker_free(CHECKER* checker) {
 
 unsigned long _checker_get_node_idx(GRAPH* node) {
 
-    return ((CHECKER_NODE*)graph_get_info(node))->hamiltonian_idx;
+    return ((CHECKER_NODE*)node->data)->hamiltonian_idx;
 } 
 
 uint8_t _checker_is_inner_node(CHECKER* decoder, GRAPH* node) {
 
-	CHECKER_NODE* node_info = graph_get_info(node);
-	uint8_t is_odd = !(node_info->hamiltonian_idx & 1);
+	CHECKER_NODE* node_data = node->data;
+	uint8_t is_odd = !(node_data->hamiltonian_idx & 1);
 
 	PSTACK* stack = get_parity_stack(&decoder->stacks, is_odd);
 
-	return !( node_info->stack_idx < stack->n && stack->stack[node_info->stack_idx] == node );
+	return !( node_data->stack_idx < stack->n && stack->stack[node_data->stack_idx] == node );
 }
 
 uint8_t _is_mute_until_end(GRAPH* node) {
@@ -227,7 +217,7 @@ uint8_t _watermark_check(CHECKER* checker) {
     unsigned long max_n_forward_edges = get_num_bits(checker->graph) - checker->n_bits;
     unsigned long current_n_forward_edges = 0;
 
-    _checker_register_node(checker, 0, 0, '1');
+    _checker_register_node(checker, 0, 0, '1', 0);
 
     GRAPH* fourth_last = _get_fourth_last(checker->final_node);
 
@@ -244,7 +234,7 @@ uint8_t _watermark_check(CHECKER* checker) {
         }
 		if( forward_flag != 0 ) {
 
-			if( get_forward_edge_with_info(checker->node) ) {
+			if( get_forward_edge(checker->node) ) {
                 current_n_forward_edges++;
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
@@ -255,7 +245,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                 }
                 bit = '1';
 				forward_flag = 2;
-			} else if( get_backedge_with_info(checker->node) && !( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))-1) & 1 ) ) {
+			} else if( get_backedge(checker->node) && !( (h_idx - _checker_get_node_idx(get_backedge(checker->node))-1) & 1 ) ) {
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
                         graph_print(checker->graph, checker_print_node);
@@ -263,7 +253,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                     #endif
                     return 0;
                 }
-				GRAPH* dest_node = get_backedge_with_info(checker->node);
+				GRAPH* dest_node = get_backedge(checker->node);
 
 				// check if it is inner node
 				if( _checker_is_inner_node(checker, dest_node) ) {
@@ -275,10 +265,10 @@ uint8_t _watermark_check(CHECKER* checker) {
 				}
 
                 bit = '1';
-				CHECKER_NODE* dest = graph_get_info(dest_node);
+				CHECKER_NODE* dest = dest_node->data;
 				pop_stacks(&checker->stacks, dest->stack_idx, dest->hamiltonian_idx);
 			} else {
-				GRAPH* dest_node = get_backedge_with_info(checker->node);
+				GRAPH* dest_node = get_backedge(checker->node);
 
 				if(dest_node) {
 
@@ -299,7 +289,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                         return 0;
                     }
                     bit = '0';
-                    CHECKER_NODE* dest = graph_get_info(dest_node);
+                    CHECKER_NODE* dest = dest_node->data;
 					pop_stacks(&checker->stacks, dest->stack_idx, dest->hamiltonian_idx);
                 // using removed hamiltonian edge, we can identify this node as a 1 even if its backedge was removed
 				} else if ( !connection_search_node(checker->node->connections, checker->node->next) ) {
@@ -351,7 +341,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                         #endif
                         return 0;
                     }
-                    _checker_register_node(checker, h_idx, i, '1');
+                    _checker_register_node(checker, h_idx, i, '1', 0);
                     bit = '0';
                     return 1;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
@@ -379,7 +369,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                             fprintf(stderr, "checker failed:\n\tidx: %lu\n\treason: ", i+1);
                         #endif
                     }
-                    _checker_register_node(checker, h_idx, i, '0');
+                    _checker_register_node(checker, h_idx, i, '0', 2);
                     i++;
                     h_idx++;
                     forward_flag=1;
@@ -400,10 +390,11 @@ uint8_t _watermark_check(CHECKER* checker) {
 			i--;
 		}
 
-		if( forward_flag >= 0 ) forward_flag--;
 
-        _checker_register_node(checker, h_idx, i, bit);
+        _checker_register_node(checker, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit, forward_flag);
 		h_idx++;
+
+		if( forward_flag >= 0 ) forward_flag--;
 	}
     return 1;
 }
@@ -442,7 +433,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     unsigned long max_n_forward_edges = get_num_bits(checker->graph) - checker->n_bits;
     unsigned long current_n_forward_edges = 0;
 
-    _checker_register_node(checker, 0, 0, '1');
+    _checker_register_node(checker, 0, 0, '1', 0);
     bit_arr[0]='1';
 
     GRAPH* fourth_last = _get_fourth_last(checker->final_node);
@@ -456,9 +447,13 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
             #endif
             break;
         }
+
+        printf("h_idx: %lu\n", h_idx);
+        printf("has backedge: %d\n", !!get_backedge(checker->node));
+        utils_print_stacks(&checker->stacks, checker_print_node);
 		if( forward_flag != 0 ) {
 
-			if( get_forward_edge_with_info(checker->node) ) {
+			if( get_forward_edge(checker->node) ) {
                 current_n_forward_edges++;
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
@@ -469,14 +464,14 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 				    forward_flag = 2;
                     bit_arr[i] = '1';
                 }
-			} else if( get_backedge_with_info(checker->node) && ( (h_idx - _checker_get_node_idx(get_backedge_with_info(checker->node))) & 1 ) ) {
+			} else if( get_backedge(checker->node) && ( (h_idx - _checker_get_node_idx(get_backedge(checker->node))) & 1 ) ) {
 				if(!checker->bit_arr[i]) {
                     #ifdef DEBUG
                         graph_print(checker->graph, checker_print_node);
                         fprintf(stderr, "check failed:\n\tidx: %lu\n\treason: bit is 0 for node with backedge with odd index difference\n", i);
                     #endif
                 } else {
-                    GRAPH* dest_node = get_backedge_with_info(checker->node);
+                    GRAPH* dest_node = get_backedge(checker->node);
 
                     // check if it is inner node
                     if( _checker_is_inner_node(checker, dest_node) ) {
@@ -487,11 +482,11 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     } else {
                         bit_arr[i] = '1';
                     }
-                    CHECKER_NODE* dest = graph_get_info(dest_node);
+                    CHECKER_NODE* dest = dest_node->data;
                     pop_stacks(&checker->stacks, dest->stack_idx, dest->hamiltonian_idx);
                 }
 			} else {
-				GRAPH* dest_node = get_backedge_with_info(checker->node);
+				GRAPH* dest_node = get_backedge(checker->node);
 
 				if(dest_node) {
 
@@ -512,7 +507,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                         } else {
                             bit_arr[i] = '0';
                         }
-                        CHECKER_NODE* dest = graph_get_info(dest_node);
+                        CHECKER_NODE* dest = dest_node->data;
                         pop_stacks(&checker->stacks, dest->stack_idx, dest->hamiltonian_idx);
                     }
                 // using removed hamiltonian edge, we can identify this node as a 1 even if its backedge was removed
@@ -580,7 +575,16 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                             // check if the node has an odd hamiltonian idx and can't connect to anyone
                             ) || (
                                 !(h_idx & 1) &&
-                                !get_parity_stack(&checker->stacks, 0)->n
+                                // can't connect if the previous node connects to it
+                                (
+                                  !get_parity_stack(&checker->stacks, 0)->n ||
+                                  (
+                                    get_parity_stack(&checker->stacks, 0)->n == 1 &&
+                                    connection_search_node(checker->node->prev->connections, checker->graph) &&
+                                    connection_search_node(checker->node->prev->connections, checker->graph)->node ==
+                                    get_parity_stack(&checker->stacks, 0)->stack[0]
+                                  )
+                                )
                             ) 
                         )
                         ) {
@@ -603,7 +607,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 			i--;
 		}
 
-        _checker_register_node(checker, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i]);
+        _checker_register_node(checker, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i], forward_flag);
 		h_idx++;
 
         if( forward_flag >= 0 ) forward_flag--;

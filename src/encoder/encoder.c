@@ -134,8 +134,8 @@ void encode2017(ENCODER* encoder, void* data, unsigned long total_bits, unsigned
 			if(bit) {
 				add_node_to_graph(encoder);
 				graph_oriented_connect(node, node->next->next);
-                if( node->next->next == encoder->final_node->prev ) {
-                    add_idx(node->next, h_idx+1, i-trailing_zeroes+1, 'x');
+                if( node->next->next == encoder->final_node ) {
+                    add_idx(node->next, h_idx+1, i-trailing_zeroes+1, UTILS_MUTE_NODE);
                 }
 				forward_status |= FORWARD_SOURCE;
 			}

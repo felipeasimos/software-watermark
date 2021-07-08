@@ -401,14 +401,14 @@ GRAPH* get_nth_node(GRAPH* g, unsigned long i) {
 
 int tmp_test() {
 
-    unsigned long identifier = invert_unsigned_long(174762);
+    unsigned long identifier = invert_unsigned_long(5461);
     unsigned long identifier_len = sizeof(identifier);
 
     GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
     printf("original:\n");
     graph_print(graph, utils_print_node);
     // disconnect forward edge
-    GRAPH* node = get_nth_node(graph, 6);
+    GRAPH* node = get_nth_node(graph, 7);
     ctdd_assert(node);
     free(watermark_check_analysis(graph, &identifier, &identifier_len));
     checker_graph_to_utils_nodes(graph);

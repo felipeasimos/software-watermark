@@ -222,10 +222,12 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
             copy_node = copy_node->next;
         }*/
     }
-    if(errors > 10) {
+    if(errors > 3) {
         graph_print(graph, utils_print_node);
         graph_print(copy, utils_print_node);
         printf("%lu\n", errors);
+
+        exit(0);
     }
     return errors;
 }
