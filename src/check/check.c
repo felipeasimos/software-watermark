@@ -1,11 +1,16 @@
 #include "check/check.h"
 
+typedef struct GRAPH_ARR {
+
+    GRAPH** nodes;
+    unsigned long n;
+} GRAPH_ARR;
+
 typedef struct CHECKER {
     uint8_t* bit_arr;
     unsigned long n_bits;
 
-    GRAPH** possible_removed_forward_edges;
-    unsigned long n_possible_removed_forward_edges;
+    GRAPH_ARR possible_removed_forward_edges;
 
     STACKS stacks;
 
@@ -61,9 +66,37 @@ void checker_print_node(void* data, unsigned long data_len) {
     }
 }
 
+uint8_t _is_mute(GRAPH* node) {
+
+    // check if it has a connection that isn't the hamiltonian edge
+    for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+        if( conn->node != node->next ) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void _get_possibly_removed_forward_edges(CHECKER* checker) {
+
+    for(GRAPH* node = checker->graph; node && node->next && node->next->next && node->next->next->next; node = node->next) {
+        if( _is_mute(node) &&
+            _is_mute(node->next) &&
+            _is_mute(node->next->next) ) {
+
+            checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
+                    (++checker->possible_removed_forward_edges.n) * sizeof(GRAPH*));
+            checker->possible_removed_forward_edges.nodes[checker->possible_removed_forward_edges.n-1] = node;
+        }
+    }
+}
+
 CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
 
     CHECKER* checker = malloc(sizeof(CHECKER));
+
+    checker->possible_removed_forward_edges.nodes = NULL;
+    checker->possible_removed_forward_edges.n = 0;
 
     checker->graph = checker->node = graph;
 
@@ -78,6 +111,8 @@ CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
     }
 
     for(GRAPH* node=graph; node; node = node->next) checker->final_node = node;
+
+    _get_possibly_removed_forward_edges(checker);
 
     create_stacks(&checker->stacks, checker->n_bits);
     return checker;
@@ -123,7 +158,7 @@ void _checker_free(CHECKER* checker) {
         }
     }
 
-    free(checker->possible_removed_forward_edges);
+    free(checker->possible_removed_forward_edges.nodes);
     free(checker->bit_arr);
     free_stacks(&checker->stacks);
     free(checker);
@@ -142,17 +177,6 @@ uint8_t _checker_is_inner_node(CHECKER* decoder, GRAPH* node) {
 	PSTACK* stack = get_parity_stack(&decoder->stacks, is_odd);
 
 	return !( node_info->stack_idx < stack->n && stack->stack[node_info->stack_idx] == node );
-}
-
-uint8_t _is_mute(GRAPH* node) {
-
-    // check if it has a connection that isn't the hamiltonian edge
-    for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
-        if( conn->node != node->next ) {
-            return 0;
-        }
-    }
-    return 1;
 }
 
 uint8_t _is_mute_until_end(GRAPH* node) {
@@ -176,32 +200,21 @@ GRAPH* _get_fourth_last(GRAPH* last) {
     return _is_mute_until_end(last) ? last : NULL;
 }
 
-GRAPH** _get_possibly_removed_forward_edges(GRAPH* graph, unsigned long* n) {
+void remove_first_node(CHECKER* checker) {
 
-    GRAPH** nodes = NULL;
-    *n=0;
-    for(; graph && graph->next && graph->next->next; graph = graph->next) {
-
-        if( _is_mute(graph) &&
-            _is_mute(graph->next) &&
-            _is_mute(graph->next->next) ) {
-
-            nodes = realloc(nodes, (++(*n)) * sizeof(GRAPH*));
-            nodes[(*n)-1] = graph;
-        }
+    for(unsigned long i = 1; i < checker->possible_removed_forward_edges.n; i++) {
+        checker->possible_removed_forward_edges.nodes[i-1] = checker->possible_removed_forward_edges.nodes[i];
     }
-
-    return nodes;
+    checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
+            --checker->possible_removed_forward_edges.n * sizeof(GRAPH*));
 }
 
-GRAPH** _remove_first_node(GRAPH** nodes, unsigned long* n) {
+int possible_forward_edge_check(CHECKER* checker) {
+    uint8_t res = checker->possible_removed_forward_edges.n && checker->possible_removed_forward_edges.nodes[0] == checker->node;
 
-    for(unsigned long i = 1; i < *n; i++) {
-
-        nodes[i-1] = nodes[i];
-    }
-    (*n)--;
-    return realloc(nodes, *n);
+    // every node is only evaluated once
+    if(res) remove_first_node(checker);
+    return res;
 }
 
 uint8_t _watermark_check(CHECKER* checker) {
@@ -217,9 +230,6 @@ uint8_t _watermark_check(CHECKER* checker) {
     _checker_register_node(checker, 0, 0, '1');
 
     GRAPH* fourth_last = _get_fourth_last(checker->final_node);
-
-    checker->n_possible_removed_forward_edges=0;
-    checker->possible_removed_forward_edges = _get_possibly_removed_forward_edges(checker->graph, &checker->n_possible_removed_forward_edges);
 
     char bit = 'x';
 
@@ -345,8 +355,8 @@ uint8_t _watermark_check(CHECKER* checker) {
                     bit = '0';
                     return 1;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
-                } else if( checker->n_possible_removed_forward_edges &&
-                        checker->possible_removed_forward_edges[0] == checker->node &&
+                } else if(
+                        possible_forward_edge_check(checker) &&
                         checker->bit_arr[i] && (
                             // check if the node has an even hamiltonian idx and can't connect to anyone, not even 1
                             (
@@ -362,7 +372,7 @@ uint8_t _watermark_check(CHECKER* checker) {
                         ) {
 
                     current_n_forward_edges++;
-                    checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
+
                     if(checker->bit_arr[i+1]) {
                         #ifdef DEBUG
                             graph_print(checker->graph, checker_print_node);
@@ -436,9 +446,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     bit_arr[0]='1';
 
     GRAPH* fourth_last = _get_fourth_last(checker->final_node);
-
-    checker->n_possible_removed_forward_edges=0;
-    checker->possible_removed_forward_edges = _get_possibly_removed_forward_edges(checker->graph, &checker->n_possible_removed_forward_edges);
 
     // iterate over every node but the last
 	for(unsigned long i=1; i < checker->n_bits; i++ ) {
@@ -562,8 +569,8 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     }
                     break;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
-                } else if( checker->n_possible_removed_forward_edges &&
-                        checker->possible_removed_forward_edges[0] == checker->node &&
+                } else if(
+                        possible_forward_edge_check(checker) &&
                         checker->bit_arr[i] && (
                             // check if the node has an even hamiltonian idx and can't connect to anyone, not even 1
                             (
@@ -578,7 +585,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                         )
                         ) {
                     current_n_forward_edges++;
-                    checker->possible_removed_forward_edges = _remove_first_node(checker->possible_removed_forward_edges, &checker->n_possible_removed_forward_edges);
                     bit_arr[i] = '1';
                     forward_flag = 2;
                 
@@ -600,7 +606,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
         _checker_register_node(checker, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i]);
 		h_idx++;
 
-		if( forward_flag >= 0 ) forward_flag--;
+        if( forward_flag >= 0 ) forward_flag--;
 	}
 
     _checker_free(checker);

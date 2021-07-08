@@ -310,6 +310,7 @@ void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long h_idx, unsign
 
 	// save to stack with the same parity
 	PSTACK* stack = get_parity_stack(stacks, is_odd);
+
 	stack->stack[stack->n++] = node;
 }
 

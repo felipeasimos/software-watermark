@@ -153,6 +153,7 @@ void _conn_list_free(_CONN_LIST* list) {
     }
     return correct;
 }*/
+
 unsigned long _check(GRAPH* graph, GRAPH* copy) {
 
     GRAPH* graph_node = graph;
@@ -221,11 +222,11 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
             copy_node = copy_node->next;
         }*/
     }
-    /*if(errors > 5) {
+    if(errors > 10) {
         graph_print(graph, utils_print_node);
         graph_print(copy, utils_print_node);
         printf("%lu\n", errors);
-    }*/
+    }
     return errors;
 }
 
