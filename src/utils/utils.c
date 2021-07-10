@@ -74,13 +74,13 @@ void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned 
     print_func = print_func ? print_func : utils_print_node;
 
     printf("stacks:\n");
-    printf("\todd:\n\t\t");
+    printf("\todd: %lu\n\t\t", stacks->odd.n);
     for(unsigned long i = 0; i < stacks->odd.n; i++) {
         print_func(stacks->odd.stack[i]->data, stacks->odd.stack[i]->data_len);
         printf("\t");
     }
     printf("\n");
-    printf("\teven:\n\t\t");
+    printf("\teven: %lu\n\t\t", stacks->even.n);
     for(unsigned long i = 0; i < stacks->even.n; i++) {
         print_func(stacks->even.stack[i]->data, stacks->even.stack[i]->data_len);
         printf("\t");
@@ -388,12 +388,12 @@ void* encode_numeric_string(char* string, unsigned long* data_len) {
     return data;
 }
 
-char* decode_numeric_string(void* data, unsigned long data_len) {
+uint8_t* decode_numeric_string(void* data, unsigned long* data_len) {
 
-    unsigned long num_bits = data_len * 8;
-    uint8_t offset = get_trailing_zeroes(data, data_len);
-    unsigned long str_size = 4 * (data_len/3) + (data_len % 3) + 1;
-    char* str = malloc(str_size);
+    unsigned long num_bits = *data_len * 8;
+    uint8_t offset = get_trailing_zeroes(data, *data_len);
+    unsigned long str_size = 4 * (*data_len - (offset/8)/3) + ((*data_len - offset/8)% 3);
+    uint8_t* str = malloc(str_size);
     memset(str, 0x00, str_size);
 
     unsigned long str_idx = 0;
@@ -404,6 +404,7 @@ char* decode_numeric_string(void* data, unsigned long data_len) {
 
         set_bit((uint8_t*)str, str_idx++, get_bit(data, i));
     }
+    *data_len = str_size;
     return str;
 }
 
@@ -416,3 +417,73 @@ void add_idx(GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit) 
 	((UTILS_NODE*)node->data)->bit = bit;
 }
 
+int has_possible_backedge2017(STACKS* stacks, GRAPH* node, uint8_t is_odd, uint8_t bit) {
+
+    if( !node->prev ) return 0;
+
+    // if bit is negative, use the same stack as the one this node resides in
+    // otherwise, use the other stack
+    PSTACK* connect_stack = get_parity_stack(stacks, bit? !is_odd : is_odd);
+
+    // if there is only one item in the stack, we can only connect to it if the
+    // previous node is not connected to it
+    if( connect_stack->n == 1 ) return !connection_search_node(node->prev->connections, connect_stack->stack[0]);
+
+    // if there is more than one item, we can connect for sure
+    return connect_stack->n > 1;
+
+}
+
+uint8_t* encoded_ascii_bit_arr_to_bit_arr(uint8_t* result, unsigned long* result_len) {
+
+    // each symbol in 'str_result' should be a number in 10 base
+    uint8_t* str_result = decode_numeric_string(result, result_len);
+
+    // turn unkown symbols to 'x'
+    for(unsigned long i = 0; i < *result_len; i++)
+        if( str_result[i] > '9' || str_result[i] < '0' )
+            str_result[i] = 'x';
+
+    *result_len = *result_len * 8;
+    unsigned long offset=0;
+    for(unsigned long i = 0; i < *result_len; i++) if(!get_bit((uint8_t*)str_result, i)) offset++; else break;
+
+    result = malloc(*result_len);
+
+    for(unsigned long i = 0; i < *result_len; i++)
+        // + 2 because every ascii number starts with 
+        result[i] =
+            str_result[i/8] == 'x' ?
+            'x' : '0' +
+            get_bit((uint8_t*)str_result, i+offset);
+
+    free(str_result);
+    return result;
+}
+
+uint8_t* bin_to_bit_arr(uint8_t* bin, unsigned long* bin_len) {
+
+    unsigned long offset = get_trailing_zeroes(bin, *bin_len);
+    unsigned long bin_n_bits = *bin_len * 8 - offset;
+
+    *bin_len = (bin_n_bits/8) + !!(bin_n_bits % 8);
+    uint8_t* bit_arr = malloc(*bin_len);
+
+    for(unsigned long i = 0; i < *bin_len; i++) bit_arr[i] = '0' + get_bit(bin, i+offset);
+
+    return bit_arr;
+}
+
+uint8_t* bit_arr_to_bin(uint8_t* bit_arr, unsigned long* bit_arr_len) {
+
+    unsigned long offset = 0;
+    for(unsigned long i = 0; i < *bit_arr_len; i++) if(bit_arr[i]=='0') offset++; else break;
+    *bit_arr_len = ((*bit_arr_len-offset)/8) + !!(offset % 8);
+    unsigned long byte_offset = offset % 8;
+    uint8_t* bin = malloc(*bit_arr_len);
+    memset(bin, 0x00, *bit_arr_len);
+    for(unsigned long i = 0; i < *bit_arr_len; i++)
+        for(unsigned long j=0; j < 8; j++)
+            set_bit(bin, byte_offset+i, bit_arr[i+offset] - '0');
+    return bin;
+}

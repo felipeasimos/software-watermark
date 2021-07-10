@@ -8,4 +8,7 @@
 // return source code corresponding to the graph with encoded key
 char* watermark_get_code2014(GRAPH* graph);
 
+// return valid source code corresponding to the graph with encoded key
+char* watermark_get_code2017(GRAPH* graph);
+
 #endif

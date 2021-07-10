@@ -77,9 +77,7 @@ uint8_t _is_mute(GRAPH* node) {
 
 void _get_possibly_removed_forward_edges(CHECKER* checker) {
 
-    unsigned long i=0;
     for(GRAPH* node = checker->graph; node && node->next && node->next->next && node->next->next->next; node = node->next) {
-        i++;
         if( _is_mute(node) &&
             _is_mute(node->next) &&
             _is_mute(node->next->next) ) {
@@ -87,10 +85,8 @@ void _get_possibly_removed_forward_edges(CHECKER* checker) {
             checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
                     (++checker->possible_removed_forward_edges.n) * sizeof(GRAPH*));
             checker->possible_removed_forward_edges.nodes[checker->possible_removed_forward_edges.n-1] = node;
-            printf("%lu ", i);
         }
     }
-    printf("\n");
 }
 
 CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
@@ -347,18 +343,8 @@ uint8_t _watermark_check(CHECKER* checker) {
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
                 } else if(
                         possible_forward_edge_check(checker) &&
-                        checker->bit_arr[i] && (
-                            // check if the node has an even hamiltonian idx and can't connect to anyone, not even 1
-                            (
-                                (h_idx & 1) && 
-                                get_parity_stack(&checker->stacks, 1)->n == 1 &&
-                                connection_search_node(checker->node->prev->connections, checker->graph)
-                            // check if the node has an odd hamiltonian idx and can't connect to anyone
-                            ) || (
-                                !(h_idx & 1) &&
-                                !get_parity_stack(&checker->stacks, 0)->n
-                            ) 
-                        )
+                        checker->bit_arr[i] &&
+                        !has_possible_backedge2017(&checker->stacks, checker->node, !(h_idx & 1), 1)
                         ) {
 
                     current_n_forward_edges++;
@@ -448,9 +434,6 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
             break;
         }
 
-        printf("h_idx: %lu\n", h_idx);
-        printf("has backedge: %d\n", !!get_backedge(checker->node));
-        utils_print_stacks(&checker->stacks, checker_print_node);
 		if( forward_flag != 0 ) {
 
 			if( get_forward_edge(checker->node) ) {
@@ -566,27 +549,8 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
                 } else if(
                         possible_forward_edge_check(checker) &&
-                        checker->bit_arr[i] && (
-                            // check if the node has an even hamiltonian idx and can't connect to anyone, not even 1
-                            (
-                                (h_idx & 1) && 
-                                get_parity_stack(&checker->stacks, 1)->n == 1 &&
-                                connection_search_node(checker->node->prev->connections, checker->graph)
-                            // check if the node has an odd hamiltonian idx and can't connect to anyone
-                            ) || (
-                                !(h_idx & 1) &&
-                                // can't connect if the previous node connects to it
-                                (
-                                  !get_parity_stack(&checker->stacks, 0)->n ||
-                                  (
-                                    get_parity_stack(&checker->stacks, 0)->n == 1 &&
-                                    connection_search_node(checker->node->prev->connections, checker->graph) &&
-                                    connection_search_node(checker->node->prev->connections, checker->graph)->node ==
-                                    get_parity_stack(&checker->stacks, 0)->stack[0]
-                                  )
-                                )
-                            ) 
-                        )
+                        checker->bit_arr[i] &&
+                        !has_possible_backedge2017(&checker->stacks, checker->node, !(h_idx & 1), 1)
                         ) {
                     current_n_forward_edges++;
                     bit_arr[i] = '1';

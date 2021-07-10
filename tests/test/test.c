@@ -15,6 +15,23 @@ void print_node_func(void* data, unsigned int data_len) {
 	}
 }
 
+int bit_arr_conversion_test() {
+
+    for(unsigned long i=0; i < 100000; i++) {
+
+        unsigned long len = sizeof(i);
+        uint8_t* bit_arr = bin_to_bit_arr((uint8_t*)&i, &len);
+        uint8_t* bin = bit_arr_to_bin(bit_arr, &len);
+        for(unsigned long j=0; j < len; j++) {
+            ctdd_assert( get_bit(bin, len*8-j-1) == get_bit((uint8_t*)&i, 64-j-1 ));
+        }
+        free(bit_arr);
+        free(bin);
+    }
+
+    return 0;
+}
+
 int reed_solomon_api_heavy_test() {
 
 	srand(time(0));
@@ -279,8 +296,8 @@ int ascii_numbers_test() {
         unsigned long data_len = 0;
         void* data = encode_numeric_string(str, &data_len);
 
-        char* new_str = decode_numeric_string(data, data_len);
-        ctdd_assert(!strcmp( str, new_str ));
+        uint8_t* new_str = decode_numeric_string(data, &data_len);
+        ctdd_assert(!strncmp( str, (char*)new_str, data_len ));
 
         free(data);
         free(new_str);
@@ -421,7 +438,8 @@ int tmp_test() {
 
 int run_tests() {
 
-    ctdd_verify(tmp_test);
+    //ctdd_verify(tmp_test);
+    ctdd_verify(bit_arr_conversion_test);
     ctdd_verify(simple_checker_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);

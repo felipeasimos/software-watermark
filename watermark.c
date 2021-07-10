@@ -188,47 +188,17 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
             copy_node = copy_node->next;
             
         }
-
-        /*// if one is mute and the other isn't, skip both and increment 'errors'
-        if( (graph_utils->bit == UTILS_MUTE_NODE) ^ (copy_utils->bit == UTILS_MUTE_NODE) ) {
-
-            if(graph_utils->bit == UTILS_MUTE_NODE) {
-                mute_offset_graph++;
-            } else {
-                mute_offset_copy++;
-            }
-            graph_node = graph_node->next;
-            copy_node = copy_node->next;
-            errors++;
-        // if only one is mute, then both of them are (due to the XOR), so skip both
-        } else if( graph_utils->bit == UTILS_MUTE_NODE ) {
-            graph_node = graph_node->next;
-            copy_node = copy_node->next;
-        // check if the bit indexes match, if they don't, skip the lower one
-        } else if( copy_utils->bit_idx + mute_offset_copy < graph_utils->bit_idx ) {
-            copy_node = copy_node->next;
-        } else if( graph_utils->bit_idx + mute_offset_graph < copy_utils->bit_idx ) {
-            graph_node = graph_node->next;
-        // at this point, the bit indexes always match, so we can skip both
-        } else {
-            // if one of them is unknown, increment errors
-            if( copy_utils->bit == UTILS_UNKNOWN_NODE || graph_utils->bit == UTILS_UNKNOWN_NODE ) {
-                errors++;
-            // if they are different, increment errors and skip both
-            } else if( copy_utils->bit != graph_utils->bit ) {
-                errors++;
-            }
-            graph_node = graph_node->next;
-            copy_node = copy_node->next;
-        }*/
     }
-    if(errors > 3) {
-        graph_print(graph, utils_print_node);
-        graph_print(copy, utils_print_node);
-        printf("%lu\n", errors);
 
-        exit(0);
-    }
+    return errors;
+}
+unsigned long check_bit_arrs(uint8_t* result, uint8_t* identifier, unsigned long result_len, unsigned long identifier_len) {
+
+    unsigned long errors = 0;
+    for(unsigned long i = 0; i < identifier_len && i < result_len; i++)
+        if( result[i] != identifier[i] || result[i] =='x' || identifier[i]=='x' ) errors++;
+
+    if( identifier_len > result_len ) errors += identifier_len - result_len;
     return errors;
 }
 
@@ -251,21 +221,24 @@ unsigned long _test_with_removed_connections(
     GRAPH* copy = graph_get_info(graph);
 
     graph_unload_all_info(graph);
-
-    unsigned long num_bytes = identifier_len;
     n_bits++;
+    unsigned long num_bytes = identifier_len;
     //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
-    uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
-    //uint8_t* result = watermark2017_decode_analysis(copy, &num_bytes);
-    checker_graph_to_utils_nodes(copy);
-    identifier = NULL;
+    //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
+    uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes);
+    //checker_graph_to_utils_nodes(copy);
+    //identifier = NULL;
     //char* result_final = decode_numeric_string(result, num_bytes);
     //free(result);
     //result = (uint8_t*)result_final;
     //num_bytes = strlen((char*)result);
 
-    unsigned long errors = _check(graph, copy);
+    //unsigned long errors = _check(graph, copy);
+    uint8_t* final_result = encoded_ascii_bit_arr_to_bit_arr(result, &num_bytes);
+    uint8_t* final_identifier = bin_to_bit_arr(identifier, &identifier_len);
+    unsigned long errors = check_bit_arrs(final_result, final_identifier, num_bytes, identifier_len);
     graph_free(copy);
+    free(final_result);
     free(result);
 
     if( errors > *worst_case ) *worst_case = errors;
@@ -359,15 +332,15 @@ void removal_attack() {
                 unsigned long errors = 0;
                 unsigned long worst_case = 0;
 
-                //char i_str[50]={0};
-                //sprintf(i_str, "%lu", i);
-                //unsigned long identifier_len = 0;
-                //void* identifier = encode_numeric_string(i_str, &identifier_len);
-                unsigned long identifier = invert_unsigned_long(i);
-                unsigned long identifier_len = sizeof(unsigned long);
+                char i_str[50]={0};
+                sprintf(i_str, "%lu", i);
+                unsigned long identifier_len = strlen(i_str);
+                void* identifier = encode_numeric_string(i_str, &identifier_len);
+                //unsigned long identifier = invert_unsigned_long(i);
+                //unsigned long identifier_len = sizeof(unsigned long);
 
-                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
                 //GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+                GRAPH* graph = watermark2017_encode_with_rs(i_str, strlen(i_str), strlen(i_str));
                 _multiple_removal_test(n_removals, &total, &errors, &worst_case, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
                 graph_free(graph);
                 //free(identifier);

@@ -108,9 +108,8 @@ STRING* string_truncate(STRING* str, unsigned long new_len) {
 
 void free_data_from_nodes(GRAPH* graph) {
 
-	GRAPH* node=NULL;
 	// get rid of all data stored in the nodes
-	for(node = graph; node; node = node->next) {
+	for(GRAPH* node = graph; node; node = node->next) {
 		free(node->data);
 		node->data = NULL;
 		node->data_len = 0;
@@ -451,3 +450,14 @@ char* watermark_get_code2014(GRAPH* graph) {
 
 	return join_strings_from_graph(graph);
 }
+/*
+char* watermark_get_code2017(GRAPH* graph) {
+
+    free_data_from_nodes(graph);
+
+    generate_code_blocks(graph);
+
+    generate_pseudocode2017(graph);
+
+    return join_strings_from_graph(graph);
+}*/

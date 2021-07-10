@@ -211,5 +211,3 @@ GRAPH* watermark2017_encode_with_rs(void* data, unsigned long data_len, unsigned
 
 	return _watermark_encode_with_rs(data, data_len, num_rs_bytes, watermark2017_encode);
 }
-
-
