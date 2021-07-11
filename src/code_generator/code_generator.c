@@ -29,6 +29,15 @@ typedef struct GEN_TABLE {
 	.new_counter = 0\
 }
 
+void code_generator_print_node(void* data, unsigned long data_len) {
+
+    if( data_len == sizeof(STRING) ) {
+		printf("\x1b[33m '%s'[%lu] \x1b[0m", ((STRING*)data)->str, ((STRING*)data)->len);
+    } else {
+        printf("\x1b[33m null \x1b[0m");
+    }
+}
+
 STRING* string_create(char* str, unsigned long str_len) {
 
 	STRING* string = malloc(sizeof(STRING));
@@ -128,7 +137,8 @@ void generate_code_blocks(GRAPH* graph) {
 
 		// check if there is a backedge (get connection where data != NULL)
 		GRAPH* backedge_node = get_backedge(node);
-		if( backedge_node ) {
+        // make sure it is not a forward edge or the origin is a inner node of a forward edge
+		if( backedge_node && backedge_node != node->next->next && connection_search_node(node->connections, node->next) ) {
 			if(!node->data) node->data_len = sizeof(STRING);
 			if(!backedge_node->data) backedge_node->data_len = sizeof(STRING);
 
@@ -380,7 +390,7 @@ STRING* generate_closing_bracket_snippet(
 		GEN_TABLE* values,
 		GEN_TABLE* comparisons) {
 
-	// <n tabs>while( <condition> );\n
+	// <n tabs>} while( <condition> );\n
 	STRING* t = generate_tabs(--tabs);
 	STRING* while_ = string_create((char*)"} while( ", 0);
 	STRING* condition = generate_condition(variables, values, comparisons);
@@ -395,6 +405,106 @@ STRING* generate_closing_bracket_snippet(
 	string_free(endline);
 
 	return closing;
+}
+
+STRING* generate_while_block(unsigned long tabs, GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* comparisons, GEN_TABLE* operations) {
+
+    // <n tabs>while( <condition> ) {\n
+    // <n+1 tabs><expression>;\n
+    // <n tabs>}
+	STRING* t1 = generate_tabs(tabs++);
+	STRING* while_ = string_create("while( ", 0);
+
+    STRING* condition = generate_condition(variables, values, comparisons);
+    STRING* endline1 = string_create(" ) {\n", 0);
+
+	STRING* t2 = generate_tabs(tabs--);
+	STRING* exp = generate_expression(variables, values, operations);
+
+	STRING* endline2 = string_create(";\n", 0);
+
+    STRING* t3 = generate_tabs(tabs);
+    STRING* closing = string_create("}\n", 0);
+
+	STRING* while_block = string_append(
+            t1,
+            string_append(
+                while_,
+                string_append(
+                    condition,
+                    string_append(
+                        endline1,
+                        string_append(
+                            t2,
+                            string_append(
+                                exp,
+                                string_append(
+                                    endline2,
+                                    string_append(t3, closing)
+                                )))))));
+
+	while_block = string_clone(while_block);
+	string_free( t1 );
+	string_free( while_ );
+	string_free( condition );
+	string_free( endline1 );
+    string_free( t2 );
+    string_free( exp );
+    string_free( endline2 );
+    string_free( t3 );
+    string_free( closing );
+
+    return while_block;
+}
+
+STRING* generate_if_block(unsigned long tabs, GEN_TABLE* variables, GEN_TABLE* values, GEN_TABLE* comparisons, GEN_TABLE* operations) {
+
+    // <n tabs>if( <condition> ) {\n
+    // <n+1 tabs><expression>;\n
+    // <n tabs>}
+	STRING* t1 = generate_tabs(tabs++);
+	STRING* if_ = string_create("if( ", 0);
+
+    STRING* condition = generate_condition(variables, values, comparisons);
+    STRING* endline1 = string_create(" ) {\n", 0);
+
+	STRING* t2 = generate_tabs(tabs--);
+	STRING* exp = generate_expression(variables, values, operations);
+
+	STRING* endline2 = string_create(";\n", 0);
+
+    STRING* t3 = generate_tabs(tabs);
+    STRING* closing = string_create("}\n", 0);
+
+	STRING* if_block = string_append(
+            t1,
+            string_append(
+                if_,
+                string_append(
+                    condition,
+                    string_append(
+                        endline1,
+                        string_append(
+                            t2,
+                            string_append(
+                                exp,
+                                string_append(
+                                    endline2,
+                                    string_append(t3, closing)
+                                )))))));
+
+	if_block = string_clone(if_block);
+	string_free( t1 );
+	string_free( if_ );
+	string_free( condition );
+	string_free( endline1 );
+    string_free( t2 );
+    string_free( exp );
+    string_free( endline2 );
+    string_free( t3 );
+    string_free( closing );
+
+    return if_block;
 }
 
 void generate_pseudocode(GRAPH* graph) {
@@ -450,7 +560,73 @@ char* watermark_get_code2014(GRAPH* graph) {
 
 	return join_strings_from_graph(graph);
 }
-/*
+
+void generate_pseudocode2017(GRAPH* graph) {
+
+	// tables used to produce code
+	GEN_TABLE variables = GEN_TABLE_CREATE("ptr", "idx", "x", "y", "n", "i", "len");
+	GEN_TABLE values = GEN_TABLE_CREATE("0b1010000", "'a'", "0x00", "1", "0", "4096", "~1", "'z'");
+	GEN_TABLE comparisons = GEN_TABLE_CREATE(" > ", " < ", " == ", " != ", " <= ", " >= ", " ^ ", " & ");
+	GEN_TABLE operations = GEN_TABLE_CREATE("*", "/", "+", "-", "|", "&", "^");
+	GEN_TABLE initializers = GEN_TABLE_CREATE("int ", "unsigned long ", "unsigned int ", "short ");
+
+	unsigned long tabs = 0;
+
+    graph_print(graph, code_generator_print_node);
+
+	for(GRAPH* node=graph; node->next; node = node->next) {
+
+		if( node->data ) {
+
+			STRING* new_str = string_create("", 0);
+			STRING* old_str = node->data;
+
+			// iterate through string
+			for(unsigned long i = 0; i < old_str->len; i++) {
+
+                STRING* new_part = NULL;
+                if( old_str->str[i] == '{' ) {
+                    new_part = generate_opening_bracket_snippet(tabs, &variables, &values, &operations);
+                    tabs++;
+                } else if( old_str->str[i] == '}' ) {
+                    new_part = generate_closing_bracket_snippet(tabs, &variables, &values, &comparisons);
+                    tabs--;
+                }
+                string_append(new_str, new_part);
+                string_free(new_part);
+			}
+			string_copy(node->data, new_str);
+			string_free(new_str);
+		}
+
+        // check if there is a forward edge here
+        // if there is, this can be either a 'while' block or a 'if' block
+        if( connection_search_node(node->connections, node->next->next) ) {
+
+            if(!node->data) {
+                node->data = string_create("", 0);
+            }
+
+            STRING* new_part = NULL;
+            // check if it is a 'while' block by searching for a missing hamiltonian edge
+            if( !connection_search_node(node->next->connections, node->next->next) ) {
+                new_part = generate_while_block(tabs, &variables, &values, &comparisons, &operations);
+                string_free(node->next->data);
+                node->next->data = string_create("", 0);
+            } else {
+                new_part = generate_if_block(tabs, &variables, &values, &comparisons, &operations);
+            }
+            string_append(node->data, new_part);
+            string_free(new_part);
+            node = node->next;
+        }
+	}
+
+	STRING* tmp = graph->data;
+	graph->data = string_append( generate_initializers(&variables, &initializers, &values), graph->data);
+	string_free(tmp);
+}
+
 char* watermark_get_code2017(GRAPH* graph) {
 
     free_data_from_nodes(graph);
@@ -460,4 +636,4 @@ char* watermark_get_code2017(GRAPH* graph) {
     generate_pseudocode2017(graph);
 
     return join_strings_from_graph(graph);
-}*/
+}

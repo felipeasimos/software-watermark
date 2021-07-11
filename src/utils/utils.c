@@ -393,6 +393,7 @@ uint8_t* decode_numeric_string(void* data, unsigned long* data_len) {
     unsigned long num_bits = *data_len * 8;
     uint8_t offset = get_trailing_zeroes(data, *data_len);
     unsigned long str_size = 4 * ((*data_len - (offset/8))/3) + ((*data_len - offset/8)% 3);
+    if( *data_len < 4 ) str_size = *data_len;
     uint8_t* str = malloc(str_size);
     memset(str, 0x00, str_size);
 

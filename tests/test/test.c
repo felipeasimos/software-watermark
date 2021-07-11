@@ -222,20 +222,6 @@ int simple_2014_test_with_rs() {
 	return 0;
 }
 
-
-int code_test() {
-
-	uint8_t n[] = {16};
-	GRAPH* graph = watermark2014_encode(&n, sizeof(n));
-	//graph_print(graph, NULL);
-	char* code = watermark_get_code2014(graph);
-	//printf("'%s'\n", code);
-	free(code);
-	graph_free(graph);
-
-	return 0;
-}
-
 int serialization_test() {
 
     for(uint8_t i = 1; i < 255; i++) {
@@ -416,6 +402,19 @@ GRAPH* get_nth_node(GRAPH* g, unsigned long i) {
     return a < i ? NULL : g;
 }
 
+int code_test() {
+
+	uint8_t n[] = {126};
+	GRAPH* graph = watermark2017_encode(&n, sizeof(n));
+    graph_print(graph, utils_print_node);
+	char* code = watermark_get_code2017(graph);
+	printf("'%s'\n", code);
+	free(code);
+	graph_free(graph);
+
+	return 0;
+}
+
 int tmp_test() {
 
     unsigned long identifier = invert_unsigned_long(5461);
@@ -439,9 +438,9 @@ int tmp_test() {
 int run_tests() {
 
     //ctdd_verify(tmp_test);
+	ctdd_verify(code_test);
     ctdd_verify(bit_arr_conversion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
-	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);
 	ctdd_verify(simple_2017_test);
 	ctdd_verify(simple_2014_test_with_rs);

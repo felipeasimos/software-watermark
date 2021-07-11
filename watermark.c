@@ -10,7 +10,7 @@
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
 #define MAX_N_BITS 25
-#define MAX_N_SYMBOLS 7
+#define MAX_N_SYMBOLS 8
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
 
@@ -230,9 +230,13 @@ unsigned long _test_with_removed_connections(
 
         // turn result to string of ascii numbers
         // 'result' = bit arr of encoded ascii numbers
-        uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes);
+        //uint8_t* result = watermark_check_analysis_with_rs(copy, 
+        uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
         //unsigned long result_len = num_bytes;
         decoder_graph_to_utils_nodes(copy);
+
+        // prepare identifier (currently it is an encoded ascii array)
+        identifier = decode_numeric_string(identifier, &identifier_len);
 
         // 'bin_result' = encoded ascii numbers
         uint8_t* bin_result = bit_arr_to_bin(result, &num_bytes);
@@ -263,9 +267,12 @@ unsigned long _test_with_removed_connections(
             printf("\n\n");
             graph_print(graph, utils_print_node);
             graph_print(copy, utils_print_node);
+            exit(0);
         }*/
         free(result);
+        free(bin_result);
         free(final_result);
+        free(identifier);
     } else {
 
         free(watermark_check_analysis(copy, identifier, &num_bytes));
@@ -434,7 +441,8 @@ void removal_attack_with_rs() {
                 uint8_t* identifier = encode_numeric_string(i_str, &identifier_len);
 
                 GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len);
-                _multiple_removal_test(n_removals, &total, &errors, &worst_case, i_str, n_symbols, graph, graph, NULL, NULL, 1);
+                //_multiple_removal_test(n_removals, &total, &errors, &worst_case, i_str, n_symbols, graph, graph, NULL, NULL, 1);
+                _multiple_removal_test(n_removals, &total, &errors, &worst_case, identifier, identifier_len, graph, graph, NULL, NULL, 1);
                 graph_free(graph);
                 free(identifier);
                 identifiers_evaluated++;
