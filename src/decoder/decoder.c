@@ -416,10 +416,10 @@ void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_byt
     srand(time(NULL));
     for(unsigned long i = 0; i < result_n_bits; i++) {
 
-        if( result[ result_n_bits - i - 1 ] == 'x' ) {
+        if( result[ result_n_bits - i - 1 ] == UTILS_UNKNOWN_NODE ) {
 
             // set to wrong bit
-            set_bit(final_result, result_total_n_bits - i - 1, rand() & 1);
+            set_bit(final_result, result_total_n_bits - i - 1, !!(result[ result_n_bits - i - 1 ] - '0'));
         } else {
             // set to result bit
             set_bit(final_result, result_total_n_bits - i - 1, result[ result_n_bits - i - 1 ] - '0');
@@ -440,7 +440,8 @@ void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_byt
         unsigned long payload_n_bits = payload_total_n_bits - get_trailing_zeroes(final_result, payload_total_n_bits/8);
         *num_bytes = payload_n_bits;
         result = malloc( sizeof(uint8_t) * payload_n_bits );
-        for(unsigned long i = 0; i < payload_n_bits; i++) result[ payload_n_bits - i - 1 ] = '0' + !!get_bit(final_result, payload_total_n_bits - i - 1);
+        for(unsigned long i = 0; i < payload_n_bits; i++)
+            result[ payload_n_bits - i - 1 ] = '0' + get_bit(final_result, payload_total_n_bits - i - 1);
         free(final_result);
     } else {
         // an error happened

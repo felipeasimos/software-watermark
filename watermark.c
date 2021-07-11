@@ -10,6 +10,7 @@
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
 #define MAX_N_BITS 25
+#define MAX_N_SYMBOLS 7
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
 
@@ -192,11 +193,12 @@ unsigned long _check(GRAPH* graph, GRAPH* copy) {
 
     return errors;
 }
-unsigned long check_bit_arrs(uint8_t* result, uint8_t* identifier, unsigned long result_len, unsigned long identifier_len) {
+unsigned long check_symbol_arrs(uint8_t* result, uint8_t* identifier, unsigned long result_len, unsigned long identifier_len) {
 
     unsigned long errors = 0;
-    for(unsigned long i = 0; i < identifier_len && i < result_len; i++)
-        if( result[i] != identifier[i] || result[i] =='x' || identifier[i]=='x' ) errors++;
+    for(unsigned long i = 0; i < identifier_len && i < result_len; i++) {
+        if( result[i] != identifier[i] || result[i] == UTILS_UNKNOWN_NODE || identifier[i]== UTILS_UNKNOWN_NODE ) errors++;
+    }
 
     if( identifier_len > result_len ) errors += identifier_len - result_len;
     return errors;
@@ -206,9 +208,9 @@ unsigned long _test_with_removed_connections(
         void* identifier,
         unsigned long identifier_len,
         unsigned long* worst_case,
-        unsigned long n_bits,
         GRAPH* graph,
-        _CONN_LIST* conns) {
+        _CONN_LIST* conns,
+        uint8_t rs) {
 
     graph_load_copy(graph);
 
@@ -221,25 +223,56 @@ unsigned long _test_with_removed_connections(
     GRAPH* copy = graph_get_info(graph);
 
     graph_unload_all_info(graph);
-    n_bits++;
-    unsigned long num_bytes = identifier_len;
-    //uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
-    //uint8_t* result = watermark_check_analysis(copy, identifier, &num_bytes);
-    uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes);
-    //checker_graph_to_utils_nodes(copy);
-    //identifier = NULL;
-    //char* result_final = decode_numeric_string(result, num_bytes);
-    //free(result);
-    //result = (uint8_t*)result_final;
-    //num_bytes = strlen((char*)result);
 
-    //unsigned long errors = _check(graph, copy);
-    uint8_t* final_result = encoded_ascii_bit_arr_to_bit_arr(result, &num_bytes);
-    uint8_t* final_identifier = bin_to_bit_arr(identifier, &identifier_len);
-    unsigned long errors = check_bit_arrs(final_result, final_identifier, num_bytes, identifier_len);
+    unsigned long num_bytes = identifier_len;
+    unsigned long errors = 0;
+    if(rs) {
+
+        // turn result to string of ascii numbers
+        // 'result' = bit arr of encoded ascii numbers
+        uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes);
+        //unsigned long result_len = num_bytes;
+        decoder_graph_to_utils_nodes(copy);
+
+        // 'bin_result' = encoded ascii numbers
+        uint8_t* bin_result = bit_arr_to_bin(result, &num_bytes);
+        //unsigned long bin_result_len = num_bytes;
+
+        // 'final_result' = decoded ascii numbers
+        uint8_t* final_result = decode_numeric_string(bin_result, &num_bytes);
+        errors = check_symbol_arrs(final_result, identifier, num_bytes, identifier_len);
+
+        /*if(errors > 2) {
+            printf("errors: %lu\n", errors);
+            printf("identifier (decoded ascii numbers): %lu\n\t", identifier_len);
+            for(unsigned long i = 0; i < identifier_len; i++) printf("%hhu('%c')[%lu] ", ((uint8_t*)identifier)[i], ((uint8_t*)identifier)[i], i);
+            printf("\n");
+
+            printf("result (bit arr of encoded ascii numbers): %lu\n\t", result_len);
+            for(unsigned long i = 0; i < result_len; i++) printf("%hhu[%lu] ", result[i], i);
+            printf("\n");
+
+            printf("bin result (encoded ascii numbers): %lu\n\t", bin_result_len);
+            for(unsigned long i = 0; i < bin_result_len; i++) printf("%hhu[%lu] ", bin_result[i], i);
+            printf("\n");
+            
+            printf("final result (decoded ascii numbers): %lu\n\t", num_bytes);
+            for(unsigned long i = 0; i < num_bytes; i++) printf("%hhu('%c')[%lu] ", final_result[i],
+                    final_result[i] == 'x' || ( final_result[i] <= '9' && final_result[i] >= '0') ? final_result[i] : 'm'
+                    ,i);
+            printf("\n\n");
+            graph_print(graph, utils_print_node);
+            graph_print(copy, utils_print_node);
+        }*/
+        free(result);
+        free(final_result);
+    } else {
+
+        free(watermark_check_analysis(copy, identifier, &num_bytes));
+        checker_graph_to_utils_nodes(copy);
+        errors = _check(graph, copy);
+    }
     graph_free(copy);
-    free(final_result);
-    free(result);
 
     if( errors > *worst_case ) *worst_case = errors;
 
@@ -251,28 +284,24 @@ void _multiple_removal_test(
         unsigned long* total,
         unsigned long* errors,
         unsigned long* worst_case,
-        unsigned long n_bits,
         void* identifier,
         unsigned long identifier_len,
         GRAPH* root,
         GRAPH* node,
         CONNECTION* conn,
-        _CONN_LIST* l) {
+        _CONN_LIST* l,
+        uint8_t rs) {
 
     if(!n_removals) {
 
         (*total)++;
-        (*errors) += _test_with_removed_connections(identifier, identifier_len, worst_case, n_bits, root, l);
+        (*errors) += _test_with_removed_connections(identifier, identifier_len, worst_case, root, l, rs);
  
     } else {
         GRAPH* initial_node = node;
 
         for(; node; node = node->next) {
 
-            /*printf("next: %p\n", (void*)node->next);
-            fflush(stdout);
-            if(node->next) printf("next->next: %p\n", (void*)node->next->next);
-            fflush(stdout);*/
             if(node->connections) {
 
                 CONNECTION* c = ( node->connections->node == node->next ? node->connections->next : node->connections );
@@ -282,7 +311,7 @@ void _multiple_removal_test(
 
                     _CONN_LIST* list = _conn_list_create(l, c);
 
-                    _multiple_removal_test(n_removals-1, total, errors, worst_case, n_bits, identifier, identifier_len, root, node, c->next, list);
+                    _multiple_removal_test(n_removals-1, total, errors, worst_case, identifier, identifier_len, root, node, c->next, list, rs);
 
                     _conn_list_free(list);
                 }
@@ -292,14 +321,26 @@ void _multiple_removal_test(
     }
 }
 
+unsigned long get_higher_bound(unsigned long n_bits) {
+
+    return 1 << (n_bits);
+}
+
 unsigned long get_lower_bound(unsigned long n_bits) {
 
     return 1 << (n_bits-1);
 }
 
-unsigned long get_higher_bound(unsigned long n_bits) {
+unsigned long get_higher_bound_for_symbol(unsigned long n_symbols) {
 
-    return 1 << (n_bits);
+    unsigned long higher_bound = 1;
+    for(unsigned long i=0; i < n_symbols; i++) higher_bound *= 10;
+    return higher_bound;
+}
+
+unsigned long get_lower_bound_for_symbol(unsigned long n_symbols) {
+
+    return get_higher_bound_for_symbol(n_symbols-1);
 }
 
 void removal_attack() {
@@ -323,7 +364,7 @@ void removal_attack() {
             unsigned long higher_bound = get_higher_bound(n_bits);
 
             double identifiers_evaluated = 0;
-            double correct_mean_sum = 0;
+            double error_mean_sum = 0;
             double worst_case_mean_sum = 0;
 
             for(unsigned long i = lower_bound; i < higher_bound; i++) {
@@ -332,25 +373,19 @@ void removal_attack() {
                 unsigned long errors = 0;
                 unsigned long worst_case = 0;
 
-                char i_str[50]={0};
-                sprintf(i_str, "%lu", i);
-                unsigned long identifier_len = strlen(i_str);
-                void* identifier = encode_numeric_string(i_str, &identifier_len);
-                //unsigned long identifier = invert_unsigned_long(i);
-                //unsigned long identifier_len = sizeof(unsigned long);
+                unsigned long identifier = invert_unsigned_long(i);
+                unsigned long identifier_len = sizeof(unsigned long);
 
-                //GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
-                GRAPH* graph = watermark2017_encode_with_rs(i_str, strlen(i_str), strlen(i_str));
-                _multiple_removal_test(n_removals, &total, &errors, &worst_case, n_bits, &identifier, identifier_len, graph, graph, NULL, NULL);
+                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
+                _multiple_removal_test(n_removals, &total, &errors, &worst_case, &identifier, identifier_len, graph, graph, NULL, NULL, 0);
                 graph_free(graph);
-                //free(identifier);
                 identifiers_evaluated++;
 
-                correct_mean_sum += total ? ((double)errors)/total : n_bits;
+                error_mean_sum += ((double)errors)/total;
                 worst_case_mean_sum += worst_case;
                 matrix[worst_case][n_bits]++;
             }
-            fprintf(file, "%lu %F %F\n", n_bits, correct_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
+            fprintf(file, "%lu %F %F\n", n_bits, error_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
             fflush(file);
         }
         fclose(file);
@@ -362,6 +397,65 @@ void removal_attack() {
         fclose(matrix_file);
     }
 }
+
+void removal_attack_with_rs() {
+
+    for(unsigned long n_removals = 1; n_removals < 2; n_removals++) {
+
+        char filename[50]={0};
+        sprintf(filename, "tests/report_rm_%lu.plt", n_removals);
+        FILE* file = fopen(filename, "w");
+
+        printf("number of removals: %lu\n", n_removals);
+
+        unsigned long matrix[MAX_N_SYMBOLS][MAX_N_SYMBOLS] = {{0}};
+
+        for(unsigned long n_symbols = 1; n_symbols < MAX_N_SYMBOLS; n_symbols++) {
+
+            printf("\tnumber of symbols: %lu\n", n_symbols);
+
+            unsigned long lower_bound = get_lower_bound_for_symbol(n_symbols);
+
+            unsigned long higher_bound = get_higher_bound_for_symbol(n_symbols);
+
+            double identifiers_evaluated = 0;
+            double error_mean_sum = 0;
+            double worst_case_mean_sum = 0;
+
+            for(unsigned long i = lower_bound; i < higher_bound; i++) {
+
+                unsigned long total = 0;
+                unsigned long errors = 0;
+                unsigned long worst_case = 0;
+
+                char i_str[MAX_N_SYMBOLS+1]={0};
+                sprintf(i_str, "%lu", i);
+                unsigned long identifier_len = n_symbols;
+                uint8_t* identifier = encode_numeric_string(i_str, &identifier_len);
+
+                GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len);
+                _multiple_removal_test(n_removals, &total, &errors, &worst_case, i_str, n_symbols, graph, graph, NULL, NULL, 1);
+                graph_free(graph);
+                free(identifier);
+                identifiers_evaluated++;
+
+                error_mean_sum += ((double)errors)/total;
+                worst_case_mean_sum += worst_case;
+                matrix[worst_case][n_symbols]++;
+            }
+            fprintf(file, "%lu %F %F\n", n_symbols, error_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
+            fflush(file);
+        }
+        fclose(file);
+
+        FILE* matrix_file = fopen("tests/report_matrix.plt", "wb");
+        unsigned long max_n_symbols = MAX_N_SYMBOLS;
+        fwrite(&max_n_symbols, sizeof(unsigned long), 1, matrix_file);
+        fwrite(&matrix, sizeof(unsigned long), MAX_N_SYMBOLS * MAX_N_SYMBOLS, matrix_file);
+        fclose(matrix_file);
+    }
+}
+
 
 void show_report_matrix() {
     
@@ -413,7 +507,8 @@ int main() {
     printf("1) encode string\n");
     printf("2) encode number\n");
     printf("3) run removal test\n");
-    printf("4) show report matrix\n");
+    printf("4) run removal test with reed solomon\n");
+    printf("5) show report matrix\n");
     printf("else) exit\n");
     switch( get_uint8_t() ) {
 
@@ -429,6 +524,9 @@ int main() {
             removal_attack();
             break;
         case 4:
+            removal_attack_with_rs();
+            break;
+        case 5:
             show_report_matrix();
             break;
     }

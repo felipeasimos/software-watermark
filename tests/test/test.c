@@ -440,7 +440,6 @@ int run_tests() {
 
     //ctdd_verify(tmp_test);
     ctdd_verify(bit_arr_conversion_test);
-    ctdd_verify(simple_checker_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(code_test);
 	ctdd_verify(simple_2014_test);

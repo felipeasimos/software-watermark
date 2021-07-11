@@ -99,8 +99,6 @@ void add_idx(GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit);
 
 int has_possible_backedge2017(STACKS* stacks, GRAPH* node, uint8_t is_odd, uint8_t bit);
 
-uint8_t* encoded_ascii_bit_arr_to_bit_arr(uint8_t* result, unsigned long* result_len);
-
 uint8_t* bin_to_bit_arr(uint8_t* bin, unsigned long* bin_len);
 
 uint8_t* bit_arr_to_bin(uint8_t* bit_arr, unsigned long* bit_arr_len);

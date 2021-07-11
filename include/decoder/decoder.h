@@ -20,7 +20,6 @@ void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsig
 
 void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes);
 
-// encode numbers in ASCII style
 void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_uint16s);
 
 #endif

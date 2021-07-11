@@ -370,7 +370,7 @@ void* encode_numeric_string(char* string, unsigned long* data_len) {
     for(unsigned long i = 0; i < size; i++) if( string[i] < '0' || string[i] > '9' ) return NULL;
 
     unsigned long offset = size % 4;
-    *data_len = 3 * (size/4) + ( offset ? offset: 1);
+    *data_len = 3 * (size/4) + ( offset ? offset : 1);
     uint8_t* data = malloc(*data_len);
     memset(data, 0x00, *data_len);
 
@@ -392,17 +392,17 @@ uint8_t* decode_numeric_string(void* data, unsigned long* data_len) {
 
     unsigned long num_bits = *data_len * 8;
     uint8_t offset = get_trailing_zeroes(data, *data_len);
-    unsigned long str_size = 4 * (*data_len - (offset/8)/3) + ((*data_len - offset/8)% 3);
+    unsigned long str_size = 4 * ((*data_len - (offset/8))/3) + ((*data_len - offset/8)% 3);
     uint8_t* str = malloc(str_size);
     memset(str, 0x00, str_size);
 
-    unsigned long str_idx = 0;
+    unsigned long str_idx = 2;
 
-    for(unsigned long i = offset; i < num_bits; i++) {
-
-        if( !(str_idx % 8) ) str_idx+=2;
+    for(unsigned long i = offset; i < num_bits && str_idx < str_size * 8; i++) {
 
         set_bit((uint8_t*)str, str_idx++, get_bit(data, i));
+
+        if( !(str_idx % 8) ) str_idx+=2;
     }
     *data_len = str_size;
     return str;
@@ -434,39 +434,11 @@ int has_possible_backedge2017(STACKS* stacks, GRAPH* node, uint8_t is_odd, uint8
 
 }
 
-uint8_t* encoded_ascii_bit_arr_to_bit_arr(uint8_t* result, unsigned long* result_len) {
-
-    // each symbol in 'str_result' should be a number in 10 base
-    uint8_t* str_result = decode_numeric_string(result, result_len);
-
-    // turn unkown symbols to 'x'
-    for(unsigned long i = 0; i < *result_len; i++)
-        if( str_result[i] > '9' || str_result[i] < '0' )
-            str_result[i] = 'x';
-
-    *result_len = *result_len * 8;
-    unsigned long offset=0;
-    for(unsigned long i = 0; i < *result_len; i++) if(!get_bit((uint8_t*)str_result, i)) offset++; else break;
-
-    result = malloc(*result_len);
-
-    for(unsigned long i = 0; i < *result_len; i++)
-        // + 2 because every ascii number starts with 
-        result[i] =
-            str_result[i/8] == 'x' ?
-            'x' : '0' +
-            get_bit((uint8_t*)str_result, i+offset);
-
-    free(str_result);
-    return result;
-}
-
 uint8_t* bin_to_bit_arr(uint8_t* bin, unsigned long* bin_len) {
 
     unsigned long offset = get_trailing_zeroes(bin, *bin_len);
-    unsigned long bin_n_bits = *bin_len * 8 - offset;
 
-    *bin_len = (bin_n_bits/8) + !!(bin_n_bits % 8);
+    *bin_len = *bin_len * 8 - offset;
     uint8_t* bit_arr = malloc(*bin_len);
 
     for(unsigned long i = 0; i < *bin_len; i++) bit_arr[i] = '0' + get_bit(bin, i+offset);
@@ -478,12 +450,27 @@ uint8_t* bit_arr_to_bin(uint8_t* bit_arr, unsigned long* bit_arr_len) {
 
     unsigned long offset = 0;
     for(unsigned long i = 0; i < *bit_arr_len; i++) if(bit_arr[i]=='0') offset++; else break;
-    *bit_arr_len = ((*bit_arr_len-offset)/8) + !!(offset % 8);
+
+    unsigned long n_bits = *bit_arr_len;
+    *bit_arr_len = ((*bit_arr_len-offset)/8) + !!((*bit_arr_len-offset) % 8);
     unsigned long byte_offset = offset % 8;
     uint8_t* bin = malloc(*bit_arr_len);
     memset(bin, 0x00, *bit_arr_len);
-    for(unsigned long i = 0; i < *bit_arr_len; i++)
-        for(unsigned long j=0; j < 8; j++)
-            set_bit(bin, byte_offset+i, bit_arr[i+offset] - '0');
+
+    unsigned long bit_arr_cursor = 0;
+    for(unsigned long i = 0; i < *bit_arr_len; i++) {
+        for(unsigned long j=0; j < 8; j++) {
+            if(bit_arr_cursor >= n_bits) {
+                set_bit(bin, byte_offset + j + i*8, 0);
+            } else if(bit_arr[bit_arr_cursor + offset] == UTILS_UNKNOWN_NODE) {
+                bin[i] = UTILS_UNKNOWN_NODE;
+                bit_arr_cursor = bit_arr_cursor/8 + 8;
+                break;
+            } else {
+                set_bit(bin, byte_offset + j + i*8, bit_arr[bit_arr_cursor + offset] - '0');
+            }
+            bit_arr_cursor++;
+        }
+    }
     return bin;
 }
