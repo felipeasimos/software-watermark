@@ -431,7 +431,7 @@ void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_byt
 
 	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_parity_symbols);
 
-	// if there were no errors or they were corrected
+    // if there were no errors or they were corrected
 	if( res >= 0 ) {
 
         // convert 'final_result' values into array of bits

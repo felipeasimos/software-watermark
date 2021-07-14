@@ -370,11 +370,12 @@ void* encode_numeric_string(char* string, unsigned long* data_len) {
     for(unsigned long i = 0; i < size; i++) if( string[i] < '0' || string[i] > '9' ) return NULL;
 
     unsigned long offset = size % 4;
-    *data_len = 3 * (size/4) + ( offset ? offset : 1);
+    *data_len = 3 * (size/4) + offset;
     uint8_t* data = malloc(*data_len);
     memset(data, 0x00, *data_len);
-
+    printf("data_len after: %lu, size: %lu\n", *data_len, size);
     unsigned long data_idx = offset == 1 ? 2 : 4;
+    if(!offset) data_idx = 0;
 
     for(unsigned long i = 0; i < size; i++) {
 
@@ -392,8 +393,9 @@ uint8_t* decode_numeric_string(void* data, unsigned long* data_len) {
 
     unsigned long num_bits = *data_len * 8;
     uint8_t offset = get_trailing_zeroes(data, *data_len);
-    unsigned long str_size = 4 * ((*data_len - (offset/8))/3) + ((*data_len - offset/8)% 3);
-    if( *data_len < 4 ) str_size = *data_len;
+    unsigned long str_size = 4 * ((*data_len - offset/8)/3) + ((*data_len - offset/8)% 3);
+
+    if( !(str_size % 4) && offset ) str_size--;
     uint8_t* str = malloc(str_size);
     memset(str, 0x00, str_size);
 

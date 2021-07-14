@@ -279,11 +279,18 @@ int ascii_numbers_test() {
         char str[10]={0};
         sprintf(str, "%lu", i);
 
+        unsigned long data_len_original = strlen(str);
         unsigned long data_len = 0;
         void* data = encode_numeric_string(str, &data_len);
 
+        unsigned long data_len_encoded = data_len;
         uint8_t* new_str = decode_numeric_string(data, &data_len);
         ctdd_assert(!strncmp( str, (char*)new_str, data_len ));
+        if(data_len_original != data_len) {
+            printf("i: %lu original: %lu encoded: %lu, decoded: %lu\n", i, data_len_original, data_len_encoded, data_len);
+            fflush(stdout);
+            ctdd_assert(data_len_original == data_len);
+        }
 
         free(data);
         free(new_str);
@@ -438,7 +445,9 @@ int tmp_test() {
 int run_tests() {
 
     //ctdd_verify(tmp_test);
-	ctdd_verify(code_test);
+	//ctdd_verify(code_test);
+
+    ctdd_verify(ascii_numbers_test);
     ctdd_verify(bit_arr_conversion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(simple_2014_test);
