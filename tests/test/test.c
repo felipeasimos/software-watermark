@@ -411,7 +411,7 @@ GRAPH* get_nth_node(GRAPH* g, unsigned long i) {
 
 int code_test() {
 
-	uint8_t n[] = {126};
+	uint8_t n[] = {253};
 	GRAPH* graph = watermark2017_encode(&n, sizeof(n));
     graph_print(graph, utils_print_node);
 	char* code = watermark_get_code2017(graph);
@@ -447,7 +447,6 @@ int run_tests() {
     //ctdd_verify(tmp_test);
 	//ctdd_verify(code_test);
 
-    ctdd_verify(ascii_numbers_test);
     ctdd_verify(bit_arr_conversion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(simple_2014_test);

@@ -71,22 +71,14 @@ void encode_number() {
 
 	GRAPH* g = watermark2017_encode(&n, sizeof(n));
 
-    GRAPH* _2014 = watermark2014_encode(&n, sizeof(n));
-
-    unsigned long i = 0;
-    for(GRAPH* node = g; node; node = node->next) {
-        i++;
-        graph_alloc(node, sizeof(unsigned long));
-        memcpy(node->data, &i, sizeof(unsigned long));
-    }
-    graph_print(g, NULL);
+    graph_print(g, utils_print_node);
 	
-    char* code = watermark_get_code2014(_2014);
+    char* code = watermark_get_code2017(g);
 
     printf("%s\n", code);
 
 	graph_free(g);
-	//free(code);
+	free(code);
 }
 
 
@@ -231,24 +223,24 @@ unsigned long _test_with_removed_connections(
 
         // turn result to string of ascii numbers
         // 'result' = bit arr of encoded ascii numbers
-        //uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes);
-        uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes);
-        unsigned long result_len = num_bytes;
+        //uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes+1);
+        uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes+1);
+        //unsigned long result_len = num_bytes;
         //decoder_graph_to_utils_nodes(copy);
-        checker_graph_to_utils_nodes(copy);
+        //checker_graph_to_utils_nodes(copy);
 
         // prepare identifier (currently it is an encoded ascii array)
         identifier = decode_numeric_string(identifier, &identifier_len);
 
         // 'bin_result' = encoded ascii numbers
         uint8_t* bin_result = bit_arr_to_bin(result, &num_bytes);
-        unsigned long bin_result_len = num_bytes;
+        //unsigned long bin_result_len = num_bytes;
 
         // 'final_result' = decoded ascii numbers
         uint8_t* final_result = decode_numeric_string(bin_result, &num_bytes);
         errors = check_symbol_arrs(final_result, identifier, num_bytes, identifier_len);
 
-        if(errors >= MAX_N_SYMBOLS) {
+        /*if(errors >= MAX_N_SYMBOLS) {
             printf("errors: %lu\n", errors);
             printf("identifier (decoded ascii numbers): %lu\n\t", identifier_len);
             for(unsigned long i = 0; i < identifier_len; i++) printf("%hhu('%c')[%lu] ", ((uint8_t*)identifier)[i], ((uint8_t*)identifier)[i], i);
@@ -270,7 +262,7 @@ unsigned long _test_with_removed_connections(
             graph_print(graph, utils_print_node);
             graph_print(copy, utils_print_node);
             exit(0);
-        }
+        }*/
         free(result);
         free(bin_result);
         free(final_result);
@@ -447,11 +439,10 @@ void removal_attack_with_rs() {
 
                 char i_str[MAX_N_SYMBOLS]={0};
                 sprintf(i_str, "%lu", i);
-                printf("i: %lu\n", i);
                 unsigned long identifier_len = n_symbols;
                 uint8_t* identifier = encode_numeric_string(i_str, &identifier_len);
 
-                GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len);
+                GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len+1);
 
                 //_multiple_removal_test(n_removals, &total, &errors, &worst_case, i_str, n_symbols, graph, graph, NULL, NULL, 1);
                 _multiple_removal_test(n_removals, &total, &errors, &worst_case, identifier, identifier_len, graph, graph, NULL, NULL, 1);

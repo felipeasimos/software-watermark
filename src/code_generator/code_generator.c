@@ -572,9 +572,7 @@ void generate_pseudocode2017(GRAPH* graph) {
 
 	unsigned long tabs = 0;
 
-    graph_print(graph, code_generator_print_node);
-
-	for(GRAPH* node=graph; node->next; node = node->next) {
+	for(GRAPH* node = graph; node->next; node = node->next) {
 
 		if( node->data ) {
 

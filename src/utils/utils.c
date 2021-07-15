@@ -373,7 +373,7 @@ void* encode_numeric_string(char* string, unsigned long* data_len) {
     *data_len = 3 * (size/4) + offset;
     uint8_t* data = malloc(*data_len);
     memset(data, 0x00, *data_len);
-    printf("data_len after: %lu, size: %lu\n", *data_len, size);
+
     unsigned long data_idx = offset == 1 ? 2 : 4;
     if(!offset) data_idx = 0;
 
