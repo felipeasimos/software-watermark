@@ -1,16 +1,8 @@
 #include "check/check.h"
 
-typedef struct GRAPH_ARR {
-
-    GRAPH** nodes;
-    unsigned long n;
-} GRAPH_ARR;
-
 typedef struct CHECKER {
     uint8_t* bit_arr;
     unsigned long n_bits;
-
-    GRAPH_ARR possible_removed_forward_edges;
 
     STACKS stacks;
 
@@ -75,26 +67,9 @@ uint8_t _is_mute(GRAPH* node) {
     return 1;
 }
 
-void _get_possibly_removed_forward_edges(CHECKER* checker) {
-
-    for(GRAPH* node = checker->graph; node && node->next && node->next->next && node->next->next->next; node = node->next) {
-        if( _is_mute(node) &&
-            _is_mute(node->next) &&
-            _is_mute(node->next->next) ) {
-
-            checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
-                    (++checker->possible_removed_forward_edges.n) * sizeof(GRAPH*));
-            checker->possible_removed_forward_edges.nodes[checker->possible_removed_forward_edges.n-1] = node;
-        }
-    }
-}
-
 CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
 
     CHECKER* checker = malloc(sizeof(CHECKER));
-
-    checker->possible_removed_forward_edges.nodes = NULL;
-    checker->possible_removed_forward_edges.n = 0;
 
     checker->graph = checker->node = graph;
 
@@ -109,8 +84,6 @@ CHECKER* _checker_create(GRAPH* graph, void* data, unsigned long data_len) {
     }
 
     for(GRAPH* node=graph; node; node = node->next) checker->final_node = node;
-
-    _get_possibly_removed_forward_edges(checker);
 
     create_stacks(&checker->stacks, checker->n_bits);
     return checker;
@@ -144,7 +117,6 @@ void _checker_register_node(CHECKER* checker, unsigned long h_idx, unsigned long
 }
 
 void _checker_free(CHECKER* checker) {
-    free(checker->possible_removed_forward_edges.nodes);
     free(checker->bit_arr);
     free_stacks(&checker->stacks);
     free(checker);
@@ -184,23 +156,6 @@ GRAPH* _get_fourth_last(GRAPH* last) {
     }
 
     return _is_mute_until_end(last) ? last : NULL;
-}
-
-void remove_first_node(CHECKER* checker) {
-
-    for(unsigned long i = 1; i < checker->possible_removed_forward_edges.n; i++) {
-        checker->possible_removed_forward_edges.nodes[i-1] = checker->possible_removed_forward_edges.nodes[i];
-    }
-    checker->possible_removed_forward_edges.nodes = realloc(checker->possible_removed_forward_edges.nodes,
-            --checker->possible_removed_forward_edges.n * sizeof(GRAPH*));
-}
-
-int possible_forward_edge_check(CHECKER* checker) {
-    uint8_t res = checker->possible_removed_forward_edges.n && checker->possible_removed_forward_edges.nodes[0] == checker->node;
-
-    // every node is only evaluated once
-    if(res) remove_first_node(checker);
-    return res;
 }
 
 uint8_t _watermark_check(CHECKER* checker) {
@@ -342,8 +297,11 @@ uint8_t _watermark_check(CHECKER* checker) {
                     return 1;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
                 } else if(
-                        possible_forward_edge_check(checker) &&
+                        forward_flag == -1 &&
                         checker->bit_arr[i] &&
+                        _is_mute(checker->node) &&
+                        _is_mute(checker->node->next) &&
+                        _is_mute(checker->node->next->next) &&
                         !has_possible_backedge2017(&checker->stacks, checker->node, !(h_idx & 1), 1)
                         ) {
 
@@ -548,8 +506,11 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
                     break;
                 // if this node is the beginning of a three node mute group, and it is supposed to be 1 and there is no possible backedge from it
                 } else if(
-                        possible_forward_edge_check(checker) &&
+                        forward_flag == -1 &&
                         checker->bit_arr[i] &&
+                        _is_mute(checker->node) &&
+                        _is_mute(checker->node->next) &&
+                        _is_mute(checker->node->next->next) &&
                         !has_possible_backedge2017(&checker->stacks, checker->node, !(h_idx & 1), 1)
                         ) {
                     current_n_forward_edges++;

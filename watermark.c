@@ -9,7 +9,8 @@
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
-#define MAX_N_BITS 25
+//#define MAX_N_BITS 25
+#define MAX_N_BITS 18
 #define MAX_N_SYMBOLS 5
 #define MAX_RS_REMOVALS 4
 

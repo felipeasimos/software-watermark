@@ -10,20 +10,11 @@ tenha estruturas case e if then else, é uma marca d'água válida.
 	eles representam.
 * expansão do gráfico: adicionar comandos estruturados.
 
-## TODO
+Notas:
 
-* achar código de teste.
+* Afirmativo. Não usar "possível", "possibilidade", "podem".
 
-* main completo
-
-* comparação: código de teste com marca d'agua embarcada dentro de uma funcão como
-código morto (dummy) e código embarcado (integrado com o grafo existente do código)
-	* comparar complexidade aciclomática
-	* comparar código morto (sonarqube)
-
-* i < 100
-    * 65% de erro (por combinações totais)
-    * 98% de erro (por número) (2 e 14 dão certo)
-* 10⁷ < i < 10⁸
-    * 55% de error (por combinações totais)
-    * 100% de erro (por número)
+* Cobert 2014: codec para identificar posição do grafo da marca d'água.
+    * BIBITEC, Scihub:
+        * Error-correcting graphs for software watermarking
+        * Graph-Based Approaches to Software Watermarking
