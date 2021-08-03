@@ -10,11 +10,5 @@ tenha estruturas case e if then else, é uma marca d'água válida.
 	eles representam.
 * expansão do gráfico: adicionar comandos estruturados.
 
-Notas:
+* Isomorfismo:
 
-* Afirmativo. Não usar "possível", "possibilidade", "podem".
-
-* Cobert 2014: codec para identificar posição do grafo da marca d'água.
-    * BIBITEC, Scihub:
-        * Error-correcting graphs for software watermarking
-        * Graph-Based Approaches to Software Watermarking
