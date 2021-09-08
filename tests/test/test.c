@@ -5,6 +5,7 @@
 #include "code_generator/code_generator.h"
 #include "metrics/metrics.h"
 #include "check/check.h"
+#include "dijkstra/dijkstra.h"
 
 void print_node_func(void* data, unsigned int data_len) {
 
@@ -13,6 +14,40 @@ void print_node_func(void* data, unsigned int data_len) {
 	} else {
 		printf("\x1b[33m null \x1b[0m");
 	}
+}
+
+int num_cycles_test() {
+
+    // create 5 nodes
+    GRAPH* graph = graph_empty();
+    graph_insert(graph, graph_empty());
+    graph_oriented_connect(graph, graph->next);
+
+    graph_insert(graph->next, graph_empty());
+    graph_oriented_connect(graph->next, graph->next->next);
+
+    graph_insert(graph->next->next, graph_empty());
+    graph_oriented_connect(graph->next->next, graph->next->next->next);
+    
+    graph_insert(graph->next->next->next, graph_empty());
+    graph_oriented_connect(graph->next->next->next, graph->next->next->next->next);
+
+    // connect third node to first (1)
+    graph_oriented_connect(graph->next->next, graph);
+    // connect second node to first (2)
+    graph_oriented_connect(graph->next, graph);
+    // connect second node to last
+    graph_oriented_connect(graph->next, graph->next->next->next->next);
+    // connect last node to first (3)
+    graph_oriented_connect(graph->next->next->next->next, graph);
+    // connect third to last
+    graph_oriented_connect(graph->next->next, graph->next->next->next->next);
+
+    ctdd_assert( watermark_num_cycles(graph) == 3);
+
+    graph_free(graph);
+
+    return 0;
 }
 
 int bit_arr_conversion_test() {
@@ -400,6 +435,18 @@ int checker_analysis_with_rs_test() {
     return 0;
 }
 
+int dijkstra_recognition_test() {
+
+    for(uint8_t k=15; k < 16; k++) {
+
+        GRAPH* graph = watermark2017_encode(&k, sizeof(k));
+        printf("k=%hhu\n", k);
+        graph_print(graph, NULL);
+        ctdd_assert( watermark_is_dijkstra(graph) );
+    }
+    return 0;
+}
+
 GRAPH* get_nth_node(GRAPH* g, unsigned long i) {
 
     unsigned long a=1;
@@ -447,6 +494,8 @@ int run_tests() {
     //ctdd_verify(tmp_test);
 	//ctdd_verify(code_test);
 
+    ctdd_verify(dijkstra_recognition_test);
+    ctdd_verify(num_cycles_test);
     ctdd_verify(bit_arr_conversion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
 	ctdd_verify(simple_2014_test);
@@ -461,6 +510,7 @@ int run_tests() {
     ctdd_verify(decoder_analysis_with_rs_test);
     ctdd_verify(checker_analysis_test);
     ctdd_verify(checker_analysis_with_rs_test);
+    //ctdd_verify(dijkstra_recognition_test);
 
     //ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);

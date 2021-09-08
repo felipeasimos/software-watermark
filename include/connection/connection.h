@@ -30,6 +30,9 @@ void connection_insert(CONNECTION* connection, CONNECTION* conn);
 //if none is found, return NULL
 CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_node);
 
+// search for a node different from the ones given
+CONNECTION* connection_search_different_node(CONNECTION* connection, GRAPH** list_of_nodes, unsigned long n);
+
 //search for and delete node pointing to graph_node, starting from connection_node
 //if connection_node points to graph_node nothing happens
 void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node);

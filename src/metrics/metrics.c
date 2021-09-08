@@ -58,3 +58,24 @@ unsigned long watermark_cyclomatic_complexity(GRAPH* graph) {
 
 	return watermark_num_edges(graph) - watermark_num_nodes(graph) + 2;
 }
+
+unsigned long watermark_num_cycles(GRAPH* graph) {
+
+    // only backedges form cycles
+    // so #cycles == #backedges
+
+    unsigned long num_cycles = 0;
+    for(GRAPH* node = graph; node; node = node->next) {
+
+        // if a connection is not a forward edge or hamiltonian edge
+        // then it must be a backedge
+        for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
+
+            if( conn->node != conn->parent->next && ( !conn->parent->next || ( conn->parent->next && conn->parent->next->next != conn->node ) ) ) {
+                num_cycles++;
+                break; // only one backedge per node
+            }
+        }
+    }
+    return num_cycles;
+}

@@ -14,4 +14,6 @@ unsigned long watermark_num_nodes(GRAPH* graph);
 
 unsigned long watermark_cyclomatic_complexity(GRAPH* graph);
 
+unsigned long watermark_num_cycles(GRAPH* graph);
+
 #endif

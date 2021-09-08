@@ -54,9 +54,9 @@ void graph_free_node(GRAPH* graph){
 void graph_insert(GRAPH* graph_prev, GRAPH* graph_next){
 
 	//if these represent the same graph nothing happens
+	//if both arguments are NULL, nothing happens
 	if( graph_prev == graph_next || !graph_prev || !graph_next ) return;
 
-	//if both arguments are NULL, nothing happens
 
 	//put graph_next in right place by its perspective
 	if( graph_next ){
@@ -142,20 +142,10 @@ void graph_isolate(GRAPH* graph_to_isolate){
 	//if one of the arguments is NULL nothing happens
 	if( !graph_to_isolate ) return;
 
-	/*
-	we want to delete graph_to_isolate connections to its neighbours
-	so we need to look in graph_to_isolate's connections list and
-	not only delete each node from the list
-	but also go to the neighbor's list of connection's and
-	delete the struct pointing to graph_to_isolate there
-	*/
-
-	//since we want to do it until no connection is left,
-	//the graph_to_isolate->connection should be NULL at the end
-	while( graph_to_isolate->connections ) //we keep on going until this is NULL (no connection left)
-
-		//then we close our connection with it
-		graph_disconnect(graph_to_isolate, graph_to_isolate->connections->node);
+    // go through all nodes and delete connections to this node
+    GRAPH* node = NULL;
+    for(node = graph_to_isolate; node->prev; node = node->prev);
+    for(; node; node = node->next) graph_disconnect(node, graph_to_isolate);
 }
 
 GRAPH* graph_delete(GRAPH* graph_to_delete){
@@ -167,7 +157,8 @@ GRAPH* graph_delete(GRAPH* graph_to_delete){
 	graph_isolate( graph_to_delete );
 
 	//take graph_to_delete out of the list
-	graph_insert( graph_to_delete->prev, graph_to_delete->next );//now no node points to graph_to_delete
+    graph_to_delete->prev->next = graph_to_delete->next;
+    graph_to_delete->next->prev = graph_to_delete->prev;
 
 	//save pointer to valid node to return
 	GRAPH* to_return = graph_to_delete->prev ? graph_to_delete->prev : graph_to_delete->next;
@@ -277,7 +268,7 @@ unsigned long graph_order(GRAPH* graph_root, GRAPH* graph_node){
 unsigned long graph_num_nodes(GRAPH* graph) {
 
     unsigned long i = 0;
-    for(; graph; graph = graph->next)i++;
+    for(; graph; graph = graph->next) i++;
     return i;
 }
 

@@ -12,3 +12,7 @@ tenha estruturas case e if then else, é uma marca d'água válida.
 
 * Isomorfismo:
 
+* software data set:
+    * https://gist.github.com/rverton/a44fc8ca67ab9ec32089 (dataset used in https://arxiv.org/pdf/2106.08913.pdf, 2012)
+    * https://ieeexplore-ieee-org.ez24.periodicos.capes.gov.br/stamp/stamp.jsp?tp=&arnumber=9275317 (dataset is derived from coreutils,
+    but the paper is from 2020: https://github.com/whj0401/RLOBF/tree/master/samples, 2020)

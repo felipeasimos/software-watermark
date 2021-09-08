@@ -59,6 +59,24 @@ CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_nod
 	return NULL;
 }
 
+CONNECTION* connection_search_different_node(CONNECTION* connection, GRAPH** list_of_nodes, unsigned long n) {
+
+    if( !connection || !list_of_nodes || !n ) return NULL;
+
+    for(; connection; connection = connection->next) {
+
+        uint8_t different_from_all=1;
+        for(unsigned long i = 0; i < n; i++) {
+            if( list_of_nodes[i] == connection->node ) {
+
+                different_from_all=0;
+            }
+        }
+        if(different_from_all) return connection;
+    }
+    return NULL;
+}
+
 void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node){
 
 	//if one of the given arguments is NULL, nothing happens
