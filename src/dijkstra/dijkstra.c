@@ -74,6 +74,7 @@ GRAPH** dijkstra_topological_sort_ignoring_cycle_edges(GRAPH* source, unsigned l
             ordered_nodes[t++] = stack_pop(stack);
         }
     }
+    for(GRAPH* node = source; node; node = node->next) free(graph_get_info(node));
     stack_free(stack);
     graph_unload_all_info(source);
     return ordered_nodes;
@@ -82,16 +83,31 @@ GRAPH** dijkstra_topological_sort_ignoring_cycle_edges(GRAPH* source, unsigned l
 // aka is closed and isomorphic to non-trivial statement graph
 GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
 
+    // if we have an auto connection, this means that we contracted a
+    // while block before
+    if(connection_search_node(source->connections, source)) {
+
+        #ifdef LOG
+            printf("has auto connection\n");
+            printf("repeat\n");
+            graph_print(source, NULL);
+        #endif
+        return source;
+    }
     // if source has only one connection
     if( source->connections && !source->connections->next ) {
-
+        #ifdef LOG
+            printf("has one connection\n");
+        #endif
         /* repeat */
         // if the connected node connects back to the source, this
         // can only be a a repeat block or not valid
         if( connection_search_node(source->connections->node->connections, source) ) {
 
-            printf("repeat\n");
-            graph_print(source, NULL);
+            #ifdef LOG
+                printf("repeat\n");
+                graph_print(source, NULL);
+            #endif
             // if the connected node connects to at least three nodes, this is not valid
             return source->connections->node->connections->next->next ?
                 NULL :
@@ -100,15 +116,20 @@ GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
         /* sequence */
         // if it doesn't connect back to source
         } else {
-            printf("sequence\n");
-            graph_print(source, NULL);
+            #ifdef LOG
+                printf("sequence\n");
+                graph_print(source, NULL);
+            #endif
             return source->connections->node;
         }
         /* sequence */
     // if it only has two connections
     } else if( source->connections->next && !source->connections->next->next ) {
-
-        /* while */
+        #ifdef LOG
+            printf("has two connections\n");
+            printf("checking it is a while\n");
+        #endif
+        /* simple while */
         GRAPH* node1 = source->connections->node;
         GRAPH* node2 = source->connections->next->node;
 
@@ -127,10 +148,38 @@ GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
         // if only one of them connects to the source, this is a
         // while
         if( node1_connects_to_source || node2_connects_to_source ) {
-
+            #ifdef LOG
+                printf("while\n");
+                graph_print(source, NULL);
+            #endif
             return node1_connects_to_source ? node2 : node1;
         }
+        /* simple while */
 
+        /* simple if */
+        CONNECTION* node1_connects_to_node2 = connection_search_node(node1->connections, node2);
+        CONNECTION* node2_connects_to_node1 = connection_search_node(node2->connections, node1);
+        // if they both connect to one another, this is not
+        // an statement graph
+        if( node1_connects_to_node2 && node2_connects_to_source ) {
+            return NULL;
+        } else if( node1_connects_to_node2 && node1->connections->next ) {
+            return NULL;
+        } else if( node2_connects_to_node1 && node2->connections->next ) {
+            return NULL;
+        }
+        
+        // if only one of them connects to the source, this is a if
+        if( node2_connects_to_node1 || node1_connects_to_node2 ) {
+            #ifdef LOG
+                printf("if\n");
+                graph_print(source, NULL);
+            #endif
+            return node2_connects_to_node1 ? node1 : node2;
+        }
+        /* simple if */
+
+        /* complex while */
         // check for recursive while (sink of one node must connect back)
         GRAPH* sink1 = dijkstra_is_prime_subgraph(node1);
         GRAPH* sink2 = dijkstra_is_prime_subgraph(node2);
@@ -150,28 +199,15 @@ GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
         // if only one of them connects to the source, this is a
         // while
         if( sink1_connects_to_source || sink2_connects_to_source ) {
-
+            #ifdef LOG
+                printf("while\n");
+                graph_print(source, NULL);
+            #endif
             return sink1_connects_to_source ? sink2 : sink1;
         }
-        /* while */
+        /* complex while */
 
-        /* if */
-        CONNECTION* node1_connects_to_node2 = connection_search_node(node1->connections, node2);
-        CONNECTION* node2_connects_to_node1 = connection_search_node(node2->connections, node1);
-        // if they both connect to one another, this is not
-        // an statement graph
-        if( node1_connects_to_node2 && node2_connects_to_source ) {
-            return NULL;
-        } else if( node1_connects_to_node2 && node1->connections->next ) {
-            return NULL;
-        } else if( node2_connects_to_node1 && node2->connections->next ) {
-            return NULL;
-        }
-
-        // if only one of them connects to the source, this is a if
-        if( node2_connects_to_node1 || node1_connects_to_node2 ) {
-            return node2_connects_to_node1 ? node1 : node2;
-        }
+        /* complex if */
         CONNECTION* sink1_connects_to_sink2 = connection_search_node(sink1->connections, sink2);
         CONNECTION* sink2_connects_to_sink1 = connection_search_node(sink2->connections, sink1);
         // if they both connect to one another, this is not
@@ -186,11 +222,21 @@ GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
 
         // if only one of them connects to the source, this is a if
         if( sink2_connects_to_sink1 || sink1_connects_to_sink2 ) {
+            #ifdef LOG
+                printf("if\n");
+                graph_print(source, NULL);
+            #endif
             return sink2_connects_to_sink1 ? sink1 : sink2;
         }
-        /* if */       
+        /* complex if */
+        #ifdef LOG
+            printf("guess it is not a if or a while...\n");
+        #endif
     } else {
 
+        #ifdef LOG
+            printf("has many connections\n");
+        #endif
         /// the only alternative left is for this to be a p-case or if-else
         /// so let's just check that all the nodes that the sources connects
         /// to go only to the same node
@@ -219,47 +265,85 @@ GRAPH* dijkstra_is_prime_subgraph(GRAPH* source) {
                 sink = sub_sink->connections->node;
             }
         }
+        #ifdef LOG
+            printf("switch\n");
+            graph_print(source, NULL);
+        #endif
         return sink;
     }
     
     return NULL;
 }
 
-unsigned long dijkstra_contract(GRAPH** ordered_nodes, unsigned long n, unsigned long source_idx, GRAPH* sink) {
-    for(unsigned long i = 0; i < n; i++) printf("node[%lu]: %p, data: %p\n", i, (void*)ordered_nodes[i], (void*)ordered_nodes[i]->data);
-    // delete all nodes between source and sink
-    unsigned long sink_idx=0;
-    printf("source_idx: %lu\n", source_idx);
+GRAPH* dijkstra_contract(GRAPH* source, GRAPH* sink, unsigned long max_nodes) {
 
-    for(unsigned long i = n+source_idx+1; i < n; i++) {
-
-        printf("node: %p\n", (void*)ordered_nodes[i]);
-        if(ordered_nodes[n-i-1] == sink) {
-            sink_idx = n-i-1;
-            printf("sink idx found: %lu\n", sink_idx);
-            break;
-        }
-        graph_delete(ordered_nodes[i]);
+    if(source == sink) {
+        connection_delete_node(source->connections, source);
+        return source;
     }
 
-    // move all connections going to the source to the sink
-    for(GRAPH* node = ordered_nodes[source_idx]; node; node = node->next) {
+    // perform dfs, until sink
+    STACK* stack = stack_create(max_nodes);
+    STACK* nodes_to_delete = stack_create(max_nodes);
+    for(GRAPH* node = source; node; node = node->next) {
 
-        CONNECTION* conn = connection_search_node(node->connections, ordered_nodes[source_idx]);
+        TOPO_NODE* topo = malloc(sizeof(TOPO_NODE));
+        topo->mark = 0;
+        topo->check_next = node->connections;
+        graph_load_info(node, topo, sizeof(TOPO_NODE));
+    }
+    stack_push(stack, source);
+    ((TOPO_NODE*)graph_get_info(source))->mark=1;
+    GRAPH* node = NULL;
+    while( ( node = stack_get(stack) ) ) {
+        uint8_t has_unmarked_connection = 0;
+        for(CONNECTION* conn = ((TOPO_NODE*)graph_get_info(node))->check_next; conn; conn = conn->next) {
+
+            // if unmarked, mark and insert in data structure
+            if(!((TOPO_NODE*)graph_get_info(conn->node))->mark && conn->node != sink) {
+
+                has_unmarked_connection=1;
+                ((TOPO_NODE*)graph_get_info(conn->node))->mark = 1;
+                stack_push(stack, conn->node);
+                stack_push(nodes_to_delete, conn->node);
+                ((TOPO_NODE*)graph_get_info(node))->check_next = conn->next;
+                break;
+            }
+            ((TOPO_NODE*)graph_get_info(node))->check_next = conn->next;
+        }
+        if(!has_unmarked_connection) {
+            stack_pop(stack);
+        }
+    }
+    for(GRAPH* node = source; node; node = node->next) free(graph_get_info(node));
+    stack_free(stack);
+    graph_unload_all_info(source);
+    GRAPH* tmp = NULL;
+    while(( tmp = stack_pop(nodes_to_delete) )) {
+        if(tmp != sink) graph_delete(tmp);
+    }
+    stack_free(nodes_to_delete);
+
+    // move all connections towards source to sink
+    for(GRAPH* node = source; node; node = node->next) {
+
+        CONNECTION* conn = connection_search_node(node->connections, source);
         if(conn) {
             conn->node = sink;
         }
     }
-    return sink_idx;
+    graph_delete(source);
+
+    return sink;
 }
 
-unsigned long dijkstra_get_first_node_in_graph(GRAPH** nodes, unsigned long idx, unsigned long n, GRAPH* graph) {
+unsigned long dijkstra_get_first_node_in_graph(GRAPH** nodes, unsigned long n, GRAPH* graph) {
 
     for(GRAPH* node = graph; node; node = node->next) {
 
-        for(unsigned long i = idx; i < n; i++) {
+        for(unsigned long i = 0; i < n; i++) {
 
-            if(nodes[i] == node) return i;
+            if(nodes[n-i-1] == node) return n-i-1;
         }
     }
     return ULONG_MAX;
@@ -273,23 +357,29 @@ int watermark_is_dijkstra(GRAPH* source) {
     if( m > 2*n-1 ) return 0;
 
     GRAPH** ordered_nodes = dijkstra_topological_sort_ignoring_cycle_edges(source, n);
-    printf("n=%lu\n", n);
+    #ifdef LOG
+        for(unsigned long u = 0; u < n; u++) printf("node[%lu]=%p, data: %p\n", u, (void*)ordered_nodes[u], (void*)ordered_nodes[u]->data);
+    #endif
+    source = ordered_nodes[n-1];
     GRAPH* sink = NULL;
     for(unsigned long i = 0; i < n; i++) {
-        //i = n-dijkstra_get_first_node_in_graph(ordered_nodes, n-i-1, n, source)-1;
-        source = ordered_nodes[n-i-1];
         // check if graph is now trivial
         if( !source->connections ) {
             graph_free(source);
             free(ordered_nodes);
             return 1;
         } else if(( sink = dijkstra_is_prime_subgraph(source) )) {
-            i = n-dijkstra_contract(ordered_nodes, n, n-i-1, sink)-2;
-            printf("i=%lu\n", i+1);
-        } else {
-            printf("no prime subgraph detected for idx: %lu\n", n-i-1);
+            source = dijkstra_contract(source, sink, n);
+            #ifdef LOG
+                printf("sink: %p\n", (void*)source);
+            #endif
         }
-        scanf("%p", (void**)&source);
+        #ifdef LOG
+            else {
+                printf("no prime subgraph detected for source: %p\n", (void*)source);
+                graph_print(source, NULL);
+            }
+        #endif
     }
     graph_free(source);
     free(ordered_nodes);

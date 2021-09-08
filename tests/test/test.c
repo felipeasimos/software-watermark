@@ -437,11 +437,11 @@ int checker_analysis_with_rs_test() {
 
 int dijkstra_recognition_test() {
 
-    for(uint8_t k=15; k < 16; k++) {
+    for(uint8_t k=1; k < 255; k++) {
 
         GRAPH* graph = watermark2017_encode(&k, sizeof(k));
-        printf("k=%hhu\n", k);
-        graph_print(graph, NULL);
+        ctdd_assert( watermark_is_dijkstra(graph) );
+        graph = watermark2014_encode(&k, sizeof(k));
         ctdd_assert( watermark_is_dijkstra(graph) );
     }
     return 0;
@@ -494,7 +494,6 @@ int run_tests() {
     //ctdd_verify(tmp_test);
 	//ctdd_verify(code_test);
 
-    ctdd_verify(dijkstra_recognition_test);
     ctdd_verify(num_cycles_test);
     ctdd_verify(bit_arr_conversion_test);
 	ctdd_verify(reed_solomon_api_heavy_test);
@@ -510,7 +509,7 @@ int run_tests() {
     ctdd_verify(decoder_analysis_with_rs_test);
     ctdd_verify(checker_analysis_test);
     ctdd_verify(checker_analysis_with_rs_test);
-    //ctdd_verify(dijkstra_recognition_test);
+    ctdd_verify(dijkstra_recognition_test);
 
     //ctdd_verify(_2017_test);
 	//ctdd_verify(_2014_test);

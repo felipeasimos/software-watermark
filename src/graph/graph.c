@@ -157,8 +157,8 @@ GRAPH* graph_delete(GRAPH* graph_to_delete){
 	graph_isolate( graph_to_delete );
 
 	//take graph_to_delete out of the list
-    graph_to_delete->prev->next = graph_to_delete->next;
-    graph_to_delete->next->prev = graph_to_delete->prev;
+    if(graph_to_delete->prev) graph_to_delete->prev->next = graph_to_delete->next;
+    if(graph_to_delete->next) graph_to_delete->next->prev = graph_to_delete->prev;
 
 	//save pointer to valid node to return
 	GRAPH* to_return = graph_to_delete->prev ? graph_to_delete->prev : graph_to_delete->next;
