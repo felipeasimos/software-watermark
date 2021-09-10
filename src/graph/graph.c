@@ -1,530 +1,120 @@
 #include "graph/graph.h"
 
-GRAPH* graph_empty(){
+// create graph with N empty nodes;
+GRAPH* graph_create(unsigned long num_nodes) {
 
-	//allocate memory for struct
-	GRAPH* graph = malloc(sizeof(GRAPH));
+    GRAPH* graph = malloc(sizeof(GRAPH));
+    graph->nodes = calloc(num_nodes, sizeof(NODE*));
+    graph->num_nodes = num_nodes;
+    graph->num_connections = 0;
 
-	//set all values inside struct to zero
-	memset(graph, 0x00, sizeof(GRAPH));
+    for(unsigned long i = 0; i < graph->num_nodes; i++) graph->nodes[i] = node_empty(graph, i);
 
-	return graph;
+    return graph;
 }
 
-void graph_alloc(GRAPH* graph, unsigned long data_len){
+// free graph and all structures in it
+void graph_free(GRAPH* graph) {
 
-	//if no graph was given, nothing happens
-	if( !graph ) return;
-
-	//deallocate any previous data stored
-	if( graph->data ) free( graph->data );
-
-	//update data_len attribute to the one given
-	graph->data_len = data_len;
-
-	//allocate memory according to new data_len
-	graph->data = malloc( graph->data_len );
+    for(unsigned long i = 0; i < graph->num_nodes; i++) node_free(graph->nodes[i]);
+    free(graph);
 }
 
-GRAPH* graph_create(void* data, unsigned long data_len) {
+// print graph
+void graph_print(GRAPH* graph, void (*print_func)(NODE*, void*, unsigned long)) {
 
-	GRAPH* graph = graph_empty();
+    for(unsigned long i = 0; i < graph->num_nodes; i++) {
 
-    if(data && data_len) {
-        graph_alloc(graph, data_len);
-        memcpy(graph->data, data, data_len);
+        // print node
+        node_print(graph->nodes[i], print_func);
+        printf("\x1b[33m\x1b[1m->\x1b[0m");
+        connection_print(graph->nodes[i]->connections, print_func);
+        printf("\n");
     }
-	return graph;
 }
 
-void graph_free_node(GRAPH* graph){
+// add node to graph
+void graph_add(GRAPH* graph) {
 
-	//if no node was given nothing happens
-	if( !graph ) return;
-
-	//deallocate data
-	if( graph->data ) free(graph->data);
-	//deallocate connections linked list
-	if( graph->connections ) connection_free( graph->connections );
-
-	//deallocate struct itself
-	free( graph );
+    graph->nodes = realloc(graph->nodes, sizeof(NODE*) * ++graph->num_nodes);
+    graph->nodes[graph->num_nodes-1] = node_empty(graph, graph->num_nodes-1);
 }
 
-void graph_insert(GRAPH* graph_prev, GRAPH* graph_next){
+// delete node
+void graph_delete(NODE* node) {
 
-	//if these represent the same graph nothing happens
-	//if both arguments are NULL, nothing happens
-	if( graph_prev == graph_next || !graph_prev || !graph_next ) return;
-
-
-	//put graph_next in right place by its perspective
-	if( graph_next ){
-		graph_next->next = graph_prev ? graph_prev->next : graph_next->next;
-		graph_next->prev = graph_prev;
-	}
-
-	//put graph_next in right place by the perspective of the rest of the list
-	if( graph_prev ){
-		if( graph_prev->next ) graph_prev->next->prev = graph_next;
-		graph_prev->next = graph_next;
-	}
+    GRAPH* graph = node->graph;
+    
+    // isolate node from the rest of the nodes
+    node_isolate(node);
+    // get rid of him in the array
+    for(unsigned long i = node->graph_idx+1; i < graph->num_nodes; i++) graph->nodes[i] = graph->nodes[i-1];
+    // update number of nodes
+    graph->num_nodes--;
+    // free node
+    node_free(node);
 }
 
-GRAPH* graph_search(GRAPH* graph, void* data, unsigned long data_len){
+// connect node to another
+void graph_oriented_connect(NODE* from, NODE* to) {
 
-	//if any of the arguments is NULL (or zero), nothing happens and NULL is returned
-	if( !graph || !data || !data_len ) return NULL;
-
-	//iterate through graph node list
-	for(; graph; graph = graph->next)
-		//if graph data is equal to given data, return it
-		if( graph->data && graph->data_len == data_len && !memcmp(graph->data, data, data_len) )
-			return graph;
-
-	//if function reached here, no graph node was found so NULL is return
-	return NULL;
+    node_oriented_connect(from, to);
+    from->graph->num_connections++;
 }
 
-CONNECTION* graph_connection(GRAPH* graph_from, GRAPH* graph_to){
+// sort topologically
+void graph_topological_sort(GRAPH* graph) {
 
-	return connection_search_node(graph_from->connections, graph_to);
-}
+    STACK* stack = stack_create(n_nodes);
+    GRAPH** ordered_nodes = calloc(n_nodes, sizeof(GRAPH*));
+    for(GRAPH* node = source; node; node = node->next) {
 
-void graph_oriented_disconnect(GRAPH* graph_from, GRAPH* graph_to){
-
-	//if one of the given pointers is NULL, nothing happens
-	if( !graph_from || !graph_to ) return;
-
-	//delete graph_to from graph_from's connection's list
-	connection_delete_node( graph_from->connections, graph_to );
-}
-
-void graph_oriented_connect(GRAPH* graph_from, GRAPH* graph_to){
-
-	//if one of the given pointers is NULL, nothing happens
-	if( !graph_from || !graph_to ) return;
-
-	//insert graph_to in graph_from's connections list
-	connection_insert_node( graph_from->connections, graph_to );
-
-	/*
-	connection_insert() will do nothing if graph->connections is NULL,
-	so we need to check for this case and manually input the
-	new connection as the first node in the list
-	*/
-	if( !graph_from->connections ){
-		graph_from->connections = connection_create(graph_from);
-		graph_from->connections->node = graph_to;
-	}
-}
-
-void graph_disconnect(GRAPH* graph1, GRAPH* graph2){
-
-	//close connection between graph1 to graph2 if it exists
-	graph_oriented_disconnect(graph1, graph2);
-
-	//close connection between graph2 to graph1 if it exists
-	graph_oriented_disconnect(graph2, graph1);
-}
-
-void graph_connect(GRAPH* graph1, GRAPH* graph2){
-
-	//create connection from graph1 to graph2
-	graph_oriented_connect(graph1, graph2);
-
-	//create connection from graph2 to graph1
-	graph_oriented_connect(graph2, graph1);
-}
-
-void graph_isolate(GRAPH* graph_to_isolate){
-
-	//if one of the arguments is NULL nothing happens
-	if( !graph_to_isolate ) return;
-
-    // go through all nodes and delete connections to this node
+        TOPO_NODE* topo = malloc(sizeof(TOPO_NODE));
+        topo->mark = 0;
+        topo->check_next = node->connections;
+        graph_load_info(node, topo, sizeof(TOPO_NODE));
+    }
+    unsigned long t = 0;
+    stack_push(stack, source);
+    ((TOPO_NODE*)graph_get_info(source))->mark=1;
     GRAPH* node = NULL;
-    for(node = graph_to_isolate; node->prev; node = node->prev);
-    for(; node; node = node->next) graph_disconnect(node, graph_to_isolate);
-}
+    while( ( node = stack_get(stack) ) ) {
+        uint8_t has_unmarked_connection = 0;
+        for(CONNECTION* conn = ((TOPO_NODE*)graph_get_info(node))->check_next; conn; conn = conn->next) {
 
-GRAPH* graph_delete(GRAPH* graph_to_delete){
+            // if unmarked, mark and insert in data structure
+            if(!((TOPO_NODE*)graph_get_info(conn->node))->mark) {
 
-	//if graph_to_delete is NULL, nothing happens and returns NULL
-	if( !graph_to_delete ) return NULL;
-
-	//cut all connections between graph_to_delete and the rest of the graph
-	graph_isolate( graph_to_delete );
-
-	//take graph_to_delete out of the list
-    if(graph_to_delete->prev) graph_to_delete->prev->next = graph_to_delete->next;
-    if(graph_to_delete->next) graph_to_delete->next->prev = graph_to_delete->prev;
-
-	//save pointer to valid node to return
-	GRAPH* to_return = graph_to_delete->prev ? graph_to_delete->prev : graph_to_delete->next;
-
-	graph_free_node( graph_to_delete ); //bye bye
-
-	return to_return;
-}
-
-void graph_free(GRAPH* graph){
-
-	//nothing given, nothing happens ¯\_(ツ)_/¯ (i <3 this emoji)
-	if( !graph ) return;
-
-	GRAPH* tmp;
-
-	//iterate through list, freeing all nodes
-	for(tmp = graph->next; graph; graph = tmp) {
-		tmp = graph->next;
-		graph_free_node(graph);
-	}
-}
-
-void graph_default_print_func(void* data, unsigned long data_len){
-
-	if( !data ) {
-		printf("\x1b[33m null \x1b[0m");
-	} else if ( data_len == sizeof(unsigned long) ) {
-		printf("\x1b[33m %lu \x1b[0m", *(unsigned long*)data);
-	} else if ( data_len == sizeof(unsigned int) ) {
-		printf("\x1b[33m %u \x1b[0m", *(unsigned int*)data);
-	} else if ( data_len == sizeof(unsigned short) ) {
-		printf("\x1b[33m %hu \x1b[0m", *(unsigned short*)data);
-	} else if (data_len == sizeof(char)) {
-		printf("\x1b[33m %hhu \x1b[0m", *(char*)data);
-	} else {
-		printf("\x1b[33m %p \x1b[0m", data);
-	}
-}
-
-void graph_print_node(GRAPH* graph, void (*print_func)(void*, unsigned long) ){
-
-	//if no graph node was given nothing happens
-	if( !graph ) return;
-
-	//calls default print function if none was given
-	(print_func ? print_func : graph_default_print_func)( graph->data, graph->data_len );
-}
-
-void graph_print(GRAPH* graph, void(*print_func)(void*, unsigned long)){
-
-	//iterate through graph nodes
-	for(; graph; graph = graph->next){
-
-		//print graph_node
-		graph_print_node(graph, print_func);
-		if( graph->connections ){
-			printf("\x1b[33m\x1b[1m -> \x1b[0m");
-			//print each of its connections
-			connection_print(graph->connections, print_func);
-		}
-		printf("\n");
-	}
-}
-
-short graph_check_isolated(GRAPH* graph){
-	return !graph || !graph->connections;
-}
-
-unsigned long graph_order_to(GRAPH* graph_root, GRAPH* graph_node){
-
-	if( !graph_root || !graph_node ) return 0;
-	
-	unsigned order_to=0;
-	
-	for(; graph_root; graph_root = graph_root->next)
-		if( graph_connection( graph_root, graph_node ) )
-			order_to++;
-	
-	return order_to;
-}
-
-unsigned long graph_order_from(GRAPH* node){
-
-	if( !node ) return 0;
-	
-	unsigned order_from=0;
-
-    for(CONNECTION* conn = node->connections; conn; conn = conn->next) order_from++;
-
-	return order_from;
-}
-
-unsigned long graph_order(GRAPH* graph_root, GRAPH* graph_node){
-	
-	if( !graph_root || !graph_node ) return 0;
-	
-	unsigned order=0;
-	
-	for(; graph_root; graph_root = graph_root->next)
-		if( graph_connection( graph_node, graph_root ) || graph_connection( graph_root, graph_node ) )
-			order++;
-	
-	return order;
-}
-
-unsigned long graph_num_nodes(GRAPH* graph) {
-
-    unsigned long i = 0;
-    for(; graph; graph = graph->next) i++;
-    return i;
-}
-
-unsigned long graph_num_connections(GRAPH* graph) {
-
-    unsigned long n=0;
-    for(; graph; graph = graph->next) {
-
-        n += connection_num(graph->connections);
-    }
-    return n;
-}
-
-void graph_load_info(GRAPH* graph, void* info, unsigned long info_len) {
-
-    INFO_NODE info_node = {
-        .data = graph->data,
-        .data_len = graph->data_len,
-        .info = info,
-        .info_len = info_len
-    };
-
-    graph->data_len = sizeof(INFO_NODE);
-    graph->data = malloc( graph->data_len );
-    memcpy(graph->data, &info_node, graph->data_len);
-}
-
-void graph_unload_info(GRAPH* graph) {
-
-    if(!graph || !graph->data) return;
-
-    INFO_NODE* info_node = (INFO_NODE*)graph->data;
-
-    graph->data_len = info_node->data_len;
-    graph->data = info_node->data;
-    free(info_node);
-}
-
-void graph_unload_all_info(GRAPH* graph) {
-
-    for(GRAPH* cursor=graph; cursor; cursor = cursor->next) graph_unload_info(cursor);
-}
-
-void* graph_get_info(GRAPH* graph) {
-
-    return ((INFO_NODE*)graph->data)->info;
-}
-
-unsigned long graph_get_info_len(GRAPH* graph) {
-
-    return ((INFO_NODE*)graph->data)->info_len;
-}
-
-GRAPH* graph_copy(GRAPH* graph) {
-
-    if(!graph) return NULL;
-    graph_load_copy(graph);
-    // get first node from copy
-    GRAPH* copy = graph_get_info(graph);
-    graph_unload_all_info(graph);
-    // unload the graph
-    return copy;
-}
-
-void graph_load_copy(GRAPH* graph) {
-
-    if(!graph) return;
-
-    //get root
-    for(; graph->prev; graph = graph->prev);
-
-    for(GRAPH* node = graph; node; node = node->next) {
-
-        // load copy of this node
-        graph_load_info(
-                node,
-                graph_create(
-                    node->data,
-                    node->data_len
-                ), // create copy
-                sizeof(GRAPH)
-            );
-        // link the copied nodes
-        if( node->prev ) {
-
-            GRAPH* current_copy = graph_get_info(node);
-            GRAPH* prev_copy = graph_get_info(node->prev);
-            prev_copy->next = current_copy;
-            current_copy->prev = prev_copy;
+                has_unmarked_connection=1;
+                ((TOPO_NODE*)graph_get_info(conn->node))->mark = 1;
+                stack_push(stack, conn->node);
+                ((TOPO_NODE*)graph_get_info(node))->check_next = conn->next;
+                break;
+            }
+            ((TOPO_NODE*)graph_get_info(node))->check_next = conn->next;
+        }
+        if(!has_unmarked_connection) {
+            ordered_nodes[t++] = stack_pop(stack);
         }
     }
-    // iterate over nodes again, this time making connections to correspondent nodes
-    for(GRAPH* cursor = graph; cursor; cursor = cursor->next) {
-
-        // look for copy counter-part
-        GRAPH* copy = graph_get_info(cursor);
-        // iterate over the connections of this node
-        for(CONNECTION* conn = cursor->connections; conn; conn = conn->next) {
-            GRAPH* neighbour = graph_get_info(conn->node);
-            graph_oriented_connect(copy, neighbour);
-        }
-    }
+    for(GRAPH* node = source; node; node = node->next) free(graph_get_info(node));
+    stack_free(stack);
+    graph_unload_all_info(source);
+    return ordered_nodes;
 }
 
-void* graph_serialize(GRAPH* graph, unsigned long* num_bytes) {
+// generate png image with the graph
+// uses 'system' syscall
+void graph_write_dot(GRAPH*, const char* filename);
 
-    if(!graph) return NULL;
+// copy the graph
+GRAPH* graph_copy(GRAPH*);
 
-    // load indices to graph (remember to free the indices later!)
-    unsigned long i = 0;
-    for(GRAPH* node = graph; node; i++) {
+// serialize the graph
+void* graph_serialize(GRAPH*, unsigned long* num_bytes);
 
-        unsigned long* i_copy = malloc(sizeof(i));
-        memcpy(i_copy, &i, sizeof(i));
-        graph_load_info(node, i_copy, sizeof(i));
-        node = node->next;
-    }
+// deserialize the graph
+GRAPH* graph_deserialize(void*, unsigned long num_bytes);
 
-    uint8_t* graph_serialized = malloc( sizeof(unsigned long) );
-    *num_bytes = sizeof(unsigned long);
 
-    // write number of nodes
-    memcpy(graph_serialized, &i, sizeof(unsigned long));
 
-    for(GRAPH* node = graph; node; node = node->next) {
-
-        // 1. data_len (unsigned long, 8 bytes)
-        // 2. data (variable length)
-        // 3. number of neighbours (unsigned long)
-        // 4. idx of neighbours (variable length)
-
-        unsigned long num_neighbours = graph_order_from(node);
-
-        unsigned long offset = 
-            sizeof(unsigned long) + // data_len
-            ((INFO_NODE*)node->data)->data_len + // data
-            sizeof(unsigned long) + // num_neighbours
-            sizeof(unsigned long) * num_neighbours; // list of neighbours idxs
-
-        *num_bytes += offset;
-        graph_serialized = realloc(graph_serialized, *num_bytes);
-
-        // 1. data_len
-        memcpy(
-            graph_serialized + ( (*num_bytes) - offset ),
-            &((INFO_NODE*)node->data)->data_len,
-            sizeof(unsigned long)
-        );
-
-        // 2. data
-        if( ((INFO_NODE*)node->data)->data_len ) {
-            memcpy(
-                graph_serialized + ( (*num_bytes) - offset + sizeof(unsigned long) ),
-                    ((INFO_NODE*)node->data)->data,
-                ((INFO_NODE*)node->data)->data_len
-            );
-        }
-
-        // 3. number of neighbours
-        memcpy(
-            graph_serialized + ( (*num_bytes) - sizeof(unsigned long) * (1+num_neighbours) ),
-            &num_neighbours,
-            sizeof(unsigned long)
-        );
-
-        // 4. list of neighbours idxs
-        unsigned long neighbour_pos = 0;
-        for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
-            memcpy(
-                graph_serialized + ( (*num_bytes) - sizeof(unsigned long) * (num_neighbours-neighbour_pos) ),
-                graph_get_info(conn->node),
-                sizeof(unsigned long)
-            );
-            neighbour_pos++;
-        }
-    }
-
-    // unload all nodes
-    for(GRAPH* node=graph; node; node = node->next) {
-
-        void* info = graph_get_info(node);
-        free(info);
-        graph_unload_info(node);
-    }
-
-    return graph_serialized;
-}
-
-GRAPH* graph_deserialize(uint8_t* data) {
-
-    if(!data) return NULL;
-
-    // get number of nodes
-    unsigned long n;
-    memcpy( &n, data, sizeof(unsigned long) );
-    data += sizeof(unsigned long);
-
-    // populate the array with empty nodes
-    GRAPH* nodes[n];
-    for(unsigned long i = 0; i < n; i++) {
-        nodes[i] = graph_empty();
-        if(i > 0) {
-            graph_insert(nodes[i-1], nodes[i]);
-        }
-    }
-
-    for(unsigned long i = 0; i < n; i++) {
-
-        // 1. data_len
-        // 2. data
-        // 3. num_neighbours
-        // 4. list of neighbour idxs
-
-        // 1. data_len
-        memcpy(
-            &nodes[i]->data_len,
-            data,
-            sizeof(unsigned long)
-        );
-        data += sizeof(unsigned long);
-        if( nodes[i]->data_len ) {
-            graph_alloc(nodes[i], nodes[i]->data_len);
-
-            // 2. data
-            memcpy(
-                nodes[i]->data,
-                data,
-                nodes[i]->data_len
-            );
-            data += nodes[i]->data_len;
-        }
-
-        // 3. num_neighbours
-        unsigned long num_neighbours;
-        memcpy(
-            &num_neighbours,
-            data,
-            sizeof(unsigned long)
-        );
-        data += sizeof(unsigned long);
-
-        // 4. list of neighbour idxs
-        for(unsigned long j = 0; j < num_neighbours; j++) {
-
-            unsigned long neighbour_idx;
-            memcpy(
-                &neighbour_idx,
-                data,
-                sizeof(unsigned long)
-            );
-            data += sizeof(unsigned long);
-            graph_oriented_connect(
-                    nodes[i],
-                    nodes[neighbour_idx]
-            );
-        }
-    }
-    return nodes[0];
-}

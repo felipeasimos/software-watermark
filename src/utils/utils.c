@@ -315,6 +315,35 @@ void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long h_idx, unsign
 }
 
 // 0 based idx
+PSTACK* pstack_create(unsigned long max) {
+
+    PSTACK* pstack = malloc(sizeof(PSTACK));
+    pstack->n = 0;
+    pstack->nodes = calloc(max, sizeof(NODE*));
+    return pstack;
+}
+
+void pstack_free(PSTACK* stack) {
+
+    free(stack->nodes);
+    free(stack);
+}
+
+void pstack_push(PSTACK* stack, NODE* node) {
+
+    stack->nodes[stack->n++] = node;
+}
+
+NODE* pstack_pop(PSTACK* stack) {
+
+    return stack->n ? stack->nodes[--stack->n] : NULL;
+}
+
+NODE* pstack_get(PSTACK* stack) {
+
+    return stack->n ? stack->nodes[stack->n-1] : NULL;
+}
+
 void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx) {
 
 	// get parity from hamiltonian idx	
