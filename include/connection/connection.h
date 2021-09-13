@@ -36,8 +36,8 @@ CONNECTION* connection_search_in_neighbour(CONNECTION* connection_node, NODE* gr
 CONNECTION* connection_search_out_neighbour(CONNECTION* connection_node, NODE* graph_node);
 
 void connection_delete(CONNECTION* conn);
-void connection_delete_in_neighbour(CONNECTION* connection_node, NODE* graph_node);
-void connection_delete_out_neighbour(CONNECTION* connection_node, NODE* graph_node);
+uint8_t connection_delete_in_neighbour(CONNECTION* connection_node, NODE* graph_node);
+uint8_t connection_delete_out_neighbour(CONNECTION* connection_node, NODE* graph_node);
 
 void connection_free(CONNECTION* connection_root);
 

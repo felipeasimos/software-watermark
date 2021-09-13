@@ -55,20 +55,27 @@ unsigned long node_get_data_len(NODE* node) {
     while(num_info--) data = ((INFO_NODE*)data)->data;
     return ((INFO_NODE*)data)->data_len;
 }
-void node_oriented_disconnect(NODE* node_from, NODE* node_to){
+
+uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to){
 
 	//if one of the given pointers is NULL, nothing happens
-	if( !node_from || !node_to ) return;
+	if( !node_from || !node_to ) return 0;
 
 	//delete node_to from node_from's connection's list
-	connection_delete_out_neighbour( node_from->out, node_to );
-    connection_delete_in_neighbour( node_to->in, node_from );
+    //and update counts if connection existed
+    uint8_t deleted=0;
+	if( connection_delete_out_neighbour( node_from->out, node_to ) ) {
+        node_from->num_connections--;
+        node_from->num_out_neighbours--;
+        deleted=1;
+    }
+    if( connection_delete_in_neighbour( node_to->in, node_from ) ) {
 
-    // update counts
-    node_from->num_connections--;
-    node_from->num_out_neighbours--;
-    node_to->num_connections--;
-    node_to->num_in_neighbours--;
+        node_to->num_connections--;
+        node_to->num_in_neighbours--;
+        deleted=1;
+    };
+    return deleted;
 }
 
 void node_oriented_connect(NODE* node_from, NODE* node_to){
@@ -113,27 +120,12 @@ void node_connect(NODE* node1, NODE* node2){
 	node_oriented_connect(node2, node1);
 }
 
-void node_isolate(NODE* node_to_isolate){
-
-	//if one of the arguments is NULL nothing happens
-	if( !node_to_isolate ) return;
-
-    // go through all nodes this one connects to
-    CONNECTION* next_conn = node_to_isolate->in;
-    for(CONNECTION* conn = next_conn; conn; conn = next_conn) {
-        next_conn = next_conn->next;
-        // disconnect from every node
-        node_disconnect(conn->from, conn->to);
-    }
-}
-
 void node_free(NODE* node){
 
     if(!node) return;
-    node_unload_all_info(node);
+    node_free_all_info(node);
+    graph_isolate(node);
     free(node->data);
-    connection_free(node->in);
-    connection_free(node->out);
     free(node);
 }
 
@@ -202,16 +194,26 @@ void node_unload_info(NODE* node) {
 
 void node_unload_all_info(NODE* node) {
 
-    unsigned long info = node->num_info;
-    if(!info) return;
-    while(info--) node_unload_info(node);
+    if(!node->num_info) return;
+    while(node->num_info--) node_unload_info(node);
+}
+
+void node_free_info(NODE* node) {
+
+    if(!node || !node->data) return;
+    INFO_NODE* info_node = (INFO_NODE*)node->data;
+
+    node->data_len = info_node->data_len;
+    node->data = info_node->data;
+    free(info_node->info);
+    free(info_node);
+    node->num_info--;
 }
 
 void node_free_all_info(NODE* node) {
 
-    unsigned long info = node->num_info;
-    if(!info) return;
-    while(info--) node_unload_info(node);
+    if(!node->num_info) return;
+    while(node->num_info--) node_free_info(node);
 }
 
 void* node_get_info(NODE* node) {

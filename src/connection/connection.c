@@ -81,18 +81,21 @@ void connection_delete(CONNECTION* conn) {
 
         (*node_conn_pointer) = conn->next;
     }
+    free(conn);
 }
 
-void connection_delete_in_neighbour(CONNECTION* conn_root, NODE* node) {
+uint8_t connection_delete_in_neighbour(CONNECTION* conn_root, NODE* node) {
 
     CONNECTION* conn = connection_search_in_neighbour(conn_root, node);
     connection_delete(conn);
+    return !!conn;
 }
 
-void connection_delete_out_neighbour(CONNECTION* conn_root, NODE* node) {
+uint8_t connection_delete_out_neighbour(CONNECTION* conn_root, NODE* node) {
 
     CONNECTION* conn = connection_search_out_neighbour(conn_root, node);
     connection_delete(conn);
+    return !!conn;
 }
 
 void connection_free(CONNECTION* conn){

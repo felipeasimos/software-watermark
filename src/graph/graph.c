@@ -13,6 +13,12 @@ GRAPH* graph_create(unsigned long num_nodes) {
     return graph;
 }
 
+// get node, returns NULL if out of bounds
+NODE* graph_get(GRAPH* graph, unsigned long i) {
+
+    return i < graph->num_nodes ? graph->nodes[i] : NULL;
+}
+
 // free graph and all structures in it
 void graph_free(GRAPH* graph) {
 
@@ -41,15 +47,25 @@ void graph_add(GRAPH* graph) {
     graph->nodes[graph->num_nodes-1] = node_empty(graph, graph->num_nodes-1);
 }
 
+// remove all connections that this node is a part of
+void graph_isolate(NODE* node) {
+
+    while((node->out)) graph_oriented_disconnect(node, node->out->to);
+    while((node->in)) graph_oriented_disconnect(node->in->from, node);
+}
+
 // delete node
 void graph_delete(NODE* node) {
 
     GRAPH* graph = node->graph;
     
     // isolate node from the rest of the nodes
-    node_isolate(node);
+    graph_isolate(node);
     // get rid of him in the array
-    for(unsigned long i = node->graph_idx+1; i < graph->num_nodes; i++) graph->nodes[i] = graph->nodes[i-1];
+    for(unsigned long i = node->graph_idx+1; i < graph->num_nodes; i++) {
+        graph->nodes[i-1] = graph->nodes[i];
+        graph->nodes[i-1]->graph_idx--;
+    }
     // update number of nodes
     graph->num_nodes--;
     // free node
@@ -64,10 +80,14 @@ void graph_oriented_connect(NODE* from, NODE* to) {
 }
 
 // disconnect node from another
-void graph_oriented_disconnect(NODE* from, NODE* to) {
+// returns true if connection existed
+uint8_t graph_oriented_disconnect(NODE* from, NODE* to) {
 
-    node_oriented_disconnect(from, to);
-    from->graph->num_connections--;
+    if( node_oriented_disconnect(from, to) ) {
+        from->graph->num_connections--;
+        return 1;
+    }
+    return 0;
 }
 
 typedef struct TOPO_NODE {
@@ -110,6 +130,7 @@ void graph_topological_sort(GRAPH* graph) {
         }
         if(!has_unmarked_connection) {
             ordered_nodes[t++] = pstack_pop(stack);
+            ordered_nodes[t-1]->graph_idx = t-1;
         }
     }
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
@@ -168,8 +189,11 @@ GRAPH* graph_copy(GRAPH* graph) {
 
     GRAPH* new_graph = graph_create(graph->num_nodes);
 
-    for(unsigned long i = 0; i < graph->num_nodes; i++) {
+    for(unsigned long i = 0; i < new_graph->num_nodes; i++) {
 
+        // copy data
+        node_alloc(new_graph->nodes[i], graph->nodes[i]->data_len);
+        memcpy(new_graph->nodes[i]->data, graph->nodes[i]->data, new_graph->nodes[i]->data_len);
         for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
             graph_oriented_connect(
@@ -196,23 +220,22 @@ void* graph_serialize(GRAPH* graph, unsigned long* num_bytes) {
     uint8_t* cursor = serialized;
 
     // get number of nodes
-    memcpy(&graph->num_nodes, cursor, sizeof(unsigned long));
+    memcpy(cursor, &graph->num_nodes, sizeof(unsigned long));
     cursor+=sizeof(unsigned long);
 
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
-
         // read data
-        memcpy(&graph->nodes[i]->data_len, cursor, sizeof(unsigned long));
+        memcpy(cursor, &graph->nodes[i]->data_len, sizeof(unsigned long));
         cursor+=sizeof(unsigned long);
-        memcpy(&graph->nodes[i]->data, cursor, graph->nodes[i]->data_len);
+        memcpy(cursor, &graph->nodes[i]->data, graph->nodes[i]->data_len);
         cursor+=graph->nodes[i]->data_len;
 
         // neighbours
-        memcpy(&graph->nodes[i]->num_out_neighbours, cursor, sizeof(unsigned long));
+        memcpy(cursor, &graph->nodes[i]->num_out_neighbours, sizeof(unsigned long));
         cursor+=sizeof(unsigned long);
         for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
-            memcpy(&conn->to->graph_idx, cursor, sizeof(unsigned long));
+            memcpy(cursor, &conn->to->graph_idx, sizeof(unsigned long));
             cursor+=sizeof(unsigned long);
         }
     }
@@ -224,7 +247,7 @@ void* graph_serialize(GRAPH* graph, unsigned long* num_bytes) {
 GRAPH* graph_deserialize(uint8_t* data) {
 
     unsigned long num_nodes = 0;
-    memcpy(data, &num_nodes, sizeof(unsigned long));
+    memcpy(&num_nodes, data, sizeof(unsigned long));
     data += sizeof(unsigned long);
     GRAPH* graph = graph_create(num_nodes);
 
@@ -232,20 +255,20 @@ GRAPH* graph_deserialize(uint8_t* data) {
 
         // read data
         unsigned long data_len=0;
-        memcpy(data, &data_len, sizeof(unsigned long));
+        memcpy(&data_len, data, sizeof(unsigned long));
         data+=sizeof(unsigned long);
         node_alloc(graph->nodes[i], data_len);
-        memcpy(data, graph->nodes[i]->data, graph->nodes[i]->data_len);
+        memcpy(graph->nodes[i]->data, data, graph->nodes[i]->data_len);
         data+=graph->nodes[i]->data_len;
 
         // neighbours
         unsigned long num_neighbours=0;
-        memcpy(data, &num_neighbours, sizeof(unsigned long));
+        memcpy(&num_neighbours, data, sizeof(unsigned long));
         data+=sizeof(unsigned long);
         unsigned long neighbour_idx=0;
         for(unsigned long j = 0; j < num_neighbours; j++) {
 
-            memcpy(data, &neighbour_idx, sizeof(unsigned long));
+            memcpy(&neighbour_idx, data, sizeof(unsigned long));
             data+=sizeof(unsigned long);
             graph_oriented_connect(graph->nodes[i], graph->nodes[j]);
         }

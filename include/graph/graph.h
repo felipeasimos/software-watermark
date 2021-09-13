@@ -18,6 +18,9 @@ typedef struct GRAPH {
 // create graph with N empty nodes;
 GRAPH* graph_create(unsigned long num_nodes);
 
+// get node, returns NULL if out of bounds
+NODE* graph_get(GRAPH* graph, unsigned long i);
+
 // free graph and all structures in it
 void graph_free(GRAPH* graph);
 
@@ -27,6 +30,9 @@ void graph_print(GRAPH* graph, void (*print_func)(FILE*, NODE*));
 // add node to graph
 void graph_add(GRAPH* graph);
 
+// remove all connections that this node is a part of
+void graph_isolate(NODE* node);
+
 // delete node
 void graph_delete(NODE* node);
 
@@ -34,7 +40,8 @@ void graph_delete(NODE* node);
 void graph_oriented_connect(NODE* from, NODE* to);
 
 // disconnect node from another
-void graph_oriented_disconnect(NODE* from, NODE* to);
+// returns true if connection existed
+uint8_t graph_oriented_disconnect(NODE* from, NODE* to);
 
 // sort topologically, ignoring back edges
 void graph_topological_sort(GRAPH*);

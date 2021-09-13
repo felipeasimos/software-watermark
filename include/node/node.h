@@ -57,15 +57,13 @@ unsigned long node_get_data_len(NODE* node);
 // free node structure and its connections
 void node_free(NODE*);
 
-void node_oriented_disconnect(NODE* node_from, NODE* node_to);
+uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to);
 
 void node_oriented_connect(NODE* node_from, NODE* node_to);
 
 void node_disconnect(NODE*, NODE*);
 
 void node_connect(NODE*,NODE*);
-
-void node_isolate(NODE* node_to_isolate);
 
 void node_write(NODE*, FILE*, void (*)(FILE*, NODE*));
 
@@ -76,6 +74,8 @@ void node_load_info(NODE* node, void* info, unsigned long info_len);
 void node_unload_info(NODE* node);
 
 void node_unload_all_info(NODE* node);
+
+void node_free_info(NODE* node);
 
 void node_free_all_info(NODE* node);
 
