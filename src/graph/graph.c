@@ -100,7 +100,7 @@ void graph_topological_sort(GRAPH* graph) {
 
     if(!graph->num_nodes) return;
 
-    PSTACK* stack = pstack_create(graph->num_nodes);
+    STACK* stack = stack_create(graph->num_nodes);
     NODE** ordered_nodes = calloc(graph->num_nodes, sizeof(NODE*));
 
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
@@ -110,51 +110,55 @@ void graph_topological_sort(GRAPH* graph) {
         node_load_info(graph->nodes[i], topo, sizeof(TOPO_NODE));
     }
     unsigned long t = 0;
-    pstack_push(stack, graph->nodes[0]);
+    stack_push(stack, 0);
     ((TOPO_NODE*)node_get_info(graph->nodes[0]))->mark=1;
-    NODE* node = NULL;
-    while( ( node = pstack_get(stack) ) ) {
+    unsigned long node_idx = 0;
+    while( ( node_idx = stack_get(stack) ) != ULONG_MAX ) {
         uint8_t has_unmarked_connection = 0;
-        for(CONNECTION* conn = ((TOPO_NODE*)node_get_info(node))->check_next; conn; conn = conn->next) {
+        for(CONNECTION* conn = ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next; conn; conn = conn->next) {
 
             // if unmarked, mark and insert in data structure
-            if(conn->parent == conn->from && !((TOPO_NODE*)node_get_info(conn->to))->mark) {
+            if(!((TOPO_NODE*)node_get_info(conn->to))->mark) {
 
                 has_unmarked_connection=1;
                 ((TOPO_NODE*)node_get_info(conn->to))->mark = 1;
-                pstack_push(stack, conn->to);
-                ((TOPO_NODE*)node_get_info(node))->check_next = conn->next;
+                stack_push(stack, conn->to->graph_idx);
+                ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next = conn->next;
                 break;
             }
-            ((TOPO_NODE*)node_get_info(node))->check_next = conn->next;
+            ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next = conn->next;
         }
         if(!has_unmarked_connection) {
-            ordered_nodes[t++] = pstack_pop(stack);
-            ordered_nodes[t-1]->graph_idx = t-1;
+            ordered_nodes[t++] = graph->nodes[stack_pop(stack)];
         }
     }
-    for(unsigned long i = 0; i < graph->num_nodes; i++) {
-
-        free(node_get_info(graph->nodes[i]));
-    }
+    graph_free_info(graph);
     free(graph->nodes);
     graph->nodes = ordered_nodes;
-    pstack_free(stack);
-    graph_unload_info(graph);
+    stack_free(stack);
+    // update indexes
+    for(unsigned long i = 0; i < graph->num_nodes; i++) graph->nodes[i]->graph_idx = i;
 }
 
 // unload info from all nodes
 void graph_unload_info(GRAPH* graph) {
-
     for(unsigned long i = 0; i < graph->num_nodes; i++) node_unload_info(graph->nodes[i]);
 }
 
 // unload all info from all nodes
 void graph_unload_all_info(GRAPH* graph) {
-
     for(unsigned long i = 0; i < graph->num_nodes; i++) node_unload_all_info(graph->nodes[i]);
 }
 
+// free info from all nodes
+void graph_free_info(GRAPH* graph) {
+    for(unsigned long i = 0; i < graph->num_nodes; i++) node_free_info(graph->nodes[i]);
+}
+
+// free all info from all nodes
+void graph_free_all_info(GRAPH* graph) { 
+    for(unsigned long i = 0; i < graph->num_nodes; i++) node_free_all_info(graph->nodes[i]);
+}
 void graph_print_node_idx(FILE* f, NODE* node) {
 
     fprintf(f, "%lu", node->graph_idx);
@@ -162,20 +166,39 @@ void graph_print_node_idx(FILE* f, NODE* node) {
 
 // generate png image with the graph
 // uses 'system' syscall
-void graph_write_dot(GRAPH* graph, const char* filename) {
+void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
 
     FILE* file = NULL;
     if(( file = fopen(filename, "w") )) {
 
         fprintf(file, "digraph G {\n");
+        fprintf(file, "\tgraph [");
+        if(label) fprintf(file, "label=\"%s\", ", label);
+        fprintf(file, "rankdir=LR, splines=polyline, layout=dot];\n");
+        fprintf(file, "\tedge [style=invis, weight=100, overlap=0, constraint=true];\n");
+        fprintf(file, "\tnode [group=main, shape=circle];\n\t0:e");
+        for(unsigned long i = 1; i < graph->num_nodes; i++) fprintf(file, " -> %lu:e", i);
+        fprintf(file, ";\n\tedge [style=solid, weight=1, overlap=scale, constraint=true];\n");
         for(unsigned long i = 0; i < graph->num_nodes; i++) {
 
             for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
                 fprintf(file, "\t");
                 node_write(graph->nodes[i], file, graph_print_node_idx);
-                fprintf(file, " -> ");
-                node_write(conn->to, file, graph_print_node_idx);
+                // if backedge
+                if(conn->to->graph_idx < graph->nodes[i]->graph_idx) {
+                    fprintf(file, ":nw -> ");
+                    node_write(conn->to, file, graph_print_node_idx);
+                    fprintf(file, ":ne");
+                // if forward edge
+                } else if(conn->to->graph_idx > graph->nodes[i]->graph_idx+1) {
+                    fprintf(file, ":se -> ");
+                    node_write(conn->to, file, graph_print_node_idx);
+                    fprintf(file, ":sw");
+                } else {
+                    fprintf(file, " -> ");
+                    node_write(conn->to, file, graph_print_node_idx);
+                }
                 fprintf(file, ";\n");
             }
         }

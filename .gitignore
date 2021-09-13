@@ -3,3 +3,5 @@ watermark/
 tests/*.dat
 test
 watermark
+*.dot
+*.png

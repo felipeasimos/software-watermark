@@ -52,9 +52,16 @@ void graph_unload_info(GRAPH*);
 // unload all info from all nodes
 void graph_unload_all_info(GRAPH*);
 
+// free info from all nodes
+void graph_free_info(GRAPH*);
+
+// free all info from all nodes
+void graph_free_all_info(GRAPH*);
+
 // generate png image with the graph
 // uses 'system' syscall
-void graph_write_dot(GRAPH*, const char* filename);
+// label can be NULL
+void graph_write_dot(GRAPH*, const char* filename, const char* label);
 
 // copy the graph
 GRAPH* graph_copy(GRAPH*);

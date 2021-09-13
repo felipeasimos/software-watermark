@@ -1,5 +1,7 @@
 #include "ctdd/ctdd.h"
 #include "graph/graph.h"
+#include "encoder/encoder.h"
+#include "decoder/decoder.h"
 #include "rs_api/rs.h"
 
 int graph_test() {
@@ -20,7 +22,6 @@ int graph_test() {
     graph_oriented_connect(graph->nodes[4], graph->nodes[5]);
     graph_oriented_connect(graph->nodes[5], graph->nodes[6]);
     graph_oriented_connect(graph->nodes[6], graph->nodes[7]);
-    graph_write_dot(graph, "dot.dot");
     ctdd_assert(graph->num_connections == 7);
     ctdd_assert(graph->num_nodes == 8);
     graph_topological_sort(graph);
@@ -46,8 +47,51 @@ int graph_test() {
     return 0;
 }
 
+int get_bit_test() {
+
+    uint8_t k = 179;
+    ctdd_assert( get_bit(&k, 0) == 1 );
+    ctdd_assert( get_bit(&k, 1) == 1 );
+    ctdd_assert( get_bit(&k, 2) == 0 );
+    ctdd_assert( get_bit(&k, 3) == 1 );
+    ctdd_assert( get_bit(&k, 4) == 1 );
+    ctdd_assert( get_bit(&k, 5) == 0 );
+    ctdd_assert( get_bit(&k, 6) == 0 );
+    ctdd_assert( get_bit(&k, 7) == 1 );
+    k = 0x1;
+    ctdd_assert( get_bit(&k, 0) == 1 );
+    ctdd_assert( get_bit(&k, 1) == 0 );
+    ctdd_assert( get_bit(&k, 2) == 0 );
+    ctdd_assert( get_bit(&k, 3) == 0 );
+    ctdd_assert( get_bit(&k, 4) == 0 );
+    ctdd_assert( get_bit(&k, 5) == 0 );
+    ctdd_assert( get_bit(&k, 6) == 0 );
+    ctdd_assert( get_bit(&k, 7) == 0 );
+    return 0;
+}
+
+int watermark2014_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark2014_encode(&k, 1);
+        graph_write_dot(graph, "dot.dot", "panquecas");
+        graph_print(graph, NULL);
+        unsigned long size;
+        uint8_t* result = watermark2014_decode(graph, &size);
+        ctdd_assert(size == 1);
+        ctdd_assert(*result == k);
+        free(result);
+        graph_free(graph);
+        invert_binary_sequence(&k, 1);
+    }
+    return 0;
+}
+
 int run_tests() {
     ctdd_verify(graph_test);
+    ctdd_verify(get_bit_test);
+    ctdd_verify(watermark2014_test);
 	return 0;
 }
 

@@ -3,31 +3,29 @@
 
 #include <stdlib.h>
 #include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
 
-struct NODE;
-
-typedef struct PSTACK {
-
-    struct NODE** stack;
-    unsigned long n;
-} PSTACK;
-
-typedef struct HSTACK {
+typedef struct STACK {
 
     unsigned long* stack;
     unsigned long n;
-} HSTACK;
+} STACK;
 
-PSTACK* pstack_create(unsigned long max_nodes);
-void pstack_push(PSTACK*, struct NODE*);
-struct NODE* pstack_pop(PSTACK*);
-struct NODE* pstack_get(PSTACK*);
-void pstack_free(PSTACK*);
+// stack
+STACK* stack_create(unsigned long max_nodes);
+void stack_push(STACK*, unsigned long);
+unsigned long stack_pop(STACK*);
+void stack_pop_until(STACK*, unsigned long size);
+unsigned long stack_get(STACK*);
+void stack_free(STACK*);
+void stack_print(STACK*);
 
-HSTACK* hstack_create(unsigned long max_nodes);
-void hstack_push(HSTACK*, unsigned long);
-unsigned long hstack_pop(HSTACK*);
-unsigned long hstack_get(HSTACK*);
-void hstack_free(HSTACK*);
+// binary sequence
+uint8_t get_bit(uint8_t* data, unsigned long idx);
+void set_bit(uint8_t* data, unsigned long idx, uint8_t value);
+void invert_binary_sequence(uint8_t* data, unsigned long size);
+unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes);
+uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes);
 
 #endif
