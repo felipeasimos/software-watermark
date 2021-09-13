@@ -174,9 +174,9 @@ void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
         fprintf(file, "digraph G {\n");
         fprintf(file, "\tgraph [");
         if(label) fprintf(file, "label=\"%s\", ", label);
-        fprintf(file, "rankdir=LR, splines=polyline, layout=dot];\n");
+        fprintf(file, "rankdir=LR, splines=polyline, layout=dot, bgcolor=\"#262626\", fontcolor=\"#FFFDB8\"];\n");
         fprintf(file, "\tedge [style=invis, weight=100, overlap=0, constraint=true];\n");
-        fprintf(file, "\tnode [group=main, shape=circle];\n\t0:e");
+        fprintf(file, "\tnode [group=main, shape=circle, color=\"#4DA6FF\", fontcolor=\"#FFFDB8\"];\n\t0:e");
         for(unsigned long i = 1; i < graph->num_nodes; i++) fprintf(file, " -> %lu:e", i);
         fprintf(file, ";\n\tedge [style=solid, weight=1, overlap=scale, constraint=true];\n");
         for(unsigned long i = 0; i < graph->num_nodes; i++) {
@@ -189,15 +189,16 @@ void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
                 if(conn->to->graph_idx < graph->nodes[i]->graph_idx) {
                     fprintf(file, ":nw -> ");
                     node_write(conn->to, file, graph_print_node_idx);
-                    fprintf(file, ":ne");
+                    fprintf(file, ":ne [color=\"#FF263C\"]");
                 // if forward edge
                 } else if(conn->to->graph_idx > graph->nodes[i]->graph_idx+1) {
                     fprintf(file, ":se -> ");
                     node_write(conn->to, file, graph_print_node_idx);
-                    fprintf(file, ":sw");
+                    fprintf(file, ":sw [color=green]");
                 } else {
                     fprintf(file, " -> ");
                     node_write(conn->to, file, graph_print_node_idx);
+                    fprintf(file, "[color=\"#4DA6FF\"]");
                 }
                 fprintf(file, ";\n");
             }
