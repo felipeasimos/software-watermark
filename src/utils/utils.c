@@ -16,7 +16,7 @@ unsigned long stack_pop(STACK* stack) {
 }
 void stack_pop_until(STACK* stack, unsigned long size) {
 
-    while(stack->n > size) stack_pop(stack);
+    stack->n = size;
 }
 unsigned long stack_get(STACK* stack) {
     return stack->n ? stack->stack[stack->n-1] : ULONG_MAX;
@@ -78,4 +78,13 @@ uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsig
 
     for(unsigned long i = 0; i < n_bits; i++) set_bit(data, i+n_zeros_on_the_left, bit_arr[i]);
     return data;
+}
+
+uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_bytes1, unsigned long num_bytes2) {
+
+    for(unsigned long i = 0; i < num_bytes1 && i < num_bytes2; i++) {
+
+        if(data1[num_bytes1-i-1] != data2[num_bytes2-i-1]) return 0;
+    }
+    return 1;
 }

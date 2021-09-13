@@ -16,10 +16,6 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
     // iterate over the bits
     for(unsigned long i = starting_idx; i < total_number_of_bits; i++) {
 
-        printf("odd: ");
-        stack_print(odd_stack);
-        printf("even: ");
-        stack_print(even_stack);
         unsigned long idx = i - starting_idx;
         uint8_t bit = get_bit(data, i);
         uint8_t is_odd = idx & 1;
@@ -33,9 +29,10 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
         if( possible_backedges->n ) {
 
             unsigned long idx_of_backedge = rand() % possible_backedges->n;
-            graph_oriented_connect(graph->nodes[idx], graph->nodes[idx_of_backedge]);
+            NODE* backedge_node = graph->nodes[possible_backedges->stack[idx_of_backedge]];
+            graph_oriented_connect(graph->nodes[idx], backedge_node);
             stack_pop_until(possible_backedges, idx_of_backedge+1); // add +1 since we want the size, not the index
-            stack_pop_until(other_stack, history[idx_of_backedge]);
+            stack_pop_until(other_stack, history[backedge_node->graph_idx]);
         }
 
         // save stacks

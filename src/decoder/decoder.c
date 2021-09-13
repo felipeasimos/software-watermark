@@ -18,7 +18,9 @@ uint8_t* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
             bits[i] = 0;
         }
     }
-    return get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    void* data = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    free(bits);
+    return data;
 }
 
 uint8_t* watermark_decode(GRAPH*, unsigned long* num_bytes);

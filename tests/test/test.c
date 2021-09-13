@@ -74,16 +74,22 @@ int watermark2014_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark2014_encode(&k, 1);
-        graph_write_dot(graph, "dot.dot", "panquecas");
-        graph_print(graph, NULL);
+        GRAPH* graph = watermark2014_encode(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark2014_decode(graph, &size);
         ctdd_assert(size == 1);
         ctdd_assert(*result == k);
         free(result);
         graph_free(graph);
-        invert_binary_sequence(&k, 1);
+    }
+    for(unsigned long k = 2; k < 10e13; k<<=1) {
+
+        GRAPH* graph = watermark2014_encode(&k, sizeof(k));
+        unsigned long size;
+        uint8_t* result = watermark2014_decode(graph, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        graph_free(graph);
     }
     return 0;
 }
