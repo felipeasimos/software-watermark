@@ -61,8 +61,8 @@ void node_oriented_disconnect(NODE* node_from, NODE* node_to){
 	if( !node_from || !node_to ) return;
 
 	//delete node_to from node_from's connection's list
-	connection_delete_out_neighbour( node_from->connections, node_to );
-    connection_delete_in_neighbour( node_to->connections, node_from );
+	connection_delete_out_neighbour( node_from->out, node_to );
+    connection_delete_in_neighbour( node_to->in, node_from );
 
     // update counts
     node_from->num_connections--;
@@ -77,15 +77,15 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
 	if( !node_from || !node_to ) return;
 
 	//insert node_to in node_from's connections list
-    if(node_from->connections) {
-        connection_insert_out_neighbour( node_from->connections, node_to );
+    if(node_from->out) {
+        connection_insert_out_neighbour( node_from->out, node_to );
     } else {
-        node_from->connections = connection_create(node_from, node_from, node_to);
+        node_from->out = connection_create(node_from, node_from, node_to, OUT);
     }
-    if(node_to->connections) {
-        connection_insert_in_neighbour( node_to->connections, node_from );
+    if(node_to->in) {
+        connection_insert_in_neighbour( node_to->in, node_from );
     } else {
-        node_to->connections = connection_create(node_to, node_from, node_to);
+        node_to->in = connection_create(node_to, node_from, node_to, IN);
     }
 
     // update counts
@@ -119,7 +119,7 @@ void node_isolate(NODE* node_to_isolate){
 	if( !node_to_isolate ) return;
 
     // go through all nodes this one connects to
-    CONNECTION* next_conn = node_to_isolate->connections;
+    CONNECTION* next_conn = node_to_isolate->in;
     for(CONNECTION* conn = next_conn; conn; conn = next_conn) {
         next_conn = next_conn->next;
         // disconnect from every node
@@ -132,35 +132,45 @@ void node_free(NODE* node){
     if(!node) return;
     node_unload_all_info(node);
     free(node->data);
-    connection_free(node->connections);
+    connection_free(node->in);
+    connection_free(node->out);
     free(node);
 }
 
-void node_default_print_func(NODE* node, void* data, unsigned long data_len){
+void node_default_print_func(FILE* f, NODE* node){
 
-    printf(" \x1b[33m[\x1b[0m%lu\x1b[33m]\x1b[0m", node->graph_idx);
+    void* data = node_get_data(node);
+    unsigned long data_len = node_get_data_len(node);
+    fprintf(f, " \x1b[33m[\x1b[0m%lu\x1b[33m]\x1b[0m", node->graph_idx);
 	if( !data ) {
-		printf("\x1b[33m(null) \x1b[0m");
+		fprintf(f, "\x1b[33m(null)\x1b[0m");
 	} else if ( data_len == sizeof(unsigned long) ) {
-		printf("\x1b[33m(%lu) \x1b[0m", *(unsigned long*)data);
+		fprintf(f, "\x1b[33m(%lu)\x1b[0m", *(unsigned long*)data);
 	} else if ( data_len == sizeof(unsigned int) ) {
-		printf("\x1b[33m(%u) \x1b[0m", *(unsigned int*)data);
+		fprintf(f, "\x1b[33m(%u)\x1b[0m", *(unsigned int*)data);
 	} else if ( data_len == sizeof(unsigned short) ) {
-		printf("\x1b[33m(%hu) \x1b[0m", *(unsigned short*)data);
+		fprintf(f, "\x1b[33m(%hu)\x1b[0m", *(unsigned short*)data);
 	} else if (data_len == sizeof(char)) {
-		printf("\x1b[33m(%hhu) \x1b[0m", *(char*)data);
+		fprintf(f, "\x1b[33m(%hhu)\x1b[0m", *(char*)data);
 	} else {
-		printf("\x1b[33m(%p) \x1b[0m", data);
+		fprintf(f, "\x1b[33m(%p)\x1b[0m", data);
 	}
 }
 
-void node_print(NODE* node, void (*print_func)(NODE*, void*, unsigned long) ){
+void node_write(NODE* node, FILE* file, void (*print_func)(FILE*, NODE*)) {
+
+    if(!node) return;
+
+	(print_func ? print_func : node_default_print_func)( file, node );
+}
+
+void node_print(NODE* node, void (*print_func)(FILE*, NODE*) ){
 
 	//if no node node was given nothing happens
 	if( !node ) return;
 
 	//calls default print function if none was given
-	(print_func ? print_func : node_default_print_func)( node, node->data, node->data_len );
+	(print_func ? print_func : node_default_print_func)( stdout, node );
 }
 
 void node_load_info(NODE* node, void* info, unsigned long info_len) {
@@ -197,6 +207,13 @@ void node_unload_all_info(NODE* node) {
     while(info--) node_unload_info(node);
 }
 
+void node_free_all_info(NODE* node) {
+
+    unsigned long info = node->num_info;
+    if(!info) return;
+    while(info--) node_unload_info(node);
+}
+
 void* node_get_info(NODE* node) {
 
     if(!node->num_info) return NULL;
@@ -213,211 +230,4 @@ unsigned long node_get_info_len(NODE* node) {
     void* data = node->data;
     while(num_info--) data = ((INFO_NODE*)data)->data;
     return ((INFO_NODE*)data)->info_len;
-}
-
-NODE* node_copy(NODE* node) {
-
-    if(!node) return NULL;
-    node_load_copy(node);
-    // get first node from copy
-    NODE* copy = node_get_info(node);
-    node_unload_all_info(node);
-    // unload the node
-    return copy;
-}
-
-void node_load_copy(NODE* node) {
-
-    if(!node) return;
-
-    //get root
-    for(; node->prev; node = node->prev);
-
-    for(NODE* node = node; node; node = node->next) {
-
-        // load copy of this node
-        node_load_info(
-                node,
-                node_create(
-                    node->data,
-                    node->data_len
-                ), // create copy
-                sizeof(NODE)
-            );
-        // link the copied nodes
-        if( node->prev ) {
-
-            NODE* current_copy = node_get_info(node);
-            NODE* prev_copy = node_get_info(node->prev);
-            prev_copy->next = current_copy;
-            current_copy->prev = prev_copy;
-        }
-    }
-    // iterate over nodes again, this time making connections to correspondent nodes
-    for(NODE* cursor = node; cursor; cursor = cursor->next) {
-
-        // look for copy counter-part
-        NODE* copy = node_get_info(cursor);
-        // iterate over the connections of this node
-        for(CONNECTION* conn = cursor->connections; conn; conn = conn->next) {
-            NODE* neighbour = node_get_info(conn->node);
-            node_oriented_connect(copy, neighbour);
-        }
-    }
-}
-
-void* node_serialize(NODE* node, unsigned long* num_bytes) {
-
-    if(!node) return NULL;
-
-    // load indices to node (remember to free the indices later!)
-    unsigned long i = 0;
-    for(NODE* node = node; node; i++) {
-
-        unsigned long* i_copy = malloc(sizeof(i));
-        memcpy(i_copy, &i, sizeof(i));
-        node_load_info(node, i_copy, sizeof(i));
-        node = node->next;
-    }
-
-    uint8_t* node_serialized = malloc( sizeof(unsigned long) );
-    *num_bytes = sizeof(unsigned long);
-
-    // write number of nodes
-    memcpy(node_serialized, &i, sizeof(unsigned long));
-
-    for(NODE* node = node; node; node = node->next) {
-
-        // 1. data_len (unsigned long, 8 bytes)
-        // 2. data (variable length)
-        // 3. number of neighbours (unsigned long)
-        // 4. idx of neighbours (variable length)
-
-        unsigned long num_neighbours = node_order_from(node);
-
-        unsigned long offset = 
-            sizeof(unsigned long) + // data_len
-            ((INFO_NODE*)node->data)->data_len + // data
-            sizeof(unsigned long) + // num_neighbours
-            sizeof(unsigned long) * num_neighbours; // list of neighbours idxs
-
-        *num_bytes += offset;
-        node_serialized = realloc(node_serialized, *num_bytes);
-
-        // 1. data_len
-        memcpy(
-            node_serialized + ( (*num_bytes) - offset ),
-            &((INFO_NODE*)node->data)->data_len,
-            sizeof(unsigned long)
-        );
-
-        // 2. data
-        if( ((INFO_NODE*)node->data)->data_len ) {
-            memcpy(
-                node_serialized + ( (*num_bytes) - offset + sizeof(unsigned long) ),
-                    ((INFO_NODE*)node->data)->data,
-                ((INFO_NODE*)node->data)->data_len
-            );
-        }
-
-        // 3. number of neighbours
-        memcpy(
-            node_serialized + ( (*num_bytes) - sizeof(unsigned long) * (1+num_neighbours) ),
-            &num_neighbours,
-            sizeof(unsigned long)
-        );
-
-        // 4. list of neighbours idxs
-        unsigned long neighbour_pos = 0;
-        for(CONNECTION* conn = node->connections; conn; conn = conn->next) {
-            memcpy(
-                node_serialized + ( (*num_bytes) - sizeof(unsigned long) * (num_neighbours-neighbour_pos) ),
-                node_get_info(conn->node),
-                sizeof(unsigned long)
-            );
-            neighbour_pos++;
-        }
-    }
-
-    // unload all nodes
-    for(NODE* node=node; node; node = node->next) {
-
-        void* info = node_get_info(node);
-        free(info);
-        node_unload_info(node);
-    }
-
-    return node_serialized;
-}
-
-NODE* node_deserialize(uint8_t* data) {
-
-    if(!data) return NULL;
-
-    // get number of nodes
-    unsigned long n;
-    memcpy( &n, data, sizeof(unsigned long) );
-    data += sizeof(unsigned long);
-
-    // populate the array with empty nodes
-    NODE* nodes[n];
-    for(unsigned long i = 0; i < n; i++) {
-        nodes[i] = node_empty();
-        if(i > 0) {
-            node_insert(nodes[i-1], nodes[i]);
-        }
-    }
-
-    for(unsigned long i = 0; i < n; i++) {
-
-        // 1. data_len
-        // 2. data
-        // 3. num_neighbours
-        // 4. list of neighbour idxs
-
-        // 1. data_len
-        memcpy(
-            &nodes[i]->data_len,
-            data,
-            sizeof(unsigned long)
-        );
-        data += sizeof(unsigned long);
-        if( nodes[i]->data_len ) {
-            node_alloc(nodes[i], nodes[i]->data_len);
-
-            // 2. data
-            memcpy(
-                nodes[i]->data,
-                data,
-                nodes[i]->data_len
-            );
-            data += nodes[i]->data_len;
-        }
-
-        // 3. num_neighbours
-        unsigned long num_neighbours;
-        memcpy(
-            &num_neighbours,
-            data,
-            sizeof(unsigned long)
-        );
-        data += sizeof(unsigned long);
-
-        // 4. list of neighbour idxs
-        for(unsigned long j = 0; j < num_neighbours; j++) {
-
-            unsigned long neighbour_idx;
-            memcpy(
-                &neighbour_idx,
-                data,
-                sizeof(unsigned long)
-            );
-            data += sizeof(unsigned long);
-            node_oriented_connect(
-                    nodes[i],
-                    nodes[neighbour_idx]
-            );
-        }
-    }
-    return nodes[0];
 }

@@ -18,7 +18,8 @@ typedef struct NODE {
     unsigned long graph_idx; // this node's index in the graph structure
     struct GRAPH* graph;
 
-	struct CONNECTION* connections;
+    struct CONNECTION* in;
+	struct CONNECTION* out;
     unsigned long num_connections;
     unsigned long num_out_neighbours;
     unsigned long num_in_neighbours;
@@ -66,13 +67,17 @@ void node_connect(NODE*,NODE*);
 
 void node_isolate(NODE* node_to_isolate);
 
-void node_print(NODE*, void (*)(NODE*, void*, unsigned long));
+void node_write(NODE*, FILE*, void (*)(FILE*, NODE*));
+
+void node_print(NODE*, void (*)(FILE*, NODE*));
 
 void node_load_info(NODE* node, void* info, unsigned long info_len);
 
 void node_unload_info(NODE* node);
 
 void node_unload_all_info(NODE* node);
+
+void node_free_all_info(NODE* node);
 
 void* node_get_info(NODE* node);
 

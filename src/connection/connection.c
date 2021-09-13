@@ -1,6 +1,6 @@
 #include "connection/connection.h"
 
-CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to){
+CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to, DIRECTION direction){
 
 	//allocate memory for struct
 	CONNECTION* connection = malloc(sizeof(CONNECTION));
@@ -11,6 +11,7 @@ CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to){
     connection->parent = parent;
     connection->from = from;
     connection->to = to;
+    connection->direction = direction;
 
 	return connection;
 }
@@ -25,13 +26,13 @@ void connection_insert(CONNECTION* root, CONNECTION* new_connection) {
 
 void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, node, connection_root->parent);
+    CONNECTION* conn = connection_create(connection_root->parent, node, connection_root->parent, IN);
     connection_insert(connection_root, conn);
 }
 
 void connection_insert_out_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, connection_root->parent, node);
+    CONNECTION* conn = connection_create(connection_root->parent, connection_root->parent, node, OUT);
     connection_insert(connection_root, conn);
 }
 
@@ -75,9 +76,10 @@ void connection_delete(CONNECTION* conn) {
     if(conn->prev) conn->prev->next = conn->next;
     if(conn->next) conn->next->prev = conn->prev;
 
-    if(conn->parent->connections == conn) {
+    CONNECTION** node_conn_pointer = (conn->direction == IN ? &conn->parent->in : &conn->parent->out);
+    if( (*node_conn_pointer) == conn ) {
 
-        conn->parent->connections = NULL;
+        (*node_conn_pointer) = conn->next;
     }
 }
 
@@ -105,12 +107,11 @@ void connection_free(CONNECTION* conn){
     } 
 }
 
-void connection_print(CONNECTION* connection, void(*print_func)(NODE*, void*,unsigned long)){
+void connection_print(CONNECTION* connection, void(*print_func)(FILE*, NODE*)){
 
 	//iterate through list and print each node the connections represent
 	for(; connection; connection = connection->next) {
-        if(connection->from == connection->parent) {
-            node_print(connection->to, print_func);
-        }
+        node_print(connection->to, print_func);
+        printf(" ");
     }
 }
