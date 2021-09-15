@@ -90,6 +90,27 @@ uint8_t graph_oriented_disconnect(NODE* from, NODE* to) {
     return 0;
 }
 
+// check if nodes are connected
+CONNECTION* graph_get_connection(NODE* from, NODE* to) {
+
+    return node_get_connection(from, to);
+}
+// return backedge connection (that goes to a node with lower index)
+// if it exists
+CONNECTION* graph_get_backedge(NODE* node) {
+    for(CONNECTION* conn = node->out; conn; conn = conn->next)
+        if(conn->to->graph_idx < node->graph_idx) return conn;
+    return NULL;
+}
+
+// return forward edge connection (that goes to a node with greater index)
+// if it exists
+CONNECTION* graph_get_forward(NODE* node) {
+    for(CONNECTION* conn = node->out; conn; conn = conn->next)
+        if(conn->to->graph_idx > node->graph_idx) return conn;
+    return NULL;
+}
+
 typedef struct TOPO_NODE {
     uint8_t mark;
     CONNECTION* check_next;
@@ -189,7 +210,7 @@ void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
                 if(conn->to->graph_idx < graph->nodes[i]->graph_idx) {
                     fprintf(file, ":nw -> ");
                     node_write(conn->to, file, graph_print_node_idx);
-                    fprintf(file, ":ne [color=\"#FF263C\"]");
+                    fprintf(file, ":ne [style=dashed, color=\"#FF263C\"]");
                 // if forward edge
                 } else if(conn->to->graph_idx > graph->nodes[i]->graph_idx+1) {
                     fprintf(file, ":se -> ");

@@ -36,8 +36,8 @@ typedef struct INFO_NODE {
     unsigned long info_len;
 } INFO_NODE;
 
-#include "graph/graph.h"
 #include "connection/connection.h" //we can't include it before 'struct CONNECTION;'
+#include "graph/graph.h"
 
 //creates empty node
 NODE* node_empty();
@@ -60,6 +60,8 @@ void node_free(NODE*);
 uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to);
 
 void node_oriented_connect(NODE* node_from, NODE* node_to);
+
+CONNECTION* node_get_connection(NODE* node_from, NODE* node_to);
 
 void node_disconnect(NODE*, NODE*);
 

@@ -39,6 +39,17 @@ void graph_delete(NODE* node);
 // connect node to another
 void graph_oriented_connect(NODE* from, NODE* to);
 
+// check if nodes are connected
+CONNECTION* graph_get_connection(NODE* from, NODE* to);
+
+// return backedge connection (that goes to a node with lower index)
+// if it exists
+CONNECTION* graph_get_backedge(NODE* node);
+
+// return forward edge connection (that goes to a node with greater index)
+// if it exists
+CONNECTION* graph_get_forward(NODE* node);
+
 // disconnect node from another
 // returns true if connection existed
 uint8_t graph_oriented_disconnect(NODE* from, NODE* to);

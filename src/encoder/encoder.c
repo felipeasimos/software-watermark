@@ -11,6 +11,7 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 
     STACK* odd_stack = stack_create(n);
     STACK* even_stack = stack_create(n);
+
     unsigned long* history = calloc(n, sizeof(unsigned long));
 
     // iterate over the bits
@@ -18,7 +19,7 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 
         unsigned long idx = i - starting_idx;
         uint8_t bit = get_bit(data, i);
-        uint8_t is_odd = idx & 1;
+        uint8_t is_odd = !(idx & 1);
 
         // construct hamiltonian path
         graph_oriented_connect(graph->nodes[idx], graph->nodes[idx+1]);
@@ -62,29 +63,68 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
 
     GRAPH* graph = graph_create(n+2);
 
+    // construct hamiltonian path
+    for(unsigned long i = 1; i < graph->num_nodes; i++) graph_oriented_connect(graph->nodes[i-1], graph->nodes[i]);
+
     STACK* odd_stack = stack_create(n);
     STACK* even_stack = stack_create(n);
-    unsigned long* history = calloc(n, sizeof(unsigned long));
+    stack_push(odd_stack, 0);
+    unsigned long* history = calloc(n*2, sizeof(unsigned long));
 
     // iterate over the bits
-    for(unsigned long i = starting_idx; i < total_number_of_bits; i++) {
+    unsigned long idx = 1;
+    for(unsigned long i = starting_idx+1; i < total_number_of_bits; i++, idx++) {
 
-        unsigned long idx = i-starting_idx;
         uint8_t bit = get_bit(data, i);
-        uint8_t is_odd = idx&1;
+        uint8_t is_odd = !(idx&1);
 
-        // construct hamiltonian path
-        graph_oriented_connect(graph->nodes[idx], graph->nodes[idx+1]);
-
-        // add backedge
+        // backedge management
         STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack ;
         STACK* other_stack = possible_backedges == even_stack ? odd_stack : even_stack;
-        if( possible_backedges->n ) {
+        // check if there is a forward edge that point to the current node and ignore it if so
+        if( idx > 1 && graph_get_connection(graph->nodes[idx-2], graph->nodes[idx]) ) {
+            i--;
+        // if there are available backedges in the backedge stack, taking into account that we
+        // can't connect a backedge to a node that the last node also does
+        } else if( has_possible_backedge(possible_backedges, graph, idx) ) {
 
-            unsigned long idx_of_backedge = rand() % possible_backedges->n;
-            graph_oriented_connect(graph->nodes[idx], graph->nodes[idx_of_backedge]);
-            stack_pop_until(possible_backedges, idx_of_backedge+1); // add +1 since we want the size, not the index
-            stack_pop_until(other_stack, history[idx_of_backedge]);
+            // if v-1 has forward edge
+            if( graph_get_connection(graph->nodes[idx-1], graph->nodes[idx+1]) ) {
+
+                if(bit) {
+
+                    // backedge to v-1
+                    graph_oriented_connect(graph->nodes[idx], graph->nodes[idx-1]);
+                    // remove hamiltonian edge
+                    graph_oriented_disconnect(graph->nodes[idx], graph->nodes[idx+1]);
+                    // while block is built!
+                } else {
+                    // nothing needs to be done, and we have an if block built!
+                }
+                // node inside forward edge can't be backedge destination
+                continue;
+            } else {
+
+                // connect to backedge
+                unsigned long backedge_idx = get_backedge_index(possible_backedges, graph, idx);
+                NODE* backedge_node = graph->nodes[possible_backedges->stack[backedge_idx]];
+                graph_oriented_connect(graph->nodes[idx], backedge_node);
+                // pop stacks
+                stack_pop_until(possible_backedges, backedge_idx); // pop backedge and all nodes on top of it
+                stack_pop_until(other_stack, history[backedge_node->graph_idx]);
+                // repeat block is built!
+                // this node is now the origin of a backedge, so it isn't a valid
+                // backedge destination
+                continue;
+            }
+        } else {
+            if(bit) {
+
+                // add new node to graph and create forward edge
+                graph_add(graph);
+                graph_oriented_connect(graph->nodes[graph->num_nodes-2], graph->nodes[graph->num_nodes-1]);
+                graph_oriented_connect(graph->nodes[idx], graph->nodes[idx+2]);
+            }
         }
 
         // save stacks

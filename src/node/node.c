@@ -102,6 +102,11 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
     node_from->num_out_neighbours++;
 }
 
+CONNECTION* node_get_connection(NODE* node_from, NODE* node_to) {
+
+    return connection_search_out_neighbour(node_from->out, node_to);
+}
+
 void node_disconnect(NODE* node1, NODE* node2){
 
 	//close connection between node1 to node2 if it exists
