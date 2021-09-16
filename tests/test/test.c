@@ -87,11 +87,35 @@ int watermark2014_test() {
         free(result);
         graph_free(graph);
     }
-    for(unsigned long k = 1; k < 10e13; k<<=1) {
+    for(unsigned long k = 1; k < 10e13; k=1+(k<<1)) {
 
         GRAPH* graph = watermark2014_encode(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark2014_decode(graph, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        graph_free(graph);
+    }
+    return 0;
+}
+
+int watermark2014_rs_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark2014_rs_encode(&k, sizeof(k), 1);
+        unsigned long size=1;
+        uint8_t* result = watermark2014_rs_decode(graph, &size);
+        ctdd_assert(size == 1);
+        ctdd_assert(*result == k);
+        free(result);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=1+(k<<1)) {
+
+        GRAPH* graph = watermark2014_rs_encode(&k, sizeof(k), 1);
+        unsigned long size=1;
+        uint8_t* result = watermark2014_rs_decode(graph, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
         free(result);
         graph_free(graph);
@@ -113,7 +137,7 @@ int watermark2017_test() {
         free(result);
         graph_free(graph);
     }
-    for(unsigned long k = 1; k < 10e13; k<<=1) {
+    for(unsigned long k = 1; k < 10e13; k=1+(k<<1)) {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size;
@@ -125,11 +149,36 @@ int watermark2017_test() {
     return 0;
 }
 
+int watermark2017_rs_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 1);
+        unsigned long size=1;
+        uint8_t* result = watermark_rs_decode(graph, &size);
+        ctdd_assert(size == 1);
+        ctdd_assert(*result == k);
+        free(result);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=1+(k<<1)) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 1);
+        unsigned long size=1;
+        uint8_t* result = watermark_rs_decode(graph, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        graph_free(graph);
+    }
+    return 0;
+}
 int run_tests() {
     ctdd_verify(graph_test);
     ctdd_verify(get_bit_test);
     ctdd_verify(watermark2014_test);
+    ctdd_verify(watermark2014_rs_test);
     ctdd_verify(watermark2017_test);
+    ctdd_verify(watermark2017_rs_test);
 	return 0;
 }
 

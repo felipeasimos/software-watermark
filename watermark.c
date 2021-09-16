@@ -69,9 +69,9 @@ void encode_number() {
 		n = tmp;
 	}
 
-	GRAPH* g = watermark2017_encode(&n, sizeof(n));
+	GRAPH* g = watermark_encode(&n, sizeof(n));
 
-    graph_print(g, utils_print_node);
+    graph_print(g, NULL);
 	
     char* code = watermark_get_code2017(g);
 

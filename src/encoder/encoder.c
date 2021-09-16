@@ -145,3 +145,33 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
     return graph;
 
 }
+
+void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
+
+    uint16_t parity[num_parity_symbols];
+    memset(parity, 0x00, sizeof(parity));
+    rs_encode(data, *data_len, parity, num_parity_symbols);
+
+    unsigned long new_len = (*data_len) + num_parity_symbols * sizeof(uint16_t);
+    uint8_t* data_with_parity = malloc(new_len);
+    memcpy(data_with_parity, data, *data_len);
+    memcpy(data_with_parity+(*data_len), parity, num_parity_symbols * sizeof(uint16_t));
+    *data_len = new_len;
+    return data_with_parity;
+}
+
+GRAPH* watermark2014_rs_encode(void* data, unsigned long data_len, unsigned long num_parity_symbols) {
+
+    uint8_t* data_with_parity = append_rs_code(data, &data_len, num_parity_symbols);
+    GRAPH* graph = watermark2014_encode(data_with_parity, data_len);
+    free(data_with_parity);
+    return graph;
+}
+
+GRAPH* watermark_rs_encode(void* data, unsigned long data_len, unsigned long num_parity_symbols) {
+
+    uint8_t* data_with_parity = append_rs_code(data, &data_len, num_parity_symbols);
+    GRAPH* graph = watermark_encode(data_with_parity, data_len);
+    free(data_with_parity);
+    return graph;
+}
