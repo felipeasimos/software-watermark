@@ -21,6 +21,8 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
 
     PRIME_SUBGRAPH prime = { .source = NULL, .sink = NULL, .type = INVALID};
 
+    if(!source->num_out_neighbours) return prime;
+
     // sequence or repeat
     if(source->num_out_neighbours == 1 && source->out->to->num_in_neighbours == 1) {
         NODE* dest = source->out->to;
@@ -111,44 +113,64 @@ int watermark_is_dijkstra(GRAPH* watermark) {
 
     // iterate through graph in inverse topological order
     PRIME_SUBGRAPH prime;
-    NODE* node = watermark->nodes[watermark->num_nodes-1];
-    while( node->graph_idx ) {
+    unsigned long num_nodes = watermark->num_nodes;
+    // iterate all nodes
+    for(unsigned long i = 0; i < num_nodes; i++) {
+
+        NODE* node = watermark->nodes[num_nodes-1-i];
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
+
             dijkstra_contract(node, prime.sink);
-            // repeat until no prime is found
+            // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 dijkstra_contract(node, prime.sink);
             }
         }
-        node = watermark->nodes[node->graph_idx-1];
     }
-    // one last time
-    if((prime = dijkstra_is_non_trivial_prime(node)).type != INVALID ) {
-        dijkstra_contract(node, prime.sink);
-    }
-
     uint8_t result = watermark->num_nodes == 1;
     graph_free(watermark);
 
     return result;
 }
 
-unsigned long* watermark_dijkstra_code(NODE* sink, unsigned long* size) {
+char* watermark_dijkstra_code(GRAPH* watermark) {
 
-    sink = (NODE*)size;
-    return (unsigned long*)sink;
+    // graphs already come in topologically sorted from
+    // the decoding and encoding processses
+
+    if(watermark->num_connections >= 2 * watermark->num_nodes - 1) return 0;
+
+    char* code = NULL;
+
+    // iterate through graph in inverse topological order
+    PRIME_SUBGRAPH prime;
+    unsigned long num_nodes = watermark->num_nodes;
+    // iterate all nodes
+    for(unsigned long i = 0; i < num_nodes; i++) {
+
+        NODE* node = watermark->nodes[num_nodes-1-i];
+        if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
+
+            dijkstra_contract(node, prime.sink);
+            // repeat until no prime is found in this node
+            while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
+                dijkstra_contract(node, prime.sink);
+            }
+        }
+    }
+    uint8_t result = watermark->num_nodes == 1;
+    graph_free(watermark);
+
+    return code;
 }
 
-int watermark_dijkstra_equal(NODE* a, NODE* b) {
+int watermark_dijkstra_equal(GRAPH* a, GRAPH* b) {
 
-    unsigned long a_size;
-    unsigned long* a_code = watermark_dijkstra_code(a, &a_size);
+    char* a_code = watermark_dijkstra_code(a);
+    char* b_code = watermark_dijkstra_code(b);
 
-    unsigned long b_size;
-    unsigned long* b_code = watermark_dijkstra_code(b, &b_size);
-
-    int res = ( a_size == b_size && !memcmp(a_code, b_code, b_size) );
+    uint8_t result = strlen(a_code) == strlen(b_code) && !strcmp(a_code, b_code);
     free(a_code);
     free(b_code);
-    return res;
+    return result;
 }

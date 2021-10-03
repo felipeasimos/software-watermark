@@ -5,8 +5,8 @@
 
 int watermark_is_dijkstra(GRAPH* watermark);
 
-unsigned long* watermark_dijkstra_code(NODE* sink, unsigned long* size);
+char* watermark_dijkstra_code(GRAPH* watermark);
 
-int watermark_dijkstra_equal(NODE*, NODE*);
+int watermark_dijkstra_equal(GRAPH*, GRAPH*);
 
 #endif

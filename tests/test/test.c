@@ -188,6 +188,27 @@ int dijkstra_recognition_test() {
     return 0;
 }
 
+int dijkstra_code_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        PRINT_K(k);
+        char* string = watermark_dijkstra_code(graph);
+        ctdd_assert(string);
+        free(string);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        char* string = watermark_dijkstra_code(graph);
+        ctdd_assert(string);
+        free(string);
+    }
+
+    return 0;
+}
+
 int run_tests() {
     ctdd_verify(graph_test);
     ctdd_verify(get_bit_test);
@@ -196,6 +217,7 @@ int run_tests() {
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(dijkstra_recognition_test);
+    ctdd_verify(dijkstra_code_test);
 	return 0;
 }
 
