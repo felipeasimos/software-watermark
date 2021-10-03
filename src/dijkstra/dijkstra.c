@@ -23,18 +23,15 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
 
     // sequence or repeat
     if(source->num_out_neighbours == 1 && source->out->to->num_in_neighbours == 1) {
-        printf("sequence or repeat\n");
         NODE* dest = source->out->to;
         // if destination has two out neighbours and one of them
         // is source
         if(dest->num_out_neighbours == 2 && graph_get_connection(dest, source)) {
 
-            printf("repeat\n");
             prime.type = REPEAT;
             prime.sink = dest->out->to == source ? dest->out->next->to : dest->out->to;
             return prime;
         } else if(!graph_get_connection(dest, source)){
-            printf("sequence\n");
             prime.type = SEQUENCE;
             prime.sink = dest;
             return prime;
@@ -43,26 +40,11 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
     } else if(source->num_out_neighbours == 2 &&
             source->graph_idx < source->out->to->graph_idx && source->graph_idx < source->out->next->to->graph_idx) {
 
-        printf("while or if\n");
         NODE* node1 = source->out->to;
         NODE* node2 = source->out->next->to;
 
-        // if this is a while, one of the destinations connects back to source
-        if(graph_get_connection(node1, source) || graph_get_connection(node2, source)) {
-
-            uint8_t node1_connects_back = !!graph_get_connection(node1, source);
-            NODE* connect_back_node = node1_connects_back ? node1 : node2;
-            NODE* other_node = node1_connects_back ? node2 : node1;
-            if( connect_back_node->num_in_neighbours == 1 && connect_back_node->num_out_neighbours == 1 &&
-                other_node->num_in_neighbours == 1) {
-
-                printf("while\n");
-                prime.type = WHILE;
-                prime.sink = other_node;
-                return prime;
-            }
         // if this is a if-then, one of the destinations connects back to the other one
-        } else if(graph_get_connection(node1, node2) || graph_get_connection(node2, node1)) {
+        if(graph_get_connection(node1, node2) || graph_get_connection(node2, node1)) {
 
             uint8_t node1_connects_to_node2 = !!graph_get_connection(node1, node2);
             NODE* middle_node = node1_connects_to_node2 ? node1 : node2;
@@ -71,9 +53,21 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             if( middle_node->num_in_neighbours == 1 && middle_node->num_out_neighbours == 1 &&
                 final_node->num_in_neighbours == 2) {
 
-                printf("if\n");
                 prime.type = IF;
                 prime.sink = final_node;
+                return prime;
+            }
+        } else if(graph_get_connection(node1, source) || graph_get_connection(node2, source)) {
+        // if this is a while, one of the destinations connects back to source
+
+            uint8_t node1_connects_back = !!graph_get_connection(node1, source);
+            NODE* connect_back_node = node1_connects_back ? node1 : node2;
+            NODE* other_node = node1_connects_back ? node2 : node1;
+            if( connect_back_node->num_in_neighbours == 1 && connect_back_node->num_out_neighbours == 1 &&
+                other_node->num_in_neighbours == 1) {
+
+                prime.type = WHILE;
+                prime.sink = other_node;
                 return prime;
             }
         // if else block
@@ -101,6 +95,11 @@ void dijkstra_contract(NODE* source, NODE* sink) {
 
     // delete sink
     graph_delete(sink);
+
+    // delete auto-references
+    while(graph_get_connection(source, source)) {
+        graph_oriented_disconnect(source, source);
+    }
 }
 
 int watermark_is_dijkstra(GRAPH* watermark) {
@@ -114,12 +113,12 @@ int watermark_is_dijkstra(GRAPH* watermark) {
     PRIME_SUBGRAPH prime;
     NODE* node = watermark->nodes[watermark->num_nodes-1];
     while( node->graph_idx ) {
-        printf("\n");
-        printf("node_idx: %lu\n", node->graph_idx);
-        graph_print(watermark, NULL);
-        printf("\n");
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
             dijkstra_contract(node, prime.sink);
+            // repeat until no prime is found
+            while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
+                dijkstra_contract(node, prime.sink);
+            }
         }
         node = watermark->nodes[node->graph_idx-1];
     }
