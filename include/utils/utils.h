@@ -12,6 +12,11 @@ typedef struct STACK {
     unsigned long n;
 } STACK;
 
+typedef struct QUEUE {
+    unsigned long* queue;
+    unsigned long n;
+} QUEUE;
+
 #include "graph/graph.h"
 
 // stack
@@ -22,6 +27,13 @@ void stack_pop_until(STACK*, unsigned long size);
 unsigned long stack_get(STACK*);
 void stack_free(STACK*);
 void stack_print(STACK*);
+
+// queue
+QUEUE* queue_create(unsigned long max_nodes);
+void queue_push(QUEUE*, unsigned long);
+unsigned long queue_pop(QUEUE*);
+unsigned long queue_get(QUEUE*);
+void queue_free(QUEUE*);
 
 // binary sequence
 uint8_t get_bit(uint8_t* data, unsigned long idx);

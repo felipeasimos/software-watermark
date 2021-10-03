@@ -103,11 +103,11 @@ CONNECTION* graph_get_backedge(NODE* node) {
     return NULL;
 }
 
-// return forward edge connection (that goes to a node with greater index)
-// if it exists
+// return forward edge connection (that goes to a node with greater index,
+// but not immediately after) if it exists
 CONNECTION* graph_get_forward(NODE* node) {
     for(CONNECTION* conn = node->out; conn; conn = conn->next)
-        if(conn->to->graph_idx > node->graph_idx) return conn;
+        if(conn->to->graph_idx > node->graph_idx+1) return conn;
     return NULL;
 }
 

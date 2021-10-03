@@ -31,6 +31,28 @@ void stack_print(STACK* stack) {
     printf("\n");
 }
 
+QUEUE* queue_create(unsigned long max_nodes) {
+    QUEUE* queue = malloc(sizeof(QUEUE));
+    queue->queue = calloc(max_nodes, sizeof(unsigned long));
+    queue->n = 0;
+    return queue;
+}
+void queue_push(QUEUE* queue, unsigned long node) {
+    queue->queue[queue->n++] = node;
+}
+unsigned long queue_pop(QUEUE* queue) {
+    unsigned long res = queue->queue[0];
+    memmove(&queue->queue[0], &queue->queue[1], --queue->n);
+    return res;
+}
+unsigned long queue_get(QUEUE* queue) {
+    return queue->queue[0];
+}
+void queue_free(QUEUE* queue) {
+    free(queue->queue);
+    free(queue);
+}
+
 uint8_t get_bit(uint8_t* data, unsigned long idx) {
 
     uint8_t byte_idx = 7-idx%8;

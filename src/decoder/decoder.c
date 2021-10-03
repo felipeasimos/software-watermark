@@ -11,8 +11,7 @@ void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
         if(graph->nodes[i]->num_out_neighbours == 2) {
 
             // get backedge
-            CONNECTION* conn = graph->nodes[i]->out->to->graph_idx < graph->nodes[i]->graph_idx ?
-                graph->nodes[i]->out : graph->nodes[i]->out->next;
+            CONNECTION* conn = graph_get_backedge(graph->nodes[i]);
             bits[i] = ( graph->nodes[i]->graph_idx - conn->to->graph_idx ) & 1;
         } else {
             bits[i] = 0;
@@ -28,6 +27,7 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
     uint8_t bits[n_bits];
     bits[0] = 1;
     unsigned long i = 1;
+
     for(unsigned long graph_idx = 1; graph_idx < n_bits; graph_idx++, i++) {
 
         // if it isn't a mute node
@@ -37,22 +37,17 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
             if( graph_idx < n_bits && graph_get_connection(graph->nodes[graph_idx], graph->nodes[graph_idx+2]) ) {
                 bits[i]=1;
             } else {
-                // if it has an odd backedge
                 CONNECTION* backedge = graph_get_backedge(graph->nodes[graph_idx]);
-                if( backedge && (( graph_idx - backedge->to->graph_idx ) & 1) ) {
-                    bits[i]=1;
-                // if it has an even backedge
-                } else {
-                    bits[i]=0;
-                }
+                bits[i] = backedge && (( graph_idx - backedge->to->graph_idx ) & 1);
             }
         } else {
             i--;
         }
     }
-    // get the index of the last bit, which must be subtracted, in case it 
-    // is a forward edge destination
-    n_bits = i-!!( graph->num_nodes > 4 && graph_get_connection(graph->nodes[n_bits-2], graph->nodes[n_bits]) );
+    // if the second last node is a forward edge destination, the
+    // third last node also needs to be ignored
+    uint8_t is_prev_last_forward_destination = !!( n_bits > 2 && graph_get_connection(graph->nodes[n_bits-2], graph->nodes[n_bits]) );
+    n_bits = i-is_prev_last_forward_destination;
     // bit sequence may be smaller than expected due to mute nodes
     void* data = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
     return data;
