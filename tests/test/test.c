@@ -193,7 +193,6 @@ int dijkstra_code_test() {
     for(uint8_t k = 1; k < 255; k++) {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
-        PRINT_K(k);
         char* string = watermark_dijkstra_code(graph);
         ctdd_assert(string);
         free(string);

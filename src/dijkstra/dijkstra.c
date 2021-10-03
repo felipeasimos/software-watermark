@@ -64,12 +64,13 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
 
             uint8_t node1_connects_back = !!graph_get_connection(node1, source);
             NODE* connect_back_node = node1_connects_back ? node1 : node2;
-            NODE* other_node = node1_connects_back ? node2 : node1;
+            NODE* final_node = node1_connects_back ? node2 : node1;
+
             if( connect_back_node->num_in_neighbours == 1 && connect_back_node->num_out_neighbours == 1 &&
-                other_node->num_in_neighbours == 1) {
+                final_node->num_in_neighbours == 1) {
 
                 prime.type = WHILE;
-                prime.sink = other_node;
+                prime.sink = final_node;
                 return prime;
             }
         // if else block
@@ -133,6 +134,80 @@ int watermark_is_dijkstra(GRAPH* watermark) {
     return result;
 }
 
+void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
+
+    char* new_code = NULL;
+    switch(prime.type) {
+
+        // add code from the only out-neighbour
+        case SEQUENCE: {
+            unsigned long new_len = node_get_data_len(source) + node_get_data_len(source->out->to);
+            new_code = malloc(new_len);
+            sprintf(new_code, "%s2%s", (char*)node_get_data(source), (char*)node_get_data(source->out->to));
+            node_set_data(source, new_code, new_len);
+            break;
+        }
+        // add code from if block and final node
+        case IF: {
+            uint8_t node1_connects_to_node2 = !!graph_get_connection(source->out->to, source->out->next->to);
+            NODE* middle_node = node1_connects_to_node2 ? source->out->to : source->out->next->to;
+            NODE* final_node = node1_connects_to_node2 ? source->out->next->to : source->out->to;
+
+            unsigned long new_len = node_get_data_len(source) + node_get_data_len(middle_node) + node_get_data_len(final_node);
+            new_code = malloc(new_len);
+            sprintf(new_code, "%s3%s%s", (char*)source->data, (char*)middle_node->data, (char*)final_node->data);
+            node_set_data(source, new_code, new_len);
+            break;
+        }
+        // add code from while block and final node
+        case WHILE: {
+            uint8_t node1_connects_back = !!graph_get_connection(source->out->to, source);
+            NODE* connect_back_node = node1_connects_back ? source->out->to : source->out->next->to;
+            NODE* final_node = node1_connects_back ? source->out->next->to : source->out->to;
+
+            unsigned long new_len = node_get_data_len(source) + node_get_data_len(connect_back_node) + node_get_data_len(final_node);
+            new_code = malloc(new_len);
+            sprintf(new_code, "%s4%s%s", (char*)node_get_data(source),
+                                        (char*)node_get_data(connect_back_node),
+                                        (char*)node_get_data(final_node));
+            node_set_data(source, new_code, new_len);
+            break;
+        }
+        case REPEAT: {
+            NODE* middle_node = source->out->to;
+            NODE* final_node = middle_node->out->to != source ? middle_node->out->to : middle_node->out->next->to;
+
+            unsigned long new_len = node_get_data_len(source) + node_get_data_len(middle_node) + node_get_data_len(final_node);
+            new_code = malloc(new_len);
+            sprintf(new_code, "%s4%s%s", (char*)node_get_data(source),
+                                        (char*)node_get_data(middle_node),
+                                        (char*)node_get_data(final_node));
+            node_set_data(source, new_code, new_len);
+            break;
+        }
+        case IF_ELSE:
+        case P_CASE: {
+            unsigned long id_num = source->num_out_neighbours + 4;
+            NODE* final_node = source->out->to->out->to;
+            GRAPH* graph = source->graph;
+            unsigned long new_len=node_get_data_len(source);
+            for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
+                new_len += node_get_data_len(node); 
+            }
+            new_code = malloc(new_len);
+            sprintf(new_code, "%s%lu", (char*)node_get_data(source), id_num);
+            for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
+                strcat(new_code, (char*)node_get_data(node));
+            }
+            node_set_data(source, new_code, new_len);
+            break;
+        }
+        case INVALID: {
+        }
+    }
+    free(new_code);
+}
+
 char* watermark_dijkstra_code(GRAPH* watermark) {
 
     // graphs already come in topologically sorted from
@@ -140,7 +215,11 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
 
     if(watermark->num_connections >= 2 * watermark->num_nodes - 1) return 0;
 
-    char* code = NULL;
+    // set code of every node to 1
+    char str[2] = "1";
+    for(unsigned long i=0; i < watermark->num_nodes; i++) {
+        node_set_data(watermark->nodes[i], str, sizeof(str)); 
+    }
 
     // iterate through graph in inverse topological order
     PRIME_SUBGRAPH prime;
@@ -151,6 +230,7 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
         NODE* node = watermark->nodes[num_nodes-1-i];
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
 
+            dijkstra_update_code(node, prime);
             dijkstra_contract(node, prime.sink);
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
@@ -158,7 +238,9 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
             }
         }
     }
-    uint8_t result = watermark->num_nodes == 1;
+    NODE* source = watermark->nodes[0];
+    char* code = malloc(node_get_data_len(source));
+    strncpy(code, node_get_data(source), node_get_data_len(source));
     graph_free(watermark);
 
     return code;
