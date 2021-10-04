@@ -33,10 +33,16 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             prime.type = REPEAT;
             prime.sink = dest->out->to == source ? dest->out->next->to : dest->out->to;
             return prime;
+        // sequence if this doesn't create a cycle where this node has backedge to a 
+        // node that has a forward edge to it (which is different from a sequence edge)
         } else if(!graph_get_connection(dest, source)){
-            prime.type = SEQUENCE;
-            prime.sink = dest;
-            return prime;
+            CONNECTION* backedge_conn = graph_get_backedge(dest);
+            if( !( backedge_conn && graph_get_connection(backedge_conn->to, source) ) ) {
+
+                prime.type = SEQUENCE;
+                prime.sink = dest;
+                return prime;
+            }
         }
     // while or if
     } else if(source->num_out_neighbours == 2 &&
@@ -179,7 +185,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
 
             unsigned long new_len = node_get_data_len(source) + node_get_data_len(middle_node) + node_get_data_len(final_node);
             new_code = malloc(new_len);
-            sprintf(new_code, "%s4%s%s", (char*)node_get_data(source),
+            sprintf(new_code, "%s5%s%s", (char*)node_get_data(source),
                                         (char*)node_get_data(middle_node),
                                         (char*)node_get_data(final_node));
             node_set_data(source, new_code, new_len);
@@ -234,6 +240,7 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
             dijkstra_contract(node, prime.sink);
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
+                dijkstra_update_code(node, prime);
                 dijkstra_contract(node, prime.sink);
             }
         }
