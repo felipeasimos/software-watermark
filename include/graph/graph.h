@@ -30,6 +30,12 @@ void graph_print(GRAPH* graph, void (*print_func)(FILE*, NODE*));
 // add node to graph
 void graph_add(GRAPH* graph);
 
+// insert node at index
+void graph_insert(GRAPH* graph, unsigned long idx);
+
+// swap the index of two nodes
+void graph_swap(NODE*, NODE*);
+
 // remove all connections that this node is a part of
 void graph_isolate(NODE* node);
 
@@ -69,8 +75,9 @@ void graph_free_info(GRAPH*);
 // free all info from all nodes
 void graph_free_all_info(GRAPH*);
 
-// generate png image with the graph
-// uses 'system' syscall
+// label can be NULL
+void graph_write_hamiltonian_dot(GRAPH*, const char* filename, const char* label);
+
 // label can be NULL
 void graph_write_dot(GRAPH*, const char* filename, const char* label);
 

@@ -238,3 +238,84 @@ unsigned long node_get_info_len(NODE* node) {
     while(num_info--) data = ((INFO_NODE*)data)->data;
     return ((INFO_NODE*)data)->info_len;
 }
+
+void node_transfer_out_connections(NODE* from, NODE* to) {
+
+    // copy all out connections
+    for(CONNECTION* conn = from->out; conn; conn = conn->next) graph_oriented_connect(to, conn->to);
+    // remove all out connections
+    while(from->out) graph_oriented_disconnect(from, from->out->to);
+}
+
+void node_transfer_in_connections(NODE* from, NODE* to) {
+
+    // copy all in connections
+    for(CONNECTION* conn = from->in; conn; conn = conn->next) graph_oriented_connect(conn->to, to);
+    // remove all out connections
+    while(from->in) graph_oriented_disconnect(from->in->from, from);
+}
+
+void node_expand_to_sequence(NODE* node) {
+
+    GRAPH* graph = node->graph;
+    graph_insert(graph, node->graph_idx+1);
+    node_transfer_out_connections(node, graph->nodes[node->graph_idx+1]);
+    graph_oriented_connect(node, graph->nodes[node->graph_idx+1]);
+}
+void node_expand_to_repeat(NODE* node) {
+
+    GRAPH* graph = node->graph;
+    graph_insert(graph, node->graph_idx+1);
+    graph_insert(graph, node->graph_idx+2);
+    NODE* middle_node = graph->nodes[node->graph_idx+1];
+    NODE* sink_node = graph->nodes[node->graph_idx+2];
+    node_transfer_out_connections(node, sink_node);
+    graph_oriented_connect(node, middle_node);
+    graph_oriented_connect(middle_node, node);
+    graph_oriented_connect(middle_node, sink_node);
+}
+void node_expand_to_while(NODE* node) {
+
+    GRAPH* graph = node->graph;
+    graph_insert(graph, node->graph_idx+1);
+    graph_insert(graph, node->graph_idx+2);
+    NODE* connect_back_node = graph->nodes[node->graph_idx+1];
+    NODE* sink_node = graph->nodes[node->graph_idx+2];
+    node_transfer_out_connections(node, sink_node);
+    graph_oriented_connect(node, connect_back_node);
+    graph_oriented_connect(connect_back_node, node);
+    graph_oriented_connect(node, sink_node);
+}
+void node_expand_to_if_then(NODE* node) {
+
+    GRAPH* graph = node->graph;
+    graph_insert(graph, node->graph_idx+1);
+    graph_insert(graph, node->graph_idx+2);
+    NODE* middle_node = graph->nodes[node->graph_idx+1];
+    NODE* sink_node = graph->nodes[node->graph_idx+2];
+    node_transfer_out_connections(node, sink_node);
+    graph_oriented_connect(node, middle_node);
+    graph_oriented_connect(node, sink_node);
+    graph_oriented_connect(middle_node, sink_node);
+}
+void node_expand_to_if_then_else(NODE* node) {
+
+    node_expand_to_p_case(node, 2);
+}
+void node_expand_to_p_case(NODE* node, unsigned long p) {
+
+    GRAPH* graph = node->graph;
+
+    // insert new nodes in the graph
+    p++;
+    for(unsigned long i = 0; i < p; i++) graph_insert(graph, node->graph_idx+i+1);
+    NODE* sink_node = graph->nodes[node->graph_idx+p];
+    node_transfer_out_connections(node, sink_node);
+    p--;
+    // connect to all nodes, and connect all nodes to sink_node
+    for(unsigned long i = 0; i < p; i++) {
+        NODE* middle_node = graph->nodes[node->graph_idx+i+1];
+        graph_oriented_connect(node, middle_node);
+        graph_oriented_connect(middle_node, sink_node);
+    }
+}

@@ -47,6 +47,30 @@ void graph_add(GRAPH* graph) {
     graph->nodes[graph->num_nodes-1] = node_empty(graph, graph->num_nodes-1);
 }
 
+// insert node at index
+void graph_insert(GRAPH* graph, unsigned long idx) {
+
+    if(idx > graph->num_nodes) return;
+    graph->nodes = realloc(graph->nodes, sizeof(NODE*) * ++graph->num_nodes);
+    unsigned long top = graph->num_nodes - idx - 1;
+    for(unsigned long i = 0; i < top; i++) {
+        unsigned long current_node_idx = graph->num_nodes - i - 1;
+        graph->nodes[current_node_idx] = graph->nodes[current_node_idx-1];
+        graph->nodes[current_node_idx]->graph_idx++;
+    }
+    graph->nodes[idx] = node_empty(graph, idx);
+}
+
+// swap the index of two nodes
+void graph_swap(NODE* a, NODE* b) {
+
+    unsigned long tmp = a->graph_idx;
+    a->graph_idx = b->graph_idx;
+    b->graph_idx = tmp;
+    a->graph->nodes[a->graph_idx] = a;
+    b->graph->nodes[b->graph_idx] = b;
+}
+
 // remove all connections that this node is a part of
 void graph_isolate(NODE* node) {
 
@@ -150,7 +174,7 @@ void graph_topological_sort(GRAPH* graph) {
             ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next = conn->next;
         }
         if(!has_unmarked_connection) {
-            ordered_nodes[t++] = graph->nodes[stack_pop(stack)];
+            ordered_nodes[graph->num_nodes - t++ - 1] = graph->nodes[stack_pop(stack)];
         }
     }
     graph_free_info(graph);
@@ -185,9 +209,8 @@ void graph_print_node_idx(FILE* f, NODE* node) {
     fprintf(f, "%lu", node->graph_idx);
 }
 
-// generate png image with the graph
-// uses 'system' syscall
-void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
+// label can be NULL
+void graph_write_hamiltonian_dot(GRAPH* graph, const char* filename, const char* label) {
 
     FILE* file = NULL;
     if(( file = fopen(filename, "w") )) {
@@ -223,6 +246,33 @@ void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
                 }
                 fprintf(file, ";\n");
             }
+        }
+        fprintf(file, "}");
+        fclose(file);
+    }
+}
+
+// label can be NULL
+void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
+
+    FILE* file = NULL;
+    if(( file = fopen(filename, "w") )) {
+
+        fprintf(file, "digraph G {\n");
+        if(label) fprintf(file, "\tgraph [ label=\"%s\" ]", label);
+        for(unsigned long i = 0; i < graph->num_nodes; i++) {
+
+            for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
+
+                fprintf(file, "\t");
+                node_write(graph->nodes[i], file, graph_print_node_idx);
+                fprintf(file, " -> ");
+                node_write(conn->to, file, graph_print_node_idx);
+                // if this a backedge
+                if(conn->to->graph_idx < i) fprintf(file, "[style=dashed, color=\"#FF263C\"]");
+                fprintf(file, ";\n");
+            }
+            if(!graph->nodes[i]->out) node_write(graph->nodes[i], file, graph_print_node_idx);
         }
         fprintf(file, "}");
         fclose(file);

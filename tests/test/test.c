@@ -7,7 +7,7 @@
 #define PRINT_K(k)\
         char str[100];\
         sprintf(str, "%hhu", k);\
-        graph_write_dot(graph, "dot.dot", str);
+        graph_write_hamiltonian_dot(graph, "dot.dot", str);
 
 int graph_test() {
 
@@ -17,6 +17,14 @@ int graph_test() {
     graph_add(graph);
     ctdd_assert(graph->num_nodes == 9);
     graph_delete(graph->nodes[3]);
+    ctdd_assert(graph->num_nodes == 8);
+    graph_insert(graph, 2);
+    ctdd_assert(graph->num_nodes == 9);
+    graph_delete(graph->nodes[4]);
+    ctdd_assert(graph->num_nodes == 8);
+    graph_insert(graph, 8);
+    ctdd_assert(graph->num_nodes == 9);
+    graph_delete(graph->nodes[0]);
     ctdd_assert(graph->num_nodes == 8);
 
     // make a hamiltonian path
@@ -176,45 +184,63 @@ int dijkstra_recognition_test() {
     for(uint8_t k = 1; k < 255; k++) {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
-        PRINT_K(k);
-        ctdd_assert(watermark_is_dijkstra(graph));
+        uint8_t result = watermark_is_dijkstra(graph_copy(graph));
+        if(!result) {
+            PRINT_K(k);
+        }
+        graph_free(graph);
+        ctdd_assert(result);
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         ctdd_assert(watermark_is_dijkstra(graph));
     }
-
     return 0;
 }
 
 int dijkstra_code_test() {
 
-    for(uint8_t k = 1; k < 255; k++) {
-
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
-        if(k==29) {
-            PRINT_K(k);
-        }
-        char* string = watermark_dijkstra_code(graph);
-        if(k==29) {
-            printf("%s\n", string);
-        }
-        ctdd_assert(string);
-        free(string);
-    }
-    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
-
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
-        char* string = watermark_dijkstra_code(graph);
-        ctdd_assert(string);
-        free(string);
-    }
-
+    // bento 2017 - Fig. 8
+    GRAPH* graph = graph_create(1);
+    node_expand_to_if_then_else(graph->nodes[0]);
+    node_expand_to_if_then(graph->nodes[2]);
+    node_expand_to_sequence(graph->nodes[3]);
+    node_expand_to_while(graph->nodes[1]);
+    node_expand_to_sequence(graph->nodes[2]);
+    node_expand_to_if_then_else(graph->nodes[3]);
+    node_expand_to_sequence(graph->nodes[12]);
+    graph_topological_sort(graph);
+    char* code = watermark_dijkstra_code(graph);
+    ctdd_assert( !strcmp(code, "161312111412161111121") );
+    free(code);
+    // 29
+    uint8_t k = 29;
+    graph = watermark_encode(&k, sizeof(k));
+    code = watermark_dijkstra_code(graph);
+    ctdd_assert( !strcmp(code, "151131151121") );
+    free(code);
+    // 28
+    k = 28;
+    graph = watermark_encode(&k, sizeof(k));
+    code = watermark_dijkstra_code(graph);
+    ctdd_assert( !strcmp(code, "1511311212121") );
+    free(code);
+    // bento 2017 - Fig 5
+    graph = graph_create(1);
+    node_expand_to_if_then_else(graph->nodes[0]);
+    node_expand_to_while(graph->nodes[1]);
+    node_expand_to_if_then(graph->nodes[4]);
+    node_expand_to_sequence(graph->nodes[7]);
+    code = watermark_dijkstra_code(graph);
+    ctdd_assert( !strcmp(code, "1614111311121") );
+    free(code);
+    
     return 0;
 }
 
 int run_tests() {
+
     ctdd_verify(graph_test);
     ctdd_verify(get_bit_test);
     ctdd_verify(watermark2014_test);

@@ -1,13 +1,14 @@
 #include "dijkstra/dijkstra.h"
 
 typedef enum {
+    INVALID,
+    TRIVIAL,
     SEQUENCE,
-    REPEAT,
     IF,
     WHILE,
+    REPEAT,
     IF_ELSE,
     P_CASE,
-    INVALID
 } STATEMENT_GRAPH;
 
 typedef struct PRIME_SUBGRAPH {
@@ -33,16 +34,12 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             prime.type = REPEAT;
             prime.sink = dest->out->to == source ? dest->out->next->to : dest->out->to;
             return prime;
-        // sequence if this doesn't create a cycle where this node has backedge to a 
-        // node that has a forward edge to it (which is different from a sequence edge)
-        } else if(!graph_get_connection(dest, source)){
-            CONNECTION* backedge_conn = graph_get_backedge(dest);
-            if( !( backedge_conn && graph_get_connection(backedge_conn->to, source) ) ) {
+        // this is a sequence if it isn't part of an while or a repeat
+        } else if(!graph_get_connection(dest, source) && source->num_in_neighbours <= 1){
 
-                prime.type = SEQUENCE;
-                prime.sink = dest;
-                return prime;
-            }
+            prime.type = SEQUENCE;
+            prime.sink = dest;
+            return prime;
         }
     // while, if or p-case
     } else if(source->num_out_neighbours > 1 &&
@@ -82,7 +79,8 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
         // if-then-else and p-case (switch)
         } else {
 
-            NODE* sink = NULL;
+            prime.type = source->num_out_neighbours == 2 ? IF_ELSE : P_CASE;
+            prime.sink = NULL;
             for(CONNECTION* conn = source->out; conn; conn = conn->next) {
 
                 NODE* node = conn->to;
@@ -90,14 +88,16 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
                     prime.type = INVALID;
                     prime.sink = NULL;
                     return prime;
-                } else if(!sink){
-                    sink = node->out->to;
-                } else if(sink != node->out->to) {
+                } else if(!prime.sink){
+                    prime.sink = node->out->to;
+                } else if(prime.sink != node->out->to) {
                     prime.type = INVALID;
                     prime.sink = NULL;
                     return prime;
                 }
             }
+
+            return prime;
         }
     }
 
@@ -106,11 +106,29 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
     return prime;
 }
 
-void dijkstra_contract(NODE* source, NODE* sink) {
+void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
 
-    // delete all nodes between source and sin
-    while(source->graph_idx+1 != sink->graph_idx) {
-        graph_delete(source->graph->nodes[source->graph_idx+1]);
+    // delete all nodes from the statement subgraph that aren't the
+    // source or the sink
+    switch(type) {
+        case REPEAT: {
+            graph_delete(source->out->to);
+            break;
+        }
+        case IF:
+        case WHILE: {
+            graph_delete(source->out->to != sink ? source->out->to : source->out->next->to);
+            break;
+        }
+        case IF_ELSE:
+        case P_CASE: {
+            while(source->out) graph_delete(source->out->to);
+            break;
+        }
+        case INVALID:
+        case SEQUENCE:
+        case TRIVIAL:
+            break;
     }
 
     // move all outer neighbours from sink to source
@@ -141,18 +159,16 @@ int watermark_is_dijkstra(GRAPH* watermark) {
     unsigned long num_nodes = watermark->num_nodes;
     // iterate all nodes
     for(unsigned long i = 0; i < num_nodes; i++) {
-
         NODE* node = watermark->nodes[num_nodes-1-i];
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
-
-            dijkstra_contract(node, prime.sink);
+            dijkstra_contract(node, prime.sink, prime.type);
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
-                dijkstra_contract(node, prime.sink);
+                dijkstra_contract(node, prime.sink, prime.type);
             }
         }
     }
-    uint8_t result = watermark->num_nodes == 1;
+    uint8_t result = watermark->num_nodes == 1 && !watermark->nodes[0]->num_out_neighbours;
     graph_free(watermark);
 
     return result;
@@ -214,7 +230,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             unsigned long id_num = source->num_out_neighbours + 4;
             NODE* final_node = source->out->to->out->to;
             GRAPH* graph = source->graph;
-            unsigned long new_len=node_get_data_len(source);
+            unsigned long new_len=node_get_data_len(source) + node_get_data_len(final_node);
             for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
                 new_len += node_get_data_len(node); 
             }
@@ -223,11 +239,13 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
                 strcat(new_code, (char*)node_get_data(node));
             }
+            strcat(new_code, (char*)node_get_data(final_node));
             node_set_data(source, new_code, new_len);
             break;
         }
-        case INVALID: {
-        }
+        case INVALID:
+        case TRIVIAL:
+            break;
     }
     free(new_code);
 }
@@ -255,11 +273,12 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
 
             dijkstra_update_code(node, prime);
-            dijkstra_contract(node, prime.sink);
+            dijkstra_contract(node, prime.sink, prime.type);
+
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 dijkstra_update_code(node, prime);
-                dijkstra_contract(node, prime.sink);
+                dijkstra_contract(node, prime.sink, prime.type);
             }
         }
     }

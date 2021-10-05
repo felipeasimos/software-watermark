@@ -41,12 +41,13 @@ void queue_push(QUEUE* queue, unsigned long node) {
     queue->queue[queue->n++] = node;
 }
 unsigned long queue_pop(QUEUE* queue) {
+    if(!queue->n) return ULONG_MAX;
     unsigned long res = queue->queue[0];
     memmove(&queue->queue[0], &queue->queue[1], --queue->n);
     return res;
 }
 unsigned long queue_get(QUEUE* queue) {
-    return queue->queue[0];
+    return queue->n ? queue->queue[0] : ULONG_MAX;
 }
 void queue_free(QUEUE* queue) {
     free(queue->queue);
