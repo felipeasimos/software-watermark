@@ -44,9 +44,9 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
                 return prime;
             }
         }
-    // while or if
-    } else if(source->num_out_neighbours == 2 &&
-            source->graph_idx < source->out->to->graph_idx && source->graph_idx < source->out->next->to->graph_idx) {
+    // while, if or p-case
+    } else if(source->num_out_neighbours > 1 &&
+        source->graph_idx < source->out->to->graph_idx && source->graph_idx < source->out->next->to->graph_idx) {
 
         NODE* node1 = source->out->to;
         NODE* node2 = source->out->next->to;
@@ -65,8 +65,8 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
                 prime.sink = final_node;
                 return prime;
             }
-        } else if(graph_get_connection(node1, source) || graph_get_connection(node2, source)) {
         // if this is a while, one of the destinations connects back to source
+        } else if(graph_get_connection(node1, source) || graph_get_connection(node2, source)) {
 
             uint8_t node1_connects_back = !!graph_get_connection(node1, source);
             NODE* connect_back_node = node1_connects_back ? node1 : node2;
@@ -79,7 +79,25 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
                 prime.sink = final_node;
                 return prime;
             }
-        // if else block
+        // if-then-else and p-case (switch)
+        } else {
+
+            NODE* sink = NULL;
+            for(CONNECTION* conn = source->out; conn; conn = conn->next) {
+
+                NODE* node = conn->to;
+                if( node->num_out_neighbours != 1 || node->num_in_neighbours != 1 ) {
+                    prime.type = INVALID;
+                    prime.sink = NULL;
+                    return prime;
+                } else if(!sink){
+                    sink = node->out->to;
+                } else if(sink != node->out->to) {
+                    prime.type = INVALID;
+                    prime.sink = NULL;
+                    return prime;
+                }
+            }
         }
     }
 
