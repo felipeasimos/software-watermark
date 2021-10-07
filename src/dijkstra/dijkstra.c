@@ -106,18 +106,21 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
     // source or the sink
     switch(type) {
         case REPEAT: {
+            node_free_info(source->out->to);
             graph_delete(source->out->to);
             break;
         }
         case IF_THEN:
         case WHILE: {
             NODE* node_to_delete = source->out->to != sink ? source->out->to : source->out->next->to;
+            node_free_info(node_to_delete);
             graph_delete(node_to_delete);
             break;
         }
         case IF_THEN_ELSE:
         case P_CASE: {
             while(source->out) {
+                node_free_info(source->out->to);
                 graph_delete(source->out->to);
             }
             break;
@@ -136,6 +139,7 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
     }
 
     // delete sink
+    node_free_info(sink);
     graph_delete(sink);
 
     // delete auto-references

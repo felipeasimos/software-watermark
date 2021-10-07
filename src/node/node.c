@@ -128,7 +128,7 @@ void node_connect(NODE* node1, NODE* node2){
 void node_free(NODE* node){
 
     if(!node) return;
-    node_free_all_info(node);
+    node_unload_all_info(node);
     graph_isolate(node);
     free(node->data);
     free(node);
