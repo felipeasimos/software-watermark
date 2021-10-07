@@ -24,10 +24,12 @@ typedef struct PRIME_SUBGRAPH {
 
 #include "graph/graph.h"
 
-int watermark_is_dijkstra(GRAPH* watermark);
+int dijkstra_check(GRAPH* graph);
 
-char* watermark_get_dijkstra_code(GRAPH* watermark);
+char* dijkstra_get_code(GRAPH* watermark);
 
-int watermark_dijkstra_equal(GRAPH*, GRAPH*);
+int dijkstra_is_equal(GRAPH*, GRAPH*);
+
+GRAPH* dijkstra_generate(char* code);
 
 #endif

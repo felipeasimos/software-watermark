@@ -141,19 +141,19 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
     }
 }
 
-int watermark_is_dijkstra(GRAPH* watermark) {
+int dijkstra_check(GRAPH* graph) {
 
     // graphs already come in topologically sorted from
     // the decoding and encoding processses
 
-    if(watermark->num_connections >= 2 * watermark->num_nodes - 1) return 0;
+    if(graph->num_connections >= 2 * graph->num_nodes - 1) return 0;
 
     // iterate through graph in inverse topological order
     PRIME_SUBGRAPH prime;
-    unsigned long num_nodes = watermark->num_nodes;
+    unsigned long num_nodes = graph->num_nodes;
     // iterate all nodes
     for(unsigned long i = 0; i < num_nodes; i++) {
-        NODE* node = watermark->nodes[num_nodes-1-i];
+        NODE* node = graph->nodes[num_nodes-1-i];
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
             dijkstra_contract(node, prime.sink, prime.type);
             // repeat until no prime is found in this node
@@ -162,8 +162,8 @@ int watermark_is_dijkstra(GRAPH* watermark) {
             }
         }
     }
-    uint8_t result = watermark->num_nodes == 1 && !watermark->nodes[0]->num_out_neighbours;
-    graph_free(watermark);
+    uint8_t result = graph->num_nodes == 1 && !graph->nodes[0]->num_out_neighbours;
+    graph_free(graph);
 
     return result;
 }
@@ -244,26 +244,26 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
     free(new_code);
 }
 
-char* watermark_get_dijkstra_code(GRAPH* watermark) {
+char* dijkstra_get_code(GRAPH* graph) {
 
     // graphs already come in topologically sorted from
     // the decoding and encoding processses
 
-    if(watermark->num_connections >= 2 * watermark->num_nodes - 1) return 0;
+    if(graph->num_connections >= 2 * graph->num_nodes - 1) return 0;
 
     // set code of every node to 1
     char str[2] = "1";
-    for(unsigned long i=0; i < watermark->num_nodes; i++) {
-        node_set_data(watermark->nodes[i], str, sizeof(str)); 
+    for(unsigned long i=0; i < graph->num_nodes; i++) {
+        node_set_data(graph->nodes[i], str, sizeof(str)); 
     }
 
     // iterate through graph in inverse topological order
     PRIME_SUBGRAPH prime;
-    unsigned long num_nodes = watermark->num_nodes;
+    unsigned long num_nodes = graph->num_nodes;
     // iterate all nodes
     for(unsigned long i = 0; i < num_nodes; i++) {
 
-        NODE* node = watermark->nodes[num_nodes-1-i];
+        NODE* node = graph->nodes[num_nodes-1-i];
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
 
             dijkstra_update_code(node, prime);
@@ -276,21 +276,89 @@ char* watermark_get_dijkstra_code(GRAPH* watermark) {
             }
         }
     }
-    NODE* source = watermark->nodes[0];
+    NODE* source = graph->nodes[0];
     char* code = malloc(node_get_data_len(source));
     strncpy(code, node_get_data(source), node_get_data_len(source));
-    graph_free(watermark);
+    graph_free(graph);
 
     return code;
 }
 
-int watermark_dijkstra_equal(GRAPH* a, GRAPH* b) {
+int dijkstra_is_equal(GRAPH* a, GRAPH* b) {
 
-    char* a_code = watermark_get_dijkstra_code(a);
-    char* b_code = watermark_get_dijkstra_code(b);
+    char* a_code = dijkstra_get_code(a);
+    char* b_code = dijkstra_get_code(b);
 
     uint8_t result = strlen(a_code) == strlen(b_code) && !strcmp(a_code, b_code);
     free(a_code);
     free(b_code);
     return result;
+}
+
+// return updated dijkstra_code pointer, from where the next node should be read from
+char* dijkstra_generate_recursive(char* dijkstra_code, NODE* source) {
+
+    // if first character isn't a '1', there is an error, since this function should
+    // be called for every node, and every node code should begin and end with an '1'
+    if(!dijkstra_code || dijkstra_code[0] != '1') return NULL;
+
+    // check if this is just a trivial node at the end of the string
+    if( dijkstra_code[1] == '\0' ) return ++dijkstra_code;
+
+    // if this isn't a trivial node, get the type from the second character
+    STATEMENT_GRAPH type = dijkstra_code[1] - '0';
+
+    if( type >= P_CASE || type == IF_THEN_ELSE ) {
+        unsigned long p = type - 4;
+        node_expand_to_p_case(source, p);
+        NODE* next_p_node = source->graph->nodes[source->graph_idx+2];
+        NODE* current_node = source->graph->nodes[source->graph_idx+1];
+        for(unsigned long i = 0; i < p; i++) {
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, next_p_node);
+            current_node = next_p_node;
+            next_p_node = next_p_node->graph->nodes[next_p_node->graph_idx+1];
+        }
+        return dijkstra_generate_recursive(dijkstra_code+2, next_p_node);
+    }
+    switch(type) {
+        case TRIVIAL:
+            return ++dijkstra_code;
+        case SEQUENCE:
+            return dijkstra_generate_recursive(dijkstra_code+2, node_expand_to_sequence(source));
+        case IF_THEN: {
+            NODE* sink_node = node_expand_to_if_then(source);
+            NODE* middle_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, middle_node);
+            return dijkstra_generate_recursive(dijkstra_code, sink_node);
+        }
+        case WHILE: {
+            NODE* sink_node = node_expand_to_while(source);
+            NODE* connect_back_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, connect_back_node);
+            return dijkstra_generate_recursive(dijkstra_code, sink_node);
+        }
+        case REPEAT: {
+            NODE* sink_node = node_expand_to_repeat(source);
+            NODE* middle_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, middle_node);
+            return dijkstra_generate_recursive(dijkstra_code, sink_node);
+        }
+        case IF_THEN_ELSE:
+        case P_CASE:
+        case INVALID:
+        default:
+            return NULL;
+    }
+}
+
+// generate graph from dijkstra code
+GRAPH* dijkstra_generate(char* dijkstra_code) {
+
+    GRAPH* graph = graph_create(1);
+    if(!dijkstra_generate_recursive(dijkstra_code, graph->nodes[0])) {
+        graph_free(graph);
+        return NULL;
+    }
+
+    return graph;
 }

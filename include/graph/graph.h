@@ -91,7 +91,4 @@ void* graph_serialize(GRAPH*, unsigned long* num_bytes);
 // deserialize the graph
 GRAPH* graph_deserialize(uint8_t*);
 
-// generate graph from dijkstra code
-GRAPH* graph_create_from_dijkstra_code(char* dijkstra_code);
-
 #endif
