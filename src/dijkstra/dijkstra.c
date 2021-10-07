@@ -1,26 +1,8 @@
 #include "dijkstra/dijkstra.h"
 
-typedef enum {
-    INVALID,
-    TRIVIAL,
-    SEQUENCE,
-    IF,
-    WHILE,
-    REPEAT,
-    IF_ELSE,
-    P_CASE,
-} STATEMENT_GRAPH;
-
-typedef struct PRIME_SUBGRAPH {
-
-    NODE* source;
-    NODE* sink;
-    STATEMENT_GRAPH type;
-} PRIME_SUBGRAPH;
-
 PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
 
-    PRIME_SUBGRAPH prime = { .source = NULL, .sink = NULL, .type = INVALID};
+    PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
 
     if(!source->num_out_neighbours) return prime;
 
@@ -34,8 +16,20 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             prime.type = REPEAT;
             prime.sink = dest->out->to == source ? dest->out->next->to : dest->out->to;
             return prime;
-        // this is a sequence if it isn't part of an while or a repeat
-        } else if(!graph_get_connection(dest, source) && source->num_in_neighbours <= 1){
+        // this is a sequence if it isn't part of an while, a repeat or a if-then
+        // make sure no cycle is created, where dest connects back to the node previous from the source
+        } else if(!graph_get_connection(dest, source) && source->num_in_neighbours <= 1 ){
+
+            // make sure it is not the sink of a while, by searching for a backedge in the node
+            // it comes from
+            if(source->num_in_neighbours) {
+
+                for(CONNECTION* conn = source->in->from->in; conn; conn = conn->next) {
+                    if(conn->from->graph_idx > source->in->from->graph_idx && conn->from != dest) {
+                        return prime;
+                    }
+                }
+            }
 
             prime.type = SEQUENCE;
             prime.sink = dest;
@@ -58,7 +52,7 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             if( middle_node->num_in_neighbours == 1 && middle_node->num_out_neighbours == 1 &&
                 final_node->num_in_neighbours == 2) {
 
-                prime.type = IF;
+                prime.type = IF_THEN;
                 prime.sink = final_node;
                 return prime;
             }
@@ -79,7 +73,7 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
         // if-then-else and p-case (switch)
         } else {
 
-            prime.type = source->num_out_neighbours == 2 ? IF_ELSE : P_CASE;
+            prime.type = source->num_out_neighbours == 2 ? IF_THEN_ELSE : P_CASE;
             prime.sink = NULL;
             for(CONNECTION* conn = source->out; conn; conn = conn->next) {
 
@@ -115,12 +109,12 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
             graph_delete(source->out->to);
             break;
         }
-        case IF:
+        case IF_THEN:
         case WHILE: {
             graph_delete(source->out->to != sink ? source->out->to : source->out->next->to);
             break;
         }
-        case IF_ELSE:
+        case IF_THEN_ELSE:
         case P_CASE: {
             while(source->out) graph_delete(source->out->to);
             break;
@@ -188,7 +182,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             break;
         }
         // add code from if block and final node
-        case IF: {
+        case IF_THEN: {
             uint8_t node1_connects_to_node2 = !!graph_get_connection(source->out->to, source->out->next->to);
             NODE* middle_node = node1_connects_to_node2 ? source->out->to : source->out->next->to;
             NODE* final_node = node1_connects_to_node2 ? source->out->next->to : source->out->to;
@@ -225,7 +219,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             node_set_data(source, new_code, new_len);
             break;
         }
-        case IF_ELSE:
+        case IF_THEN_ELSE:
         case P_CASE: {
             unsigned long id_num = source->num_out_neighbours + 4;
             NODE* final_node = source->out->to->out->to;
@@ -250,7 +244,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
     free(new_code);
 }
 
-char* watermark_dijkstra_code(GRAPH* watermark) {
+char* watermark_get_dijkstra_code(GRAPH* watermark) {
 
     // graphs already come in topologically sorted from
     // the decoding and encoding processses
@@ -292,8 +286,8 @@ char* watermark_dijkstra_code(GRAPH* watermark) {
 
 int watermark_dijkstra_equal(GRAPH* a, GRAPH* b) {
 
-    char* a_code = watermark_dijkstra_code(a);
-    char* b_code = watermark_dijkstra_code(b);
+    char* a_code = watermark_get_dijkstra_code(a);
+    char* b_code = watermark_get_dijkstra_code(b);
 
     uint8_t result = strlen(a_code) == strlen(b_code) && !strcmp(a_code, b_code);
     free(a_code);

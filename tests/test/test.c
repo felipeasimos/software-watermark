@@ -211,19 +211,19 @@ int dijkstra_code_test() {
     node_expand_to_if_then_else(graph->nodes[3]);
     node_expand_to_sequence(graph->nodes[12]);
     graph_topological_sort(graph);
-    char* code = watermark_dijkstra_code(graph);
+    char* code = watermark_get_dijkstra_code(graph);
     ctdd_assert( !strcmp(code, "161312111412161111121") );
     free(code);
     // 29
     uint8_t k = 29;
     graph = watermark_encode(&k, sizeof(k));
-    code = watermark_dijkstra_code(graph);
+    code = watermark_get_dijkstra_code(graph);
     ctdd_assert( !strcmp(code, "151131151121") );
     free(code);
     // 28
     k = 28;
     graph = watermark_encode(&k, sizeof(k));
-    code = watermark_dijkstra_code(graph);
+    code = watermark_get_dijkstra_code(graph);
     ctdd_assert( !strcmp(code, "1511311212121") );
     free(code);
     // bento 2017 - Fig 5
@@ -232,10 +232,53 @@ int dijkstra_code_test() {
     node_expand_to_while(graph->nodes[1]);
     node_expand_to_if_then(graph->nodes[4]);
     node_expand_to_sequence(graph->nodes[7]);
-    code = watermark_dijkstra_code(graph);
+    code = watermark_get_dijkstra_code(graph);
     ctdd_assert( !strcmp(code, "1614111311121") );
     free(code);
-    
+
+    graph = graph_create_from_dijkstra_code("151131151121");
+    code = watermark_get_dijkstra_code(graph);
+    ctdd_assert(!strcmp(code, "151131151121"));
+    free(code);
+
+    return 0;
+}
+
+int dijkstra_watermark_code_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        char* code = watermark_get_dijkstra_code(graph);
+        graph = graph_create_from_dijkstra_code(code);
+        char* code2 = watermark_get_dijkstra_code(graph_copy(graph));
+        // check that the resulting dijkstra code is the same
+        ctdd_assert( !strcmp(code, code2) );
+        unsigned long size;
+        uint8_t* result = watermark_decode(graph, &size);
+        graph_free(graph);
+        ctdd_assert(*result == k);
+        free(result);
+        free(code);
+        free(code2);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        char* code = watermark_get_dijkstra_code(graph);
+        graph = graph_create_from_dijkstra_code(code);
+        char* code2 = watermark_get_dijkstra_code(graph_copy(graph));
+        // check that the resulting dijkstra code is the same
+        ctdd_assert( !strcmp(code, code2) );
+        unsigned long size;
+        uint8_t* result = watermark_decode(graph, &size);
+        graph_free(graph);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        free(code);
+        free(code2);
+    }
+
     return 0;
 }
 
@@ -249,6 +292,7 @@ int run_tests() {
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(dijkstra_recognition_test);
     ctdd_verify(dijkstra_code_test);
+    ctdd_verify(dijkstra_watermark_code_test);
 	return 0;
 }
 

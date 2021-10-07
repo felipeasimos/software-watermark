@@ -88,11 +88,12 @@ unsigned long node_get_info_len(NODE* node);
 void node_transfer_out_connections(NODE* from, NODE* to);
 void node_transfer_in_connections(NODE* from, NODE* to);
 
-void node_expand_to_sequence(NODE*);
-void node_expand_to_repeat(NODE*);
-void node_expand_to_while(NODE*);
-void node_expand_to_if_then(NODE*);
-void node_expand_to_if_then_else(NODE*);
-void node_expand_to_p_case(NODE*, unsigned long p);
+// return sink of the new statement subgraph
+NODE* node_expand_to_sequence(NODE*);
+NODE* node_expand_to_repeat(NODE*);
+NODE* node_expand_to_while(NODE*);
+NODE* node_expand_to_if_then(NODE*);
+NODE* node_expand_to_if_then_else(NODE*);
+NODE* node_expand_to_p_case(NODE*, unsigned long p);
 
 #endif

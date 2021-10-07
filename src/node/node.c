@@ -255,14 +255,15 @@ void node_transfer_in_connections(NODE* from, NODE* to) {
     while(from->in) graph_oriented_disconnect(from->in->from, from);
 }
 
-void node_expand_to_sequence(NODE* node) {
+NODE* node_expand_to_sequence(NODE* node) {
 
     GRAPH* graph = node->graph;
     graph_insert(graph, node->graph_idx+1);
     node_transfer_out_connections(node, graph->nodes[node->graph_idx+1]);
     graph_oriented_connect(node, graph->nodes[node->graph_idx+1]);
+    return graph->nodes[node->graph_idx+1];
 }
-void node_expand_to_repeat(NODE* node) {
+NODE* node_expand_to_repeat(NODE* node) {
 
     GRAPH* graph = node->graph;
     graph_insert(graph, node->graph_idx+1);
@@ -273,8 +274,9 @@ void node_expand_to_repeat(NODE* node) {
     graph_oriented_connect(node, middle_node);
     graph_oriented_connect(middle_node, node);
     graph_oriented_connect(middle_node, sink_node);
+    return sink_node;
 }
-void node_expand_to_while(NODE* node) {
+NODE* node_expand_to_while(NODE* node) {
 
     GRAPH* graph = node->graph;
     graph_insert(graph, node->graph_idx+1);
@@ -285,8 +287,9 @@ void node_expand_to_while(NODE* node) {
     graph_oriented_connect(node, connect_back_node);
     graph_oriented_connect(connect_back_node, node);
     graph_oriented_connect(node, sink_node);
+    return sink_node;
 }
-void node_expand_to_if_then(NODE* node) {
+NODE* node_expand_to_if_then(NODE* node) {
 
     GRAPH* graph = node->graph;
     graph_insert(graph, node->graph_idx+1);
@@ -297,12 +300,14 @@ void node_expand_to_if_then(NODE* node) {
     graph_oriented_connect(node, middle_node);
     graph_oriented_connect(node, sink_node);
     graph_oriented_connect(middle_node, sink_node);
+    return sink_node;
 }
-void node_expand_to_if_then_else(NODE* node) {
+NODE* node_expand_to_if_then_else(NODE* node) {
 
     node_expand_to_p_case(node, 2);
+    return node->graph->nodes[node->graph_idx+3];
 }
-void node_expand_to_p_case(NODE* node, unsigned long p) {
+NODE* node_expand_to_p_case(NODE* node, unsigned long p) {
 
     GRAPH* graph = node->graph;
 
@@ -318,4 +323,5 @@ void node_expand_to_p_case(NODE* node, unsigned long p) {
         graph_oriented_connect(node, middle_node);
         graph_oriented_connect(middle_node, sink_node);
     }
+    return sink_node;
 }

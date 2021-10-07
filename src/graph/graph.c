@@ -371,3 +371,71 @@ GRAPH* graph_deserialize(uint8_t* data) {
 
     return graph;
 }
+
+// return updated dijkstra_code pointer, from where the next node should be read from
+char* graph_create_from_dijkstra_code_recursive(char* dijkstra_code, NODE* source) {
+
+    // if first character isn't a '1', there is an error, since this function should
+    // be called for every node, and every node code should begin and end with an '1'
+    if(!dijkstra_code || dijkstra_code[0] != '1') return NULL;
+
+    // check if this is just a trivial node at the end of the string
+    if( dijkstra_code[1] == '\0' ) return ++dijkstra_code;
+
+    // if this isn't a trivial node, get the type from the second character
+    STATEMENT_GRAPH type = dijkstra_code[1] - '0';
+
+    if( type >= P_CASE || type == IF_THEN_ELSE ) {
+        unsigned long p = type - 4;
+        node_expand_to_p_case(source, p);
+        NODE* next_p_node = source->graph->nodes[source->graph_idx+2];
+        NODE* current_node = source->graph->nodes[source->graph_idx+1];
+        for(unsigned long i = 0; i < p; i++) {
+            dijkstra_code = graph_create_from_dijkstra_code_recursive(dijkstra_code+2, next_p_node);
+            current_node = next_p_node;
+            next_p_node = next_p_node->graph->nodes[next_p_node->graph_idx+1];
+        }
+        return graph_create_from_dijkstra_code_recursive(dijkstra_code+2, next_p_node);
+    }
+    switch(type) {
+        case TRIVIAL:
+            return ++dijkstra_code;
+        case SEQUENCE:
+            return graph_create_from_dijkstra_code_recursive(dijkstra_code+2, node_expand_to_sequence(source));
+        case IF_THEN: {
+            NODE* sink_node = node_expand_to_if_then(source);
+            NODE* middle_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = graph_create_from_dijkstra_code_recursive(dijkstra_code+2, middle_node);
+            return graph_create_from_dijkstra_code_recursive(dijkstra_code, sink_node);
+        }
+        case WHILE: {
+            NODE* sink_node = node_expand_to_while(source);
+            NODE* connect_back_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = graph_create_from_dijkstra_code_recursive(dijkstra_code+2, connect_back_node);
+            return graph_create_from_dijkstra_code_recursive(dijkstra_code, sink_node);
+        }
+        case REPEAT: {
+            NODE* sink_node = node_expand_to_repeat(source);
+            NODE* middle_node = source->graph->nodes[source->graph_idx+1];
+            dijkstra_code = graph_create_from_dijkstra_code_recursive(dijkstra_code+2, middle_node);
+            return graph_create_from_dijkstra_code_recursive(dijkstra_code, sink_node);
+        }
+        case IF_THEN_ELSE:
+        case P_CASE:
+        case INVALID:
+        default:
+            return NULL;
+    }
+}
+
+// generate graph from dijkstra code
+GRAPH* graph_create_from_dijkstra_code(char* dijkstra_code) {
+
+    GRAPH* graph = graph_create(1);
+    if(!graph_create_from_dijkstra_code_recursive(dijkstra_code, graph->nodes[0])) {
+        graph_free(graph);
+        return NULL;
+    }
+
+    return graph;
+}
