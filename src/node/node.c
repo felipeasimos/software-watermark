@@ -200,7 +200,7 @@ void node_unload_info(NODE* node) {
 void node_unload_all_info(NODE* node) {
 
     if(!node->num_info) return;
-    while(node->num_info--) node_unload_info(node);
+    while(node->num_info) node_unload_info(node);
 }
 
 void node_free_info(NODE* node) {
@@ -218,7 +218,7 @@ void node_free_info(NODE* node) {
 void node_free_all_info(NODE* node) {
 
     if(!node->num_info) return;
-    while(node->num_info--) node_free_info(node);
+    while(node->num_info) node_free_info(node);
 }
 
 void* node_get_info(NODE* node) {

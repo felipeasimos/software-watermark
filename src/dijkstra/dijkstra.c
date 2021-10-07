@@ -111,12 +111,15 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
         }
         case IF_THEN:
         case WHILE: {
-            graph_delete(source->out->to != sink ? source->out->to : source->out->next->to);
+            NODE* node_to_delete = source->out->to != sink ? source->out->to : source->out->next->to;
+            graph_delete(node_to_delete);
             break;
         }
         case IF_THEN_ELSE:
         case P_CASE: {
-            while(source->out) graph_delete(source->out->to);
+            while(source->out) {
+                graph_delete(source->out->to);
+            }
             break;
         }
         case INVALID:
@@ -175,10 +178,11 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
 
         // add code from the only out-neighbour
         case SEQUENCE: {
-            unsigned long new_len = node_get_data_len(source) + node_get_data_len(source->out->to);
+            unsigned long new_len = node_get_info_len(source) + node_get_info_len(source->out->to);
             new_code = malloc(new_len);
-            sprintf(new_code, "%s2%s", (char*)node_get_data(source), (char*)node_get_data(source->out->to));
-            node_set_data(source, new_code, new_len);
+            sprintf(new_code, "%s2%s", (char*)node_get_info(source), (char*)node_get_info(source->out->to));
+            node_free_info(source);
+            node_load_info(source, new_code, new_len);
             break;
         }
         // add code from if block and final node
@@ -187,10 +191,11 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             NODE* middle_node = node1_connects_to_node2 ? source->out->to : source->out->next->to;
             NODE* final_node = node1_connects_to_node2 ? source->out->next->to : source->out->to;
 
-            unsigned long new_len = node_get_data_len(source) + node_get_data_len(middle_node) + node_get_data_len(final_node);
+            unsigned long new_len = node_get_info_len(source) + node_get_info_len(middle_node) + node_get_info_len(final_node);
             new_code = malloc(new_len);
-            sprintf(new_code, "%s3%s%s", (char*)source->data, (char*)middle_node->data, (char*)final_node->data);
-            node_set_data(source, new_code, new_len);
+            sprintf(new_code, "%s3%s%s", (char*)node_get_info(source), (char*)node_get_info(middle_node), (char*)node_get_info(final_node));
+            node_free_info(source);
+            node_load_info(source, new_code, new_len);
             break;
         }
         // add code from while block and final node
@@ -199,24 +204,26 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             NODE* connect_back_node = node1_connects_back ? source->out->to : source->out->next->to;
             NODE* final_node = node1_connects_back ? source->out->next->to : source->out->to;
 
-            unsigned long new_len = node_get_data_len(source) + node_get_data_len(connect_back_node) + node_get_data_len(final_node);
+            unsigned long new_len = node_get_info_len(source) + node_get_info_len(connect_back_node) + node_get_info_len(final_node);
             new_code = malloc(new_len);
-            sprintf(new_code, "%s4%s%s", (char*)node_get_data(source),
-                                        (char*)node_get_data(connect_back_node),
-                                        (char*)node_get_data(final_node));
-            node_set_data(source, new_code, new_len);
+            sprintf(new_code, "%s4%s%s", (char*)node_get_info(source),
+                                        (char*)node_get_info(connect_back_node),
+                                        (char*)node_get_info(final_node));
+            node_free_info(source);
+            node_load_info(source, new_code, new_len);
             break;
         }
         case REPEAT: {
             NODE* middle_node = source->out->to;
             NODE* final_node = middle_node->out->to != source ? middle_node->out->to : middle_node->out->next->to;
 
-            unsigned long new_len = node_get_data_len(source) + node_get_data_len(middle_node) + node_get_data_len(final_node);
+            unsigned long new_len = node_get_info_len(source) + node_get_info_len(middle_node) + node_get_info_len(final_node);
             new_code = malloc(new_len);
-            sprintf(new_code, "%s5%s%s", (char*)node_get_data(source),
-                                        (char*)node_get_data(middle_node),
-                                        (char*)node_get_data(final_node));
-            node_set_data(source, new_code, new_len);
+            sprintf(new_code, "%s5%s%s", (char*)node_get_info(source),
+                                        (char*)node_get_info(middle_node),
+                                        (char*)node_get_info(final_node));
+            node_free_info(source);
+            node_load_info(source, new_code, new_len);
             break;
         }
         case IF_THEN_ELSE:
@@ -224,24 +231,24 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime) {
             unsigned long id_num = source->num_out_neighbours + 4;
             NODE* final_node = source->out->to->out->to;
             GRAPH* graph = source->graph;
-            unsigned long new_len=node_get_data_len(source) + node_get_data_len(final_node);
+            unsigned long new_len=node_get_info_len(source) + node_get_info_len(final_node);
             for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
-                new_len += node_get_data_len(node); 
+                new_len += node_get_info_len(node); 
             }
             new_code = malloc(new_len);
-            sprintf(new_code, "%s%lu", (char*)node_get_data(source), id_num);
+            sprintf(new_code, "%s%lu", (char*)node_get_info(source), id_num);
             for(NODE* node = graph->nodes[source->graph_idx+1]; node != final_node; node = graph->nodes[node->graph_idx+1]) {
-                strcat(new_code, (char*)node_get_data(node));
+                strcat(new_code, (char*)node_get_info(node));
             }
-            strcat(new_code, (char*)node_get_data(final_node));
-            node_set_data(source, new_code, new_len);
+            strcat(new_code, (char*)node_get_info(final_node));
+            node_free_info(source);
+            node_load_info(source, new_code, new_len);
             break;
         }
         case INVALID:
         case TRIVIAL:
             break;
     }
-    free(new_code);
 }
 
 char* dijkstra_get_code(GRAPH* graph) {
@@ -252,9 +259,11 @@ char* dijkstra_get_code(GRAPH* graph) {
     if(graph->num_connections >= 2 * graph->num_nodes - 1) return 0;
 
     // set code of every node to 1
-    char str[2] = "1";
     for(unsigned long i=0; i < graph->num_nodes; i++) {
-        node_set_data(graph->nodes[i], str, sizeof(str)); 
+        char* str = malloc(2);
+        str[0] = '1';
+        str[1] = '\0';
+        node_load_info(graph->nodes[i], str, 2);
     }
 
     // iterate through graph in inverse topological order
@@ -277,8 +286,9 @@ char* dijkstra_get_code(GRAPH* graph) {
         }
     }
     NODE* source = graph->nodes[0];
-    char* code = malloc(node_get_data_len(source));
-    strncpy(code, node_get_data(source), node_get_data_len(source));
+    char* code = malloc(node_get_info_len(source));
+    strncpy(code, node_get_info(source), node_get_info_len(source));
+    graph_free_all_info(graph);
     graph_free(graph);
 
     return code;
