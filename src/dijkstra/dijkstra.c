@@ -141,11 +141,6 @@ void dijkstra_contract(NODE* source, NODE* sink, STATEMENT_GRAPH type) {
     // delete sink
     node_free_info(sink);
     graph_delete(sink);
-
-    // delete auto-references
-    while(graph_get_connection(source, source)) {
-        graph_oriented_disconnect(source, source);
-    }
 }
 
 int dijkstra_check(GRAPH* graph) {

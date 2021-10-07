@@ -291,8 +291,8 @@ int run_tests() {
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(dijkstra_recognition_test);
-    ctdd_verify(dijkstra_code_test);
-    ctdd_verify(dijkstra_watermark_code_test);
+    //ctdd_verify(dijkstra_code_test);
+    //ctdd_verify(dijkstra_watermark_code_test);
 	return 0;
 }
 
