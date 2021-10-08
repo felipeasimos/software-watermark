@@ -41,19 +41,14 @@ NODE* node_set_data(NODE* node, void* data, unsigned long data_len) {
 
 void* node_get_data(NODE* node) {
 
-    unsigned long num_info = node->num_info;
-    void* data = node->data;
-    while(num_info--) data = ((INFO_NODE*)data)->data;
-    return data;
+    INFO_NODE* info_node = node_get_info_struct(node);
+    return info_node ? info_node->data : node->data;
 }
 
 unsigned long node_get_data_len(NODE* node) {
 
-    if(!node->num_info) return node->data_len;
-    unsigned long num_info = node->num_info - 1;
-    void* data = node->data;
-    while(num_info--) data = ((INFO_NODE*)data)->data;
-    return ((INFO_NODE*)data)->data_len;
+    INFO_NODE* info_node = node_get_info_struct(node);
+    return info_node ? info_node->data_len : node->data_len;
 }
 
 uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to){
@@ -221,22 +216,36 @@ void node_free_all_info(NODE* node) {
     while(node->num_info) node_free_info(node);
 }
 
-void* node_get_info(NODE* node) {
+INFO_NODE* node_get_info_struct(NODE* node) {
 
     if(!node->num_info) return NULL;
     unsigned long num_info = node->num_info - 1;
     void* data = node->data;
     while(num_info--) data = ((INFO_NODE*)data)->data;
-    return ((INFO_NODE*)data)->info;
+    return data;
+}
+
+void* node_get_info(NODE* node) {
+
+    INFO_NODE* info_node = node_get_info_struct(node);
+    return info_node ? info_node->info : NULL;
 }
 
 unsigned long node_get_info_len(NODE* node) {
 
-    if(!node->num_info) return 0;
-    unsigned long num_info = node->num_info - 1;
-    void* data = node->data;
-    while(num_info--) data = ((INFO_NODE*)data)->data;
-    return ((INFO_NODE*)data)->info_len;
+    INFO_NODE* info_node = node_get_info_struct(node);
+    return info_node ? info_node->info_len : 0;
+}
+
+void node_set_info(NODE* node, void* info, unsigned long info_len) {
+
+    if(!node->num_info) {
+        node_load_info(node, info, info_len);
+    } else {
+        INFO_NODE* info_node = node_get_info_struct(node);
+        info_node->info = info;
+        info_node->info_len = info_len;
+    }
 }
 
 void node_transfer_out_connections(NODE* from, NODE* to) {

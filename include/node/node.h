@@ -81,9 +81,15 @@ void node_free_info(NODE* node);
 
 void node_free_all_info(NODE* node);
 
+INFO_NODE* node_get_info_struct(NODE* node);
+
 void* node_get_info(NODE* node);
 
 unsigned long node_get_info_len(NODE* node);
+
+void node_set_info(NODE* node, void* info, unsigned long info_len);
+
+void node_set_info_len(NODE* node, unsigned long info_len);
 
 void node_transfer_out_connections(NODE* from, NODE* to);
 void node_transfer_in_connections(NODE* from, NODE* to);

@@ -184,10 +184,7 @@ int dijkstra_recognition_test() {
     for(uint8_t k = 1; k < 255; k++) {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
-        uint8_t result = dijkstra_check(graph_copy(graph));
-        if(!result) {
-            PRINT_K(k);
-        }
+        uint8_t result = dijkstra_check(graph);
         graph_free(graph);
         ctdd_assert(result);
     }
@@ -195,6 +192,7 @@ int dijkstra_recognition_test() {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         ctdd_assert(dijkstra_check(graph));
+        graph_free(graph);
     }
     return 0;
 }
@@ -204,27 +202,31 @@ int dijkstra_code_test() {
     // bento 2017 - Fig. 8
     GRAPH* graph = graph_create(1);
     node_expand_to_if_then_else(graph->nodes[0]);
-    node_expand_to_if_then(graph->nodes[2]);
+    node_expand_to_while(graph->nodes[2]);
     node_expand_to_sequence(graph->nodes[3]);
-    node_expand_to_while(graph->nodes[1]);
+    node_expand_to_if_then_else(graph->nodes[4]);
+    node_expand_to_if_then(graph->nodes[1]);
     node_expand_to_sequence(graph->nodes[2]);
-    node_expand_to_if_then_else(graph->nodes[3]);
     node_expand_to_sequence(graph->nodes[12]);
+
     graph_topological_sort(graph);
     char* code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "161312111412161111121") );
+    graph_free(graph);
     free(code);
     // 29
     uint8_t k = 29;
     graph = watermark_encode(&k, sizeof(k));
     code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "151131151121") );
+    graph_free(graph);
     free(code);
     // 28
     k = 28;
     graph = watermark_encode(&k, sizeof(k));
     code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "1511311212121") );
+    graph_free(graph);
     free(code);
     // bento 2017 - Fig 5
     graph = graph_create(1);
@@ -234,11 +236,7 @@ int dijkstra_code_test() {
     node_expand_to_sequence(graph->nodes[7]);
     code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "1614111311121") );
-    free(code);
-
-    graph = dijkstra_generate("151131151121");
-    code = dijkstra_get_code(graph);
-    ctdd_assert(!strcmp(code, "151131151121"));
+    graph_free(graph);
     free(code);
 
     return 0;
@@ -248,35 +246,35 @@ int dijkstra_watermark_code_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
-        char* code = dijkstra_get_code(graph);
-        graph = dijkstra_generate(code);
-        char* code2 = dijkstra_get_code(graph_copy(graph));
+        GRAPH* original = watermark_encode(&k, sizeof(k));
+        char* code = dijkstra_get_code(original);
+        GRAPH* new = dijkstra_generate(code);
         // check that the resulting dijkstra code is the same
-        ctdd_assert( !strcmp(code, code2) );
+        ctdd_assert( dijkstra_is_equal(new, original) );
         unsigned long size;
-        uint8_t* result = watermark_decode(graph, &size);
-        graph_free(graph);
-        ctdd_assert(*result == k);
-        free(result);
+        uint8_t* result = watermark_decode(new, &size);
+        graph_free(new);
+        graph_free(original);
         free(code);
-        free(code2);
+        uint8_t res = *result == k;
+        free(result);
+        ctdd_assert(res);
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
-        char* code = dijkstra_get_code(graph);
-        graph = dijkstra_generate(code);
-        char* code2 = dijkstra_get_code(graph_copy(graph));
+        GRAPH* original = watermark_encode(&k, sizeof(k));
+        char* code = dijkstra_get_code(original);
+        GRAPH* new = dijkstra_generate(code);
         // check that the resulting dijkstra code is the same
-        ctdd_assert( !strcmp(code, code2) );
+        ctdd_assert( dijkstra_is_equal(original, new) );
         unsigned long size;
-        uint8_t* result = watermark_decode(graph, &size);
-        graph_free(graph);
-        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
-        free(result);
+        uint8_t* result = watermark_decode(new, &size);
+        graph_free(new);
+        graph_free(original);
         free(code);
-        free(code2);
+        uint8_t res = binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size);
+        free(result);
+        ctdd_assert(res);
     }
 
     return 0;
@@ -291,8 +289,8 @@ int run_tests() {
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(dijkstra_recognition_test);
-    //ctdd_verify(dijkstra_code_test);
-    //ctdd_verify(dijkstra_watermark_code_test);
+    ctdd_verify(dijkstra_code_test);
+    ctdd_verify(dijkstra_watermark_code_test);
 	return 0;
 }
 

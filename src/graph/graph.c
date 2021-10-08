@@ -210,7 +210,7 @@ void graph_print_node_idx(FILE* f, NODE* node) {
 }
 
 // label can be NULL
-void graph_write_hamiltonian_dot(GRAPH* graph, const char* filename, const char* label) {
+void graph_write_hamiltonian_dot_generic(GRAPH* graph, const char* filename, const char* label, void (*print_func)(FILE*, NODE*)) {
 
     FILE* file = NULL;
     if(( file = fopen(filename, "w") )) {
@@ -220,28 +220,34 @@ void graph_write_hamiltonian_dot(GRAPH* graph, const char* filename, const char*
         if(label) fprintf(file, "label=\"%s\", ", label);
         fprintf(file, "rankdir=LR, splines=polyline, layout=dot, bgcolor=\"#262626\", fontcolor=\"#FFFDB8\"];\n");
         fprintf(file, "\tedge [style=invis, weight=100, overlap=0, constraint=true];\n");
-        fprintf(file, "\tnode [group=main, shape=circle, color=\"#4DA6FF\", fontcolor=\"#FFFDB8\"];\n\t0:e");
-        for(unsigned long i = 1; i < graph->num_nodes; i++) fprintf(file, " -> %lu:e", i);
+        fprintf(file, "\tnode [group=main, shape=circle, color=\"#4DA6FF\", fontcolor=\"#FFFDB8\"];\n\t");
+        node_write(graph->nodes[0], file, print_func);
+        fprintf(file, ":e");
+        for(unsigned long i = 1; i < graph->num_nodes; i++) {
+            fprintf(file, " -> ");
+            node_write(graph->nodes[i], file, print_func);
+            fprintf(file, ":e");
+        }
         fprintf(file, ";\n\tedge [style=solid, weight=1, overlap=scale, constraint=true];\n");
         for(unsigned long i = 0; i < graph->num_nodes; i++) {
 
             for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
                 fprintf(file, "\t");
-                node_write(graph->nodes[i], file, graph_print_node_idx);
+                node_write(graph->nodes[i], file, print_func);
                 // if backedge
                 if(conn->to->graph_idx < graph->nodes[i]->graph_idx) {
                     fprintf(file, ":nw -> ");
-                    node_write(conn->to, file, graph_print_node_idx);
+                    node_write(conn->to, file, print_func);
                     fprintf(file, ":ne [style=dashed, color=\"#FF263C\"]");
                 // if forward edge
                 } else if(conn->to->graph_idx > graph->nodes[i]->graph_idx+1) {
                     fprintf(file, ":se -> ");
-                    node_write(conn->to, file, graph_print_node_idx);
+                    node_write(conn->to, file, print_func);
                     fprintf(file, ":sw [color=green]");
                 } else {
                     fprintf(file, " -> ");
-                    node_write(conn->to, file, graph_print_node_idx);
+                    node_write(conn->to, file, print_func);
                     fprintf(file, "[color=\"#4DA6FF\"]");
                 }
                 fprintf(file, ";\n");
@@ -250,10 +256,16 @@ void graph_write_hamiltonian_dot(GRAPH* graph, const char* filename, const char*
         fprintf(file, "}");
         fclose(file);
     }
+
 }
 
 // label can be NULL
-void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
+void graph_write_hamiltonian_dot(GRAPH* graph, const char* filename, const char* label) {
+    graph_write_hamiltonian_dot_generic(graph, filename, label, graph_print_node_idx);
+}
+
+// label can be NULL
+void graph_write_dot_generic(GRAPH* graph, const char* filename, const char* label, void (*print_func)(FILE*, NODE*)) {
 
     FILE* file = NULL;
     if(( file = fopen(filename, "w") )) {
@@ -265,18 +277,23 @@ void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
             for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
                 fprintf(file, "\t");
-                node_write(graph->nodes[i], file, graph_print_node_idx);
+                node_write(graph->nodes[i], file, print_func);
                 fprintf(file, " -> ");
-                node_write(conn->to, file, graph_print_node_idx);
+                node_write(conn->to, file, print_func);
                 // if this a backedge
                 if(conn->to->graph_idx < i) fprintf(file, "[style=dashed, color=\"#FF263C\"]");
                 fprintf(file, ";\n");
             }
-            if(!graph->nodes[i]->out) node_write(graph->nodes[i], file, graph_print_node_idx);
+            if(!graph->nodes[i]->out) node_write(graph->nodes[i], file, print_func);
         }
         fprintf(file, "}");
         fclose(file);
     }
+}
+
+// label can be NULL
+void graph_write_dot(GRAPH* graph, const char* filename, const char* label) {
+    graph_write_dot_generic(graph, filename, label, graph_print_node_idx);
 }
 
 // copy the graph

@@ -77,7 +77,13 @@ void graph_free_info(GRAPH*);
 void graph_free_all_info(GRAPH*);
 
 // label can be NULL
+void graph_write_hamiltonian_dot_generic(GRAPH*, const char* filename, const char* label, void (*print_func)(FILE*, NODE*));
+
+// label can be NULL
 void graph_write_hamiltonian_dot(GRAPH*, const char* filename, const char* label);
+
+// label can be NULL
+void graph_write_dot_generic(GRAPH*, const char* filename, const char* label, void (*print_func)(FILE*, NODE*));
 
 // label can be NULL
 void graph_write_dot(GRAPH*, const char* filename, const char* label);
