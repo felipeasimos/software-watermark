@@ -40,6 +40,15 @@ unsigned long dijkstra_num_in_neighbours(NODE* source) {
     return n;
 }
 
+unsigned long dijkstra_num_in_backedges(NODE* source) {
+
+    unsigned long n = 0;
+    for(CONNECTION* conn = source->in; conn; conn = conn->next) {
+        n += ( conn->from->graph_idx > source->graph_idx );
+    }
+    return n;
+}
+
 PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
 
     PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
@@ -62,21 +71,22 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             return prime;
         // make sure this isn't the middle node of a while
         } else if(!graph_get_connection(dest_sink, source) && source->num_in_neighbours <= 1) {
-            // make sure 'source' isn't just the sink of a subgraph of the source node
-            // in a repeat block ('dest' shouldn't have a backedge, except if the repeat
-            // source is behind this source)
-            /*if( dest_sink->num_out_neighbours == 2 &&
-                !( dijkstra_num_in_neighbours(source) == 1 && source->in->from->graph_idx == source->graph_idx-1 &&
-                graph_get_connection(dest_sink, source->in->from))) {
 
-                for(CONNECTION* conn = dest_sink->out; conn; conn = conn->next) {
-                    if( conn->to->graph_idx < dest_sink->graph_idx ) return prime;
-                }
-            }*/
             // make sure this won't create a cycle between a forward edge and a backedge
             CONNECTION* backedge = graph_get_backedge(dest_sink);
-            if(source->num_in_neighbours && dest_sink->num_out_neighbours == 2 && backedge && backedge->to->graph_idx != source->graph_idx-1 &&
-                graph_get_connection(backedge->to, source)) {
+            if(source->num_in_neighbours && backedge &&
+                backedge->to->num_out_neighbours > 1 &&
+                graph_get_connection(backedge->to, source) &&
+                // if inside repeat
+                ((
+                    dijkstra_num_in_backedges(backedge->to) == 1 &&
+                    dijkstra_num_in_neighbours(source) == 2 &&
+                    dijkstra_get_sink(backedge->to)->num_out_neighbours == 2
+                    ) || (
+                    dijkstra_num_in_backedges(backedge->to) == 2 &&
+                    dijkstra_num_in_neighbours(source) == 1 &&
+                    dijkstra_get_sink(backedge->to)->num_out_neighbours == 2   
+                  ))) {
                 return prime;
             }
 

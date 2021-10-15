@@ -10,6 +10,10 @@ typedef enum CHECKER_BIT {
     BIT_1_FORWARD_EDGE_AND_BIT_1='F'
 } CHECKER_BIT;
 
+typedef struct CHECKER_NODE {
+    unsigned long backedge_idx;
+} CHECKER_NODE;
+
 uint8_t node_only_has_hamiltonian_edge(NODE* node) {
 
     if(node->graph_idx == node->graph->num_nodes-1) {
@@ -39,9 +43,9 @@ CHECKER_BIT watermark_check_get_bit(GRAPH* graph, unsigned long idx, uint8_t bit
     // if there isn't a hamiltonian edge in the next node, return 1
     } else if( !graph_get_connection(graph->nodes[idx+1], graph->nodes[idx+2]) ) {
         return BIT_1_FORWARD_EDGE_AND_BIT_1;
-    // if current node is the fourth last node and the last four nodes
+    // if current node is the fourth last node, represents a 1 bit and the last four nodes
     // only have a hamiltonian edge, return 1
-    } else if( last_four_only_have_hamiltonian && idx == graph->num_nodes-4) {
+    } else if( last_four_only_have_hamiltonian && idx == graph->num_nodes-4 && bit) {
         return BIT_1_FORWARD_EDGE_AND_BIT_0;
     // if this node is the first one in a sequence of three nodes without a
     // backedge or forward edge, should represent a positive bit, and it isn't possible
@@ -58,26 +62,277 @@ CHECKER_BIT watermark_check_get_bit(GRAPH* graph, unsigned long idx, uint8_t bit
 }
 
 // return true if it matches
-uint8_t watermark_check(GRAPH* graph, void* data, unsigned long* num_bytes) {
+uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
 
-    //unsigned long starting_idx = 
-    //unsigned long n_bits = graph->num_nodes-2;
-    //uint8_t bits[n_bits];
-    //bits[0] = 1;
-    //unsigned long i = 1;
-    num_bytes = data;
+    unsigned long total_number_of_bits = num_bytes*8;
+    unsigned long starting_idx = get_first_positive_bit_index(data, num_bytes);
+    unsigned long n_bits = total_number_of_bits - starting_idx;
+    unsigned long max_num_nodes = graph->num_nodes - 2;
+
+    // check if number of bits represented by the graph and number of bits in the given sequence match
+    unsigned long num_forward_edges = 0;
+    for(unsigned long i = 0; i < graph->num_nodes; i++) if(graph_get_forward(graph->nodes[i])) num_forward_edges++;
+    if(n_bits != graph->num_nodes - 2 - num_forward_edges) return 0;
+
+    // load CHECKER_NODE struct to all nodes
+    CHECKER_NODE checker_nodes[graph->num_nodes];
+    for(unsigned long i = 0; i < graph->num_nodes; i++) {
+        checker_nodes[i].backedge_idx = ULONG_MAX;
+        node_load_info(graph->nodes[i], &checker_nodes[i], sizeof(CHECKER_NODE));
+    }
+
+    unsigned long i = starting_idx+1;
+
+    STACK* odd_stack = stack_create(n_bits);
+    STACK* even_stack = stack_create(n_bits);
+    stack_push(odd_stack, 0);
+    ((CHECKER_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
+
+    unsigned long history[graph->num_nodes];
+    history[0] = 0;
 
     uint8_t last_four_nodes_only_have_hamiltonian_edges = graph->num_nodes > 3 &&
         node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-1]) &&
         node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-2]) &&
         node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-3]) &&
         node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-4]);
-    watermark_check_get_bit(graph, 0, 0, last_four_nodes_only_have_hamiltonian_edges, 0);
+
+    for(unsigned long graph_idx = 1; graph_idx < max_num_nodes; graph_idx++, i++) {
+
+        uint8_t is_odd = !(graph_idx&1);
+        uint8_t bit = get_bit(data, i);
+
+        // backedge management
+        STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
+        STACK* other_stack = possible_backedges == even_stack ? odd_stack : even_stack;
+
+        CHECKER_BIT checker_flag = watermark_check_get_bit(
+                graph,
+                graph_idx,
+                bit,
+                last_four_nodes_only_have_hamiltonian_edges,
+                has_possible_backedge(possible_backedges, graph, graph_idx));
+        switch(checker_flag) {
+            case BIT_0:
+            case BIT_1:
+                if(bit != checker_flag - '0') {
+                    graph_unload_info(graph);
+                    stack_free(odd_stack);
+                    stack_free(even_stack);
+                    return 0;
+                }
+                break;
+            case BIT_MUTE:
+                i--;
+                continue;
+            case BIT_0_BACKEDGE:
+            case BIT_1_BACKEDGE:
+                if( (checker_flag == BIT_0_BACKEDGE && bit) || (checker_flag == BIT_1_BACKEDGE && !bit)) {
+                    graph_unload_info(graph);
+                    stack_free(odd_stack);
+                    stack_free(even_stack);
+                    return 0;
+                }
+                CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
+                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->to->graph_idx) & 1)) ||
+                ( !bit && ((graph_idx - backedge_conn->to->graph_idx) & 1) )) ||
+                ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx >= possible_backedges->n) {
+                    graph_unload_info(graph);
+                    stack_free(odd_stack);
+                    stack_free(even_stack);
+                    return 0;
+                }
+                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx);
+                stack_pop_until(other_stack, history[backedge_conn->to->graph_idx]);
+                continue;
+            case BIT_1_FORWARD_EDGE_AND_BIT_0:
+                if(!bit || ( i != total_number_of_bits-1 && get_bit(data, ++i) )) {
+                    graph_unload_info(graph);
+                    stack_free(odd_stack);
+                    stack_free(even_stack);
+                    return 0;
+                }
+                break;
+            case BIT_1_FORWARD_EDGE_AND_BIT_1:
+                if(!bit || ( i != total_number_of_bits-1 && !get_bit(data, ++i) )) {
+                    graph_unload_info(graph);
+                    stack_free(odd_stack);
+                    stack_free(even_stack);
+                    return 0;
+                }
+                break;
+        }
+        // save stacks
+        // odd
+        if(is_odd) {
+            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
+            stack_push(odd_stack, graph_idx);
+            history[graph_idx] = even_stack->n;
+        // even
+        } else {
+            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
+            stack_push(even_stack, graph_idx);
+            history[graph_idx] = odd_stack->n;
+        }
+        // if this was the origin of a forward node, we already processed the inner forward node and the
+        // next node will be ignored
+        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx+=2;
+    }
+    // bit sequence may be smaller than expected due to mute nodes
+    graph_unload_info(graph);
+    stack_free(odd_stack);
+    stack_free(even_stack);
     return 1;
 }
+uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, unsigned long num_parity_symbols) {
 
-uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols);
+    graph = (GRAPH*)data;
+    num_bytes = num_parity_symbols;
+    return (uint8_t)num_bytes;
+}
 
 // return bit array, in which the values can be '1', '0' or 'x' (for unknown)
-uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes);
-uint8_t* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols);
+uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes) {
+
+    unsigned long total_number_of_bits = (*num_bytes)*8;
+    unsigned long starting_idx = get_first_positive_bit_index(data, *num_bytes);
+    unsigned long n_bits = total_number_of_bits - starting_idx;
+    unsigned long max_num_nodes = graph->num_nodes - 2;
+
+    // check if number of bits represented by the graph and number of bits in the given sequence match
+    unsigned long num_forward_edges = 0;
+    for(unsigned long i = 0; i < graph->num_nodes; i++) if(graph_get_forward(graph->nodes[i])) num_forward_edges++;
+    if(n_bits != graph->num_nodes - 2 - num_forward_edges) return 0;
+
+    *num_bytes = n_bits;
+    uint8_t* bits = malloc(n_bits);
+    bits[0]='1';
+    unsigned long bit_arr_idx=1;
+
+    // load CHECKER_NODE struct to all nodes
+    CHECKER_NODE checker_nodes[graph->num_nodes];
+    for(unsigned long i = 0; i < graph->num_nodes; i++) {
+        checker_nodes[i].backedge_idx = ULONG_MAX;
+        node_load_info(graph->nodes[i], &checker_nodes[i], sizeof(CHECKER_NODE));
+    }
+
+    unsigned long i = starting_idx+1;
+
+    STACK* odd_stack = stack_create(n_bits);
+    STACK* even_stack = stack_create(n_bits);
+    stack_push(odd_stack, 0);
+    ((CHECKER_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
+
+    unsigned long history[graph->num_nodes];
+    history[0] = 0;
+
+    uint8_t last_four_nodes_only_have_hamiltonian_edges = graph->num_nodes > 3 &&
+        node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-1]) &&
+        node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-2]) &&
+        node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-3]) &&
+        node_only_has_hamiltonian_edge(graph->nodes[graph->num_nodes-4]);
+
+    for(unsigned long graph_idx = 1; graph_idx < max_num_nodes; graph_idx++, i++) {
+
+        uint8_t is_odd = !(graph_idx&1);
+        uint8_t bit = get_bit(data, i);
+
+        // backedge management
+        STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
+        STACK* other_stack = possible_backedges == even_stack ? odd_stack : even_stack;
+
+        CHECKER_BIT checker_flag = watermark_check_get_bit(
+                graph,
+                graph_idx,
+                bit,
+                last_four_nodes_only_have_hamiltonian_edges,
+                has_possible_backedge(possible_backedges, graph, graph_idx));
+        switch(checker_flag) {
+            case BIT_0:
+            case BIT_1:
+                bits[bit_arr_idx++] = (bit != checker_flag - '0') ? 'x' : checker_flag;
+                break;
+            case BIT_MUTE:
+                i--;
+                continue;
+            case BIT_0_BACKEDGE:
+            case BIT_1_BACKEDGE:
+                if( (checker_flag == BIT_0_BACKEDGE && bit) || (checker_flag == BIT_1_BACKEDGE && !bit)) {
+                    bits[bit_arr_idx++] = 'x';
+                    break;
+                }
+                CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
+                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->to->graph_idx) & 1)) ||
+                ( !bit && ((graph_idx - backedge_conn->to->graph_idx) & 1) )) ||
+                ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx >= possible_backedges->n) {
+                    bits[bit_arr_idx++] = 'x';
+                    break;
+                }
+                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx);
+                stack_pop_until(other_stack, history[backedge_conn->to->graph_idx]);
+                bits[bit_arr_idx++] = (checker_flag == BIT_0_BACKEDGE) ? '0' : '1';
+                continue;
+            case BIT_1_FORWARD_EDGE_AND_BIT_0:
+                bits[bit_arr_idx++] = !bit ? 'x' : '1';
+                if(i!=total_number_of_bits-1) {
+                    bits[bit_arr_idx++] = get_bit(data, ++i) ? 'x' : '0';
+                }
+                break;
+            case BIT_1_FORWARD_EDGE_AND_BIT_1:
+                bits[bit_arr_idx++] = !bit ? 'x' : '1';
+                if(i!=total_number_of_bits-1) {
+                    bits[bit_arr_idx++] = !get_bit(data, ++i) ? 'x' : '1';
+                }
+                break;
+        }
+        // save stacks
+        // odd
+        if(is_odd) {
+            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
+            stack_push(odd_stack, graph_idx);
+            history[graph_idx] = even_stack->n;
+        // even
+        } else {
+            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
+            stack_push(even_stack, graph_idx);
+            history[graph_idx] = odd_stack->n;
+        }
+        // if this was the origin of a forward node, we already processed the inner forward node
+        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx+=2;
+    }
+    // bit sequence may be smaller than expected due to mute nodes
+    graph_unload_info(graph);
+    stack_free(odd_stack);
+    stack_free(even_stack);
+    return bits;
+}
+
+uint8_t* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols) {
+
+    unsigned long payload_n_bytes = *num_bytes;
+    unsigned long starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
+
+    // get raw sequence
+    uint8_t* bits = watermark_check_analysis(graph, data, num_bytes);
+    unsigned long total_n_bits = *num_bytes;
+
+    // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
+    for(unsigned long i = 0; i < total_n_bits; i++) {
+        switch(bits[i]) {
+            case 'x':
+                bits[i] = !get_bit(data, starting_idx+i);
+                break;
+            case '0':
+                bits[i] = 0;
+                break;
+            case '1':
+                bits[i] = 1;
+                break;
+        }
+    }
+
+    // convert bit arr into binary sequence
+    uint8_t* raw_data = get_sequence_from_bit_arr(bits, total_n_bits, num_bytes);
+    // get correct rs code
+    
+}

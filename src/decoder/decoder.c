@@ -53,19 +53,6 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
     return data;
 }
 
-// 'num_parity_symbols' will hold the original data sequence size
-uint8_t* remove_rs_code(uint8_t* data, unsigned long data_len, unsigned long* num_parity_symbols) {
-
-    unsigned long original_size = data_len - sizeof(uint16_t) * (*num_parity_symbols);
-    if( rs_decode(data, original_size, (uint16_t*)(data+original_size), *num_parity_symbols) != -1 ) {
-        *num_parity_symbols = original_size;
-        return realloc(data, original_size);
-    } else {
-        free(data);
-        return NULL;
-    }
-}
-
 void* watermark2014_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
 
     unsigned long data_len;
@@ -78,5 +65,4 @@ void* watermark_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
     unsigned long data_len;
     uint8_t* data = watermark_decode(graph, &data_len);
     return remove_rs_code(data, data_len, num_parity_symbols);
-
 }

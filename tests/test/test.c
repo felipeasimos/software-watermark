@@ -3,6 +3,7 @@
 #include "encoder/encoder.h"
 #include "decoder/decoder.h"
 #include "dijkstra/dijkstra.h"
+#include "checker/checker.h"
 
 #define PRINT_K(k)\
         char str[100];\
@@ -185,6 +186,9 @@ int dijkstra_recognition_test() {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         uint8_t result = dijkstra_check(graph);
+        if(!result) {
+            PRINT_K(k);
+        }
         graph_free(graph);
         ctdd_assert(result);
     }
@@ -280,6 +284,85 @@ int dijkstra_watermark_code_test() {
     return 0;
 }
 
+int watermark_check_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        uint8_t result = watermark_check(graph, &k, sizeof(k));
+        if(!result) {
+            PRINT_K(k);
+        }
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        uint8_t result = watermark_check(graph, &k, sizeof(k));
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    return 0;
+}
+
+uint8_t has_x(uint8_t* bits, unsigned long size) {
+    for(unsigned long i = 0; i < size; i++) {
+        if(bits[i] == 'x') return 0;
+    }
+    return 1;
+}
+
+int watermark_check_analysis_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size = sizeof(k);
+        PRINT_K(k);
+        uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
+        uint8_t result = has_x(bit_arr, size);
+        if(!result) {
+            PRINT_K(k);
+        }
+        free(bit_arr);
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size = sizeof(k);
+        uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
+        uint8_t result = has_x(bit_arr, size);
+        free(bit_arr);
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    return 0;
+}
+
+int watermark_check_rs_test() {
+    /*
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        unsigned long size=sizeof(k);
+        uint8_t result = watermark_rs_check(graph, &k, &size, 3);
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        unsigned long size=sizeof(k);
+        uint8_t result = watermark_rs_check(graph, &k, &size, 24);
+        graph_free(graph);
+        ctdd_assert(result);
+    }*/
+    return 0;
+}
+
 int run_tests() {
 
     ctdd_verify(graph_test);
@@ -291,6 +374,9 @@ int run_tests() {
     ctdd_verify(dijkstra_recognition_test);
     ctdd_verify(dijkstra_code_test);
     ctdd_verify(dijkstra_watermark_code_test);
+    ctdd_verify(watermark_check_test);
+    ctdd_verify(watermark_check_analysis_test);
+    ctdd_verify(watermark_check_rs_test);
 	return 0;
 }
 

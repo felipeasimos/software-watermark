@@ -227,14 +227,12 @@ INFO_NODE* node_get_info_struct(NODE* node) {
 
 void* node_get_info(NODE* node) {
 
-    INFO_NODE* info_node = node_get_info_struct(node);
-    return info_node ? info_node->info : NULL;
+    return node->num_info ? ((INFO_NODE*)node->data)->info : NULL;
 }
 
 unsigned long node_get_info_len(NODE* node) {
 
-    INFO_NODE* info_node = node_get_info_struct(node);
-    return info_node ? info_node->info_len : 0;
+    return node->num_info ? ((INFO_NODE*)node->data)->info_len : ULONG_MAX;
 }
 
 void node_set_info(NODE* node, void* info, unsigned long info_len) {
@@ -242,7 +240,7 @@ void node_set_info(NODE* node, void* info, unsigned long info_len) {
     if(!node->num_info) {
         node_load_info(node, info, info_len);
     } else {
-        INFO_NODE* info_node = node_get_info_struct(node);
+        INFO_NODE* info_node = node->data;
         info_node->info = info;
         info_node->info_len = info_len;
     }

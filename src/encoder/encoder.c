@@ -59,7 +59,7 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
     // get index of first positive bit
     unsigned long total_number_of_bits = data_len*8;
     unsigned long starting_idx = get_first_positive_bit_index(data, data_len);
-    unsigned long n = data_len*8 - starting_idx;
+    unsigned long n = total_number_of_bits - starting_idx;
 
     GRAPH* graph = graph_create(n+2);
 

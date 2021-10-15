@@ -15,7 +15,6 @@ unsigned long stack_pop(STACK* stack) {
     return stack->n ? stack->stack[--stack->n] : ULONG_MAX;
 }
 void stack_pop_until(STACK* stack, unsigned long size) {
-
     stack->n = size;
 }
 unsigned long stack_get(STACK* stack) {
