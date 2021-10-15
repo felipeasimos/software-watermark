@@ -319,7 +319,6 @@ int watermark_check_analysis_test() {
 
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size = sizeof(k);
-        PRINT_K(k);
         uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
         uint8_t result = has_x(bit_arr, size);
         if(!result) {
@@ -343,12 +342,15 @@ int watermark_check_analysis_test() {
 }
 
 int watermark_check_rs_test() {
-    /*
+
     for(uint8_t k = 1; k < 255; k++) {
 
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
         unsigned long size=sizeof(k);
-        uint8_t result = watermark_rs_check(graph, &k, &size, 3);
+        uint8_t result = watermark_rs_check(graph, &k, size, 3);
+        if(!result) {
+            PRINT_K(k);
+        }
         graph_free(graph);
         ctdd_assert(result);
     }
@@ -356,10 +358,39 @@ int watermark_check_rs_test() {
 
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
         unsigned long size=sizeof(k);
-        uint8_t result = watermark_rs_check(graph, &k, &size, 24);
+        uint8_t result = watermark_rs_check(graph, &k, size, 24);
         graph_free(graph);
         ctdd_assert(result);
-    }*/
+    }
+    return 0;
+}
+
+int watermark_check_rs_analysis_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        unsigned long size = sizeof(k);
+        PRINT_K(k);
+        uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 3);
+        uint8_t result = has_x(bit_arr, size);
+        if(!result) {
+            PRINT_K(k);
+        }
+        free(bit_arr);
+        graph_free(graph);
+        ctdd_assert(result);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        unsigned long size = sizeof(k);
+        uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 24);
+        uint8_t result = has_x(bit_arr, size);
+        free(bit_arr);
+        graph_free(graph);
+        ctdd_assert(result);
+    }
     return 0;
 }
 
@@ -377,6 +408,7 @@ int run_tests() {
     ctdd_verify(watermark_check_test);
     ctdd_verify(watermark_check_analysis_test);
     ctdd_verify(watermark_check_rs_test);
+    ctdd_verify(watermark_check_rs_analysis_test);
 	return 0;
 }
 

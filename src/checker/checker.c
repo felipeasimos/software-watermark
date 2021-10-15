@@ -186,9 +186,52 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
 }
 uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, unsigned long num_parity_symbols) {
 
-    graph = (GRAPH*)data;
-    num_bytes = num_parity_symbols;
-    return (uint8_t)num_bytes;
+    unsigned long payload_n_bytes = num_bytes;
+    unsigned long starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
+
+    // get correct parity numbers
+    uint16_t parity[num_parity_symbols];
+    memset(parity, 0x00, num_parity_symbols*2);
+    rs_encode(data, num_bytes, parity, num_parity_symbols);
+
+    unsigned long data_with_parity_n_bits = num_parity_symbols*2+payload_n_bytes;
+    uint8_t data_with_parity[num_parity_symbols*2+payload_n_bytes];
+    memcpy(data_with_parity, data, payload_n_bytes);
+    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols*2);
+
+    // decode using checker
+    unsigned long total_n_bits = data_with_parity_n_bits;
+    uint8_t* bits = watermark_check_analysis(graph, data_with_parity, &total_n_bits);
+    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*16;
+
+    // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
+    for(unsigned long i = 0; i < payload_n_bits; i++) {
+        switch(bits[i]) {
+            case 'x':
+                bits[i] = !get_bit(data, starting_idx+i);
+                break;
+            case '0':
+                bits[i] = 0;
+                break;
+            case '1':
+                bits[i] = 1;
+                break;
+        }
+    }
+    // write correct parity to bit arr
+    for(unsigned long i = payload_n_bits; i < total_n_bits; i++) {
+        bits[i] = get_bit((uint8_t*)parity, i-payload_n_bits);
+    }
+
+    // convert bit arr into binary sequence
+    unsigned long final_data_n_bytes = payload_n_bytes;
+    uint8_t* final_data = get_sequence_from_bit_arr(bits, total_n_bits, &final_data_n_bytes);
+    free(bits);
+    // get correct rs code
+    final_data = remove_rs_code(final_data, final_data_n_bytes, &num_parity_symbols);
+    uint8_t result = binary_sequence_equal(data, final_data, payload_n_bytes, num_parity_symbols);
+    free(final_data);
+    return result;
 }
 
 // return bit array, in which the values can be '1', '0' or 'x' (for unknown)
@@ -310,17 +353,28 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
 uint8_t* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols) {
 
     unsigned long payload_n_bytes = *num_bytes;
-    unsigned long starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
+    unsigned long data_starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
 
-    // get raw sequence
-    uint8_t* bits = watermark_check_analysis(graph, data, num_bytes);
-    unsigned long total_n_bits = *num_bytes;
+    // get correct parity numbers
+    uint16_t parity[num_parity_symbols];
+    memset(parity, 0x00, num_parity_symbols*2);
+    rs_encode(data, *num_bytes, parity, num_parity_symbols);
+
+    unsigned long data_with_parity_n_bits = num_parity_symbols*2+payload_n_bytes;
+    uint8_t data_with_parity[num_parity_symbols*2+payload_n_bytes];
+    memcpy(data_with_parity, data, payload_n_bytes);
+    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols*2);
+
+    // decode using checker
+    unsigned long total_n_bits = data_with_parity_n_bits;
+    uint8_t* bits = watermark_check_analysis(graph, data_with_parity, &total_n_bits);
+    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*16;
 
     // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
-    for(unsigned long i = 0; i < total_n_bits; i++) {
+    for(unsigned long i = 0; i < payload_n_bits; i++) {
         switch(bits[i]) {
             case 'x':
-                bits[i] = !get_bit(data, starting_idx+i);
+                bits[i] = !get_bit(data, data_starting_idx+i);
                 break;
             case '0':
                 bits[i] = 0;
@@ -330,9 +384,33 @@ uint8_t* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* nu
                 break;
         }
     }
+    // write correct parity to bit arr
+    for(unsigned long i = payload_n_bits; i < total_n_bits; i++) {
+        bits[i] = get_bit((uint8_t*)parity, i-payload_n_bits);
+    }
 
     // convert bit arr into binary sequence
-    uint8_t* raw_data = get_sequence_from_bit_arr(bits, total_n_bits, num_bytes);
+    unsigned long final_data_n_bytes = payload_n_bytes;
+    uint8_t* final_data = get_sequence_from_bit_arr(bits, total_n_bits, &final_data_n_bytes);
     // get correct rs code
-    
+    final_data = remove_rs_code(final_data, final_data_n_bytes, &num_parity_symbols);
+
+    unsigned long final_data_len = num_parity_symbols;
+
+    // change bits that are not equal in 'final_data' and 'data' to 'x'
+    // starting from the first positive bit in each sequence
+    unsigned long final_data_starting_idx = get_first_positive_bit_index(final_data, final_data_len);
+    unsigned long final_data_n_bits = final_data_len*8 - final_data_starting_idx;
+    unsigned long data_n_bits = payload_n_bytes*8 - data_starting_idx;
+    // cut bit_arr to only contain bits from the payload
+    unsigned long bit_arr_n_bits = data_n_bits > final_data_n_bits ? data_n_bits : final_data_n_bits;
+    bits = realloc(bits, bit_arr_n_bits);
+    for(unsigned long i = 0; i < bit_arr_n_bits; i++) {
+        uint8_t final_data_bit = get_bit(final_data, final_data_starting_idx+i);
+        uint8_t data_bit = get_bit(data, data_starting_idx+i);
+        bits[i] = data_bit == final_data_bit ? data_bit : 'x';
+    }
+    *num_bytes = bit_arr_n_bits;
+    free(final_data);
+    return bits;
 }
