@@ -235,7 +235,7 @@ uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, un
 }
 
 // return bit array, in which the values can be '1', '0' or 'x' (for unknown)
-uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes) {
+void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes) {
 
     unsigned long total_number_of_bits = (*num_bytes)*8;
     unsigned long starting_idx = get_first_positive_bit_index(data, *num_bytes);
@@ -350,7 +350,7 @@ uint8_t* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     return bits;
 }
 
-uint8_t* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols) {
+void* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_bytes, unsigned long num_parity_symbols) {
 
     unsigned long payload_n_bytes = *num_bytes;
     unsigned long data_starting_idx = get_first_positive_bit_index(data, payload_n_bytes);

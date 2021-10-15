@@ -12,4 +12,7 @@ void* watermark_decode(GRAPH*, unsigned long* num_bytes);
 void* watermark2014_rs_decode(GRAPH*, unsigned long* num_parity_symbols);
 void* watermark_rs_decode(GRAPH*, unsigned long* num_parity_symbols);
 
+void* watermark_decode_analysis(GRAPH*, unsigned long* num_bytes);
+void* watermark_rs_decode_analysis(GRAPH*, unsigned long* num_parity_symbols);
+
 #endif

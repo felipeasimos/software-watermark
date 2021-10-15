@@ -64,10 +64,11 @@ void set_bit(uint8_t* data, unsigned long idx, uint8_t value) {
 
     uint8_t byte_idx = 7-idx%8;
     idx = idx/8;
-    if(value)
+    if(value) {
         data[idx] |= (1 << byte_idx);
-    else
+    } else {
         data[idx] &= ~(1 << byte_idx);
+    }
 }
 
 void invert_binary_sequence(uint8_t* data, unsigned long size) {
@@ -93,7 +94,7 @@ unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_
 
 uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes) {
 
-    uint8_t n_zeros_on_the_left = n_bits%8 ? 8 - n_bits % 8 : 0;
+    uint8_t n_zeros_on_the_left = n_bits%8 ? 8 - (n_bits % 8) : 0;
     *num_bytes = n_bits/8 + !!n_zeros_on_the_left;
     uint8_t* data = malloc(*num_bytes);
     data[0] = 0;

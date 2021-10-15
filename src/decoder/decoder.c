@@ -66,3 +66,34 @@ void* watermark_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
     uint8_t* data = watermark_decode(graph, &data_len);
     return remove_rs_code(data, data_len, num_parity_symbols);
 }
+
+void* watermark_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
+
+    uint8_t* data = watermark_decode(graph, num_bytes);
+    unsigned long starting_idx = get_first_positive_bit_index(data, *num_bytes);
+    unsigned long n_bits = (*num_bytes)*8 - starting_idx;
+    
+    uint8_t* bits = malloc(n_bits);
+    for(unsigned long i = 0; i < n_bits; i++) {
+        bits[i] = get_bit(data, starting_idx+i);
+    }
+    free(data);
+    *num_bytes = n_bits;
+    return bits;
+}
+
+void* watermark_rs_decode_analysis(GRAPH* graph, unsigned long* num_parity_symbols) {
+
+    uint8_t* data = watermark_rs_decode(graph, num_parity_symbols);
+
+    unsigned long starting_idx = get_first_positive_bit_index(data, *num_parity_symbols);
+    unsigned long n_bits = (*num_parity_symbols)*8 - starting_idx;
+    
+    uint8_t* bits = malloc(n_bits);
+    for(unsigned long i = 0; i < n_bits; i++) {
+        bits[i] = get_bit(data, starting_idx+i);
+    }
+    free(data);
+    *num_parity_symbols = n_bits;
+    return bits;
+}

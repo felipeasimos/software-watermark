@@ -180,6 +180,62 @@ int watermark2017_rs_test() {
     return 0;
 }
 
+int watermark2017_decode_analysis_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size;
+        uint8_t* result = watermark_decode_analysis(graph, &size);
+        uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
+        ctdd_assert(size == 1);
+        ctdd_assert(binary_sequence_equal(&k, result_seq, sizeof(k), size));
+        free(result);
+        free(result_seq);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size;
+        uint8_t* result = watermark_decode_analysis(graph, &size);
+        uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result_seq, sizeof(k), size));
+        free(result);
+        free(result_seq);
+        graph_free(graph);
+    }
+    return 0;
+}
+
+int watermark2017_rs_decode_analysis_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        unsigned long size=3;
+        uint8_t* result = watermark_rs_decode_analysis(graph, &size);
+        uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
+        ctdd_assert(size == 1);
+        ctdd_assert(binary_sequence_equal(&k, result_seq, sizeof(k), size));
+        free(result);
+        free(result_seq);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        unsigned long size=24;
+        uint8_t* result = watermark_rs_decode_analysis(graph, &size);
+        uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result_seq, sizeof(k), size));
+        free(result);
+        free(result_seq);
+        graph_free(graph);
+    }
+    return 0;
+}
+
 int dijkstra_recognition_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
@@ -402,6 +458,8 @@ int run_tests() {
     ctdd_verify(watermark2014_rs_test);
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_rs_test);
+    ctdd_verify(watermark2017_decode_analysis_test);
+    ctdd_verify(watermark2017_rs_decode_analysis_test);
     ctdd_verify(dijkstra_recognition_test);
     ctdd_verify(dijkstra_code_test);
     ctdd_verify(dijkstra_watermark_code_test);
