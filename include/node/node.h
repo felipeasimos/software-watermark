@@ -20,7 +20,6 @@ typedef struct NODE {
 
     struct CONNECTION* in;
 	struct CONNECTION* out;
-    unsigned long num_connections;
     unsigned long num_out_neighbours;
     unsigned long num_in_neighbours;
 } NODE;

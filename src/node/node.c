@@ -60,13 +60,11 @@ uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to){
     //and update counts if connection existed
     uint8_t deleted=0;
 	if( connection_delete_out_neighbour( node_from->out, node_to ) ) {
-        node_from->num_connections--;
         node_from->num_out_neighbours--;
         deleted=1;
     }
     if( connection_delete_in_neighbour( node_to->in, node_from ) ) {
 
-        node_to->num_connections--;
         node_to->num_in_neighbours--;
         deleted=1;
     };
@@ -91,9 +89,7 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
     }
 
     // update counts
-    node_to->num_connections++;
     node_to->num_in_neighbours++;
-    node_from->num_connections++;
     node_from->num_out_neighbours++;
 }
 
