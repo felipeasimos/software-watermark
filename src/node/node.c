@@ -82,12 +82,12 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
     if(node_from->out) {
         connection_insert_out_neighbour( node_from->out, node_to );
     } else {
-        node_from->out = connection_create(node_from, node_from, node_to, OUT);
+        node_from->out = connection_create(node_from, node_from, node_to);
     }
     if(node_to->in) {
         connection_insert_in_neighbour( node_to->in, node_from );
     } else {
-        node_to->in = connection_create(node_to, node_from, node_to, IN);
+        node_to->in = connection_create(node_to, node_from, node_to);
     }
 
     // update counts

@@ -14,8 +14,6 @@ typedef enum DIRECTION {
 //connections, pointing to the next connection on the simple linked list
 typedef struct CONNECTION{
 
-	double weight;
-    DIRECTION direction;
     struct NODE* parent; // node this connection struct belongs to
     struct NODE* to; // the node this connections goes to
     struct NODE* from; // the node this connection comes from
@@ -26,7 +24,7 @@ typedef struct CONNECTION{
 #include "node/node.h" //we can't include it before 'struct NODE;'
 
 //create empty connection
-CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to, DIRECTION direction);
+CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to);
 
 void connection_insert(CONNECTION* connection, CONNECTION* conn);
 void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node);

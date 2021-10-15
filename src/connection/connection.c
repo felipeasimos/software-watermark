@@ -1,17 +1,15 @@
 #include "connection/connection.h"
 
-CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to, DIRECTION direction){
+CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to) {
 
 	//allocate memory for struct
 	CONNECTION* connection = malloc(sizeof(CONNECTION));
 	memset( connection, 0x00, sizeof(CONNECTION) );
 
 	//set weight to one by default
-	connection->weight = 1;
     connection->parent = parent;
     connection->from = from;
     connection->to = to;
-    connection->direction = direction;
 
 	return connection;
 }
@@ -26,13 +24,13 @@ void connection_insert(CONNECTION* root, CONNECTION* new_connection) {
 
 void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, node, connection_root->parent, IN);
+    CONNECTION* conn = connection_create(connection_root->parent, node, connection_root->parent);
     connection_insert(connection_root, conn);
 }
 
 void connection_insert_out_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, connection_root->parent, node, OUT);
+    CONNECTION* conn = connection_create(connection_root->parent, connection_root->parent, node);
     connection_insert(connection_root, conn);
 }
 
@@ -76,10 +74,11 @@ void connection_delete(CONNECTION* conn) {
     if(conn->prev) conn->prev->next = conn->next;
     if(conn->next) conn->next->prev = conn->prev;
 
-    CONNECTION** node_conn_pointer = (conn->direction == IN ? &conn->parent->in : &conn->parent->out);
-    if( (*node_conn_pointer) == conn ) {
-
-        (*node_conn_pointer) = conn->next;
+    // in case this is the root pointer
+    if( conn->parent->out == conn ) {
+        conn->parent->out = conn->next;
+    } else if( conn->parent->in == conn ) {
+        conn->parent->in = conn->next;
     }
     free(conn);
 }
