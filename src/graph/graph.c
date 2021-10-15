@@ -74,8 +74,8 @@ void graph_swap(NODE* a, NODE* b) {
 // remove all connections that this node is a part of
 void graph_isolate(NODE* node) {
 
-    while((node->out)) graph_oriented_disconnect(node, node->out->to);
-    while((node->in)) graph_oriented_disconnect(node->in->from, node);
+    while((node->out)) graph_oriented_disconnect(node, node->out->node);
+    while((node->in)) graph_oriented_disconnect(node->in->node, node);
 }
 
 // delete node
@@ -123,7 +123,7 @@ CONNECTION* graph_get_connection(NODE* from, NODE* to) {
 // if it exists
 CONNECTION* graph_get_backedge(NODE* node) {
     for(CONNECTION* conn = node->out; conn; conn = conn->next)
-        if(conn->to->graph_idx < node->graph_idx) return conn;
+        if(conn->node->graph_idx < node->graph_idx) return conn;
     return NULL;
 }
 
@@ -131,7 +131,7 @@ CONNECTION* graph_get_backedge(NODE* node) {
 // but not immediately after) if it exists
 CONNECTION* graph_get_forward(NODE* node) {
     for(CONNECTION* conn = node->out; conn; conn = conn->next)
-        if(conn->to->graph_idx > node->graph_idx+1) return conn;
+        if(conn->node->graph_idx > node->graph_idx+1) return conn;
     return NULL;
 }
 
@@ -163,11 +163,11 @@ void graph_topological_sort(GRAPH* graph) {
         for(CONNECTION* conn = ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next; conn; conn = conn->next) {
 
             // if unmarked, mark and insert in data structure
-            if(!((TOPO_NODE*)node_get_info(conn->to))->mark) {
+            if(!((TOPO_NODE*)node_get_info(conn->node))->mark) {
 
                 has_unmarked_connection=1;
-                ((TOPO_NODE*)node_get_info(conn->to))->mark = 1;
-                stack_push(stack, conn->to->graph_idx);
+                ((TOPO_NODE*)node_get_info(conn->node))->mark = 1;
+                stack_push(stack, conn->node->graph_idx);
                 ((TOPO_NODE*)node_get_info(graph->nodes[node_idx]))->check_next = conn->next;
                 break;
             }
@@ -236,18 +236,18 @@ void graph_write_hamiltonian_dot_generic(GRAPH* graph, const char* filename, con
                 fprintf(file, "\t");
                 node_write(graph->nodes[i], file, print_func);
                 // if backedge
-                if(conn->to->graph_idx < graph->nodes[i]->graph_idx) {
+                if(conn->node->graph_idx < graph->nodes[i]->graph_idx) {
                     fprintf(file, ":nw -> ");
-                    node_write(conn->to, file, print_func);
+                    node_write(conn->node, file, print_func);
                     fprintf(file, ":ne [style=dashed, color=\"#FF263C\"]");
                 // if forward edge
-                } else if(conn->to->graph_idx > graph->nodes[i]->graph_idx+1) {
+                } else if(conn->node->graph_idx > graph->nodes[i]->graph_idx+1) {
                     fprintf(file, ":se -> ");
-                    node_write(conn->to, file, print_func);
+                    node_write(conn->node, file, print_func);
                     fprintf(file, ":sw [color=green]");
                 } else {
                     fprintf(file, " -> ");
-                    node_write(conn->to, file, print_func);
+                    node_write(conn->node, file, print_func);
                     fprintf(file, "[color=\"#4DA6FF\"]");
                 }
                 fprintf(file, ";\n");
@@ -279,9 +279,9 @@ void graph_write_dot_generic(GRAPH* graph, const char* filename, const char* lab
                 fprintf(file, "\t");
                 node_write(graph->nodes[i], file, print_func);
                 fprintf(file, " -> ");
-                node_write(conn->to, file, print_func);
+                node_write(conn->node, file, print_func);
                 // if this a backedge
-                if(conn->to->graph_idx < i) fprintf(file, "[style=dashed, color=\"#FF263C\"]");
+                if(conn->node->graph_idx < i) fprintf(file, "[style=dashed, color=\"#FF263C\"]");
                 fprintf(file, ";\n");
             }
             if(!graph->nodes[i]->out) node_write(graph->nodes[i], file, print_func);
@@ -310,7 +310,7 @@ GRAPH* graph_copy(GRAPH* graph) {
 
             graph_oriented_connect(
                 new_graph->nodes[i],
-                new_graph->nodes[conn->to->graph_idx]
+                new_graph->nodes[conn->node->graph_idx]
                     );
         }
     }
@@ -347,7 +347,7 @@ void* graph_serialize(GRAPH* graph, unsigned long* num_bytes) {
         cursor+=sizeof(unsigned long);
         for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
-            memcpy(cursor, &conn->to->graph_idx, sizeof(unsigned long));
+            memcpy(cursor, &conn->node->graph_idx, sizeof(unsigned long));
             cursor+=sizeof(unsigned long);
         }
     }

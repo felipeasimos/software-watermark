@@ -19,7 +19,7 @@ uint8_t node_only_has_hamiltonian_edge(NODE* node) {
     if(node->graph_idx == node->graph->num_nodes-1) {
         return node->num_out_neighbours==0;
     } else {
-        return node->num_out_neighbours==1 && node->out->to->graph_idx==node->graph_idx+1 && (node->num_in_neighbours==1 || node->graph_idx==0);
+        return node->num_out_neighbours==1 && node->out->node->graph_idx==node->graph_idx+1 && (node->num_in_neighbours==1 || node->graph_idx==0);
     }
 }
 
@@ -35,10 +35,10 @@ CHECKER_BIT watermark_check_get_bit(GRAPH* graph, unsigned long idx, uint8_t bit
     } else if( graph_get_connection(graph->nodes[idx], graph->nodes[idx+2]) ) {
         return graph_get_connection(graph->nodes[idx+1], graph->nodes[idx+2]) ? BIT_1_FORWARD_EDGE_AND_BIT_0 : BIT_1_FORWARD_EDGE_AND_BIT_1;
     // if there is an odd backedge, return 1
-    } else if(( backedge = graph_get_backedge(graph->nodes[idx]) ) && ((idx - backedge->to->graph_idx) & 1)) {
+    } else if(( backedge = graph_get_backedge(graph->nodes[idx]) ) && ((idx - backedge->node->graph_idx) & 1)) {
         return BIT_1_BACKEDGE;
     // if there is an even backedge, return 0
-    } else if( backedge && !((idx - backedge->to->graph_idx) & 1) ) {
+    } else if( backedge && !((idx - backedge->node->graph_idx) & 1) ) {
         return BIT_0_BACKEDGE;
     // if there isn't a hamiltonian edge in the next node, return 1
     } else if( !graph_get_connection(graph->nodes[idx+1], graph->nodes[idx+2]) ) {
@@ -134,16 +134,16 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
                     return 0;
                 }
                 CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
-                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->to->graph_idx) & 1)) ||
-                ( !bit && ((graph_idx - backedge_conn->to->graph_idx) & 1) )) ||
-                ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx >= possible_backedges->n) {
+                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->node->graph_idx) & 1)) ||
+                ( !bit && ((graph_idx - backedge_conn->node->graph_idx) & 1) )) ||
+                ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
                     graph_unload_info(graph);
                     stack_free(odd_stack);
                     stack_free(even_stack);
                     return 0;
                 }
-                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx);
-                stack_pop_until(other_stack, history[backedge_conn->to->graph_idx]);
+                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
+                stack_pop_until(other_stack, history[backedge_conn->node->graph_idx]);
                 continue;
             case BIT_1_FORWARD_EDGE_AND_BIT_0:
                 if(!bit || ( i != total_number_of_bits-1 && get_bit(data, ++i) )) {
@@ -305,14 +305,14 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
                     break;
                 }
                 CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
-                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->to->graph_idx) & 1)) ||
-                ( !bit && ((graph_idx - backedge_conn->to->graph_idx) & 1) )) ||
-                ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx >= possible_backedges->n) {
+                if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->node->graph_idx) & 1)) ||
+                ( !bit && ((graph_idx - backedge_conn->node->graph_idx) & 1) )) ||
+                ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
                     bits[bit_arr_idx++] = 'x';
                     break;
                 }
-                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->to))->backedge_idx);
-                stack_pop_until(other_stack, history[backedge_conn->to->graph_idx]);
+                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
+                stack_pop_until(other_stack, history[backedge_conn->node->graph_idx]);
                 bits[bit_arr_idx++] = (checker_flag == BIT_0_BACKEDGE) ? '0' : '1';
                 continue;
             case BIT_1_FORWARD_EDGE_AND_BIT_0:

@@ -6,17 +6,11 @@
 
 struct NODE; //just so we can point to NODE struct before including node.h
 
-typedef enum DIRECTION {
-    IN,
-    OUT
-} DIRECTION;
-
 //connections, pointing to the next connection on the simple linked list
 typedef struct CONNECTION{
 
     struct NODE* parent; // node this connection struct belongs to
-    struct NODE* to; // the node this connections goes to
-    struct NODE* from; // the node this connection comes from
+    struct NODE* node; // node this connection points to or comes from (depends if this is an IN or OUT connection)
     struct CONNECTION* next;
     struct CONNECTION* prev;
 } CONNECTION;
@@ -24,7 +18,7 @@ typedef struct CONNECTION{
 #include "node/node.h" //we can't include it before 'struct NODE;'
 
 //create empty connection
-CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to);
+CONNECTION* connection_create(NODE* parent, NODE* node);
 
 void connection_insert(CONNECTION* connection, CONNECTION* conn);
 void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node);

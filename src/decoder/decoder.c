@@ -12,7 +12,7 @@ void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
             // get backedge
             CONNECTION* conn = graph_get_backedge(graph->nodes[i]);
-            bits[i] = ( graph->nodes[i]->graph_idx - conn->to->graph_idx ) & 1;
+            bits[i] = ( graph->nodes[i]->graph_idx - conn->node->graph_idx ) & 1;
         } else {
             bits[i] = 0;
         }
@@ -38,7 +38,7 @@ void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
                 bits[i]=1;
             } else {
                 CONNECTION* backedge = graph_get_backedge(graph->nodes[graph_idx]);
-                bits[i] = backedge && (( graph_idx - backedge->to->graph_idx ) & 1);
+                bits[i] = backedge && (( graph_idx - backedge->node->graph_idx ) & 1);
             }
         } else {
             i--;

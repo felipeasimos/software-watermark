@@ -124,7 +124,7 @@ unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsign
 
     CONNECTION* last_node_backedge = graph_get_backedge(graph->nodes[current_idx-1]);
     unsigned long backedge_idx = rand() % possible_backedges->n;
-    if( last_node_backedge && backedge_idx == last_node_backedge->to->graph_idx ) {
+    if( last_node_backedge && backedge_idx == last_node_backedge->node->graph_idx ) {
         if(backedge_idx == 0) {
             return 1;
         } else if(backedge_idx == possible_backedges->n-1){

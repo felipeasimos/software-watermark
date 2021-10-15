@@ -34,7 +34,7 @@ unsigned long dijkstra_num_in_neighbours(NODE* source) {
     // for a backedge to connect to this node and be marked as so, it must have been
     // properly analyzed before
     for(CONNECTION* conn_in = source->in; conn_in; conn_in = conn_in->next) {
-        n += ( !!node_get_info(conn_in->from) );
+        n += ( !!node_get_info(conn_in->node) );
     }
 
     return n;
@@ -44,7 +44,7 @@ unsigned long dijkstra_num_in_backedges(NODE* source) {
 
     unsigned long n = 0;
     for(CONNECTION* conn = source->in; conn; conn = conn->next) {
-        n += ( conn->from->graph_idx > source->graph_idx );
+        n += ( conn->node->graph_idx > source->graph_idx );
     }
     return n;
 }
@@ -57,13 +57,13 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
     if(!source_sink->num_out_neighbours) return prime;
 
     // sequence or repeat
-    if(source_sink->num_out_neighbours == 1 && dijkstra_num_in_neighbours(source_sink->out->to) == 1) {
-        NODE* dest = source_sink->out->to;
+    if(source_sink->num_out_neighbours == 1 && dijkstra_num_in_neighbours(source_sink->out->node) == 1) {
+        NODE* dest = source_sink->out->node;
         NODE* dest_sink = dijkstra_get_sink(dest);
         // if destination has two out neighbours and one of them is source
         if(dest_sink->num_out_neighbours == 2 && graph_get_connection(dest_sink, source)) {
 
-            NODE* sink_node = dijkstra_get_sink(dest_sink->out->to == source ? dest_sink->out->next->to : dest_sink->out->to);
+            NODE* sink_node = dijkstra_get_sink(dest_sink->out->node == source ? dest_sink->out->next->node : dest_sink->out->node);
             prime.type = REPEAT;
             prime.sink = sink_node;
             // set sink of node with backedge to NULL
@@ -75,17 +75,17 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             // make sure this won't create a cycle between a forward edge and a backedge
             CONNECTION* backedge = graph_get_backedge(dest_sink);
             if(source->num_in_neighbours && backedge &&
-                backedge->to->num_out_neighbours > 1 &&
-                graph_get_connection(backedge->to, source) &&
+                backedge->node->num_out_neighbours > 1 &&
+                graph_get_connection(backedge->node, source) &&
                 // if inside repeat
                 ((
-                    dijkstra_num_in_backedges(backedge->to) == 1 &&
+                    dijkstra_num_in_backedges(backedge->node) == 1 &&
                     dijkstra_num_in_neighbours(source) == 2 &&
-                    dijkstra_get_sink(backedge->to)->num_out_neighbours == 2
+                    dijkstra_get_sink(backedge->node)->num_out_neighbours == 2
                     ) || (
-                    dijkstra_num_in_backedges(backedge->to) == 2 &&
+                    dijkstra_num_in_backedges(backedge->node) == 2 &&
                     dijkstra_num_in_neighbours(source) == 1 &&
-                    dijkstra_get_sink(backedge->to)->num_out_neighbours == 2   
+                    dijkstra_get_sink(backedge->node)->num_out_neighbours == 2   
                   ))) {
                 return prime;
             }
@@ -96,11 +96,11 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
         }
     // while, if or p-case
     } else if(source_sink->num_out_neighbours > 1 &&
-        source->graph_idx < source_sink->out->to->graph_idx &&
-        source->graph_idx < source_sink->out->next->to->graph_idx) {
+        source->graph_idx < source_sink->out->node->graph_idx &&
+        source->graph_idx < source_sink->out->next->node->graph_idx) {
 
-        NODE* node1 = source_sink->out->to;
-        NODE* node2 = source_sink->out->next->to;
+        NODE* node1 = source_sink->out->node;
+        NODE* node2 = source_sink->out->next->node;
         NODE* node1_sink = dijkstra_get_sink(node1);
         NODE* node2_sink = dijkstra_get_sink(node2);
 
@@ -144,15 +144,15 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             prime.sink = NULL;
             for(CONNECTION* conn = source_sink->out; conn; conn = conn->next) {
 
-                NODE* node = conn->to;
+                NODE* node = conn->node;
                 NODE* node_sink = dijkstra_get_sink(node);
                 if( node_sink->num_out_neighbours != 1 || dijkstra_num_in_neighbours(node) != 1 ) {
                     prime.type = INVALID;
                     prime.sink = NULL;
                     return prime;
                 } else if(!prime.sink){
-                    prime.sink = node_sink->out->to;
-                } else if(prime.sink != node_sink->out->to) {
+                    prime.sink = node_sink->out->node;
+                } else if(prime.sink != node_sink->out->node) {
                     prime.type = INVALID;
                     prime.sink = NULL;
                     return prime;
@@ -222,15 +222,15 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
 
         // add code from the only out-neighbour
         case SEQUENCE: {
-            dijkstra_merge_codes(codes, source, source_sink->out->to, prime.type);
-            free(codes[source_sink->out->to->graph_idx]);
+            dijkstra_merge_codes(codes, source, source_sink->out->node, prime.type);
+            free(codes[source_sink->out->node->graph_idx]);
             break;
         }
         // add code from if block and final node
         case IF_THEN: {
-            uint8_t node1_connects_to_node2 = !!graph_get_connection(dijkstra_get_sink(source_sink->out->to), source_sink->out->next->to);
-            NODE* middle_node = node1_connects_to_node2 ? source_sink->out->to : source_sink->out->next->to;
-            NODE* final_node = node1_connects_to_node2 ? source_sink->out->next->to : source_sink->out->to;
+            uint8_t node1_connects_to_node2 = !!graph_get_connection(dijkstra_get_sink(source_sink->out->node), source_sink->out->next->node);
+            NODE* middle_node = node1_connects_to_node2 ? source_sink->out->node : source_sink->out->next->node;
+            NODE* final_node = node1_connects_to_node2 ? source_sink->out->next->node : source_sink->out->node;
             dijkstra_merge_codes(codes, source, middle_node, prime.type);
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[middle_node->graph_idx]);
@@ -239,9 +239,9 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
         }
         // add code from while block and final node
         case WHILE: {
-            uint8_t node1_connects_back = !!graph_get_connection(dijkstra_get_sink(source_sink->out->to), source);
-            NODE* connect_back_node = node1_connects_back ? source_sink->out->to : source_sink->out->next->to;
-            NODE* final_node = node1_connects_back ? source_sink->out->next->to : source_sink->out->to;
+            uint8_t node1_connects_back = !!graph_get_connection(dijkstra_get_sink(source_sink->out->node), source);
+            NODE* connect_back_node = node1_connects_back ? source_sink->out->node : source_sink->out->next->node;
+            NODE* final_node = node1_connects_back ? source_sink->out->next->node : source_sink->out->node;
             dijkstra_merge_codes(codes, source, connect_back_node, prime.type);
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[connect_back_node->graph_idx]);
@@ -249,9 +249,9 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             break;
         }
         case REPEAT: {
-            NODE* middle_node = source_sink->out->to;
+            NODE* middle_node = source_sink->out->node;
             NODE* middle_node_sink = dijkstra_get_sink(middle_node);
-            NODE* final_node = middle_node_sink->out->to != source ? middle_node_sink->out->to : middle_node_sink->out->next->to;
+            NODE* final_node = middle_node_sink->out->node != source ? middle_node_sink->out->node : middle_node_sink->out->next->node;
             dijkstra_merge_codes(codes, source, middle_node, prime.type);
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[middle_node->graph_idx]);
@@ -261,7 +261,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
         case IF_THEN_ELSE:
         case P_CASE: {
             unsigned long id_num = source_sink->num_out_neighbours + 4;
-            NODE* final_node = dijkstra_get_sink(source_sink->out->to)->out->to;
+            NODE* final_node = dijkstra_get_sink(source_sink->out->node)->out->node;
             // add 'id_num' to source node code
             char id_num_str[25];
             sprintf(id_num_str, "%lu", id_num);
@@ -270,8 +270,8 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             strcat(codes[source->graph_idx], id_num_str);
             // add the code of each middle node, following the topological order
             for(CONNECTION* conn = source_sink->out; conn; conn = conn->next) {
-                dijkstra_merge_codes(codes, source, conn->to, 0);
-                free(codes[conn->to->graph_idx]);
+                dijkstra_merge_codes(codes, source, conn->node, 0);
+                free(codes[conn->node->graph_idx]);
             }
             // add final node code
             dijkstra_merge_codes(codes, source, final_node, 0);

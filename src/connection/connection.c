@@ -1,6 +1,6 @@
 #include "connection/connection.h"
 
-CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to) {
+CONNECTION* connection_create(NODE* parent, NODE* node) {
 
 	//allocate memory for struct
 	CONNECTION* connection = malloc(sizeof(CONNECTION));
@@ -8,8 +8,7 @@ CONNECTION* connection_create(NODE* parent, NODE* from, NODE* to) {
 
 	//set weight to one by default
     connection->parent = parent;
-    connection->from = from;
-    connection->to = to;
+    connection->node = node;
 
 	return connection;
 }
@@ -24,13 +23,13 @@ void connection_insert(CONNECTION* root, CONNECTION* new_connection) {
 
 void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, node, connection_root->parent);
+    CONNECTION* conn = connection_create(connection_root->parent, node);
     connection_insert(connection_root, conn);
 }
 
 void connection_insert_out_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    CONNECTION* conn = connection_create(connection_root->parent, connection_root->parent, node);
+    CONNECTION* conn = connection_create(connection_root->parent, node);
     connection_insert(connection_root, conn);
 }
 
@@ -44,7 +43,7 @@ CONNECTION* connection_search_in_neighbour(CONNECTION* connection_node, NODE* gr
 	connection_node = connection_node->next ){
 
 		//return current_connection if it is graph_connection
-		if( connection_node->from == graph_node ) return connection_node;
+		if( connection_node->node == graph_node ) return connection_node;
 	}
 
 	//no connection equivalent to graph_connection, so return NULL
@@ -61,7 +60,7 @@ CONNECTION* connection_search_out_neighbour(CONNECTION* connection_node, NODE* g
 	connection_node = connection_node->next ){
 
 		//return current_connection if it is graph_connection
-		if( connection_node->to == graph_node ) return connection_node;
+		if( connection_node->node == graph_node ) return connection_node;
 	}
 
 	//no connection equivalent to graph_connection, so return NULL
@@ -113,7 +112,7 @@ void connection_print(CONNECTION* connection, void(*print_func)(FILE*, NODE*)){
 
 	//iterate through list and print each node the connections represent
 	for(; connection; connection = connection->next) {
-        node_print(connection->to, print_func);
+        node_print(connection->node, print_func);
         printf(" ");
     }
 }

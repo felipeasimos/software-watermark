@@ -82,12 +82,12 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
     if(node_from->out) {
         connection_insert_out_neighbour( node_from->out, node_to );
     } else {
-        node_from->out = connection_create(node_from, node_from, node_to);
+        node_from->out = connection_create(node_from, node_to);
     }
     if(node_to->in) {
         connection_insert_in_neighbour( node_to->in, node_from );
     } else {
-        node_to->in = connection_create(node_to, node_from, node_to);
+        node_to->in = connection_create(node_to, node_from);
     }
 
     // update counts
@@ -249,17 +249,17 @@ void node_set_info(NODE* node, void* info, unsigned long info_len) {
 void node_transfer_out_connections(NODE* from, NODE* to) {
 
     // copy all out connections
-    for(CONNECTION* conn = from->out; conn; conn = conn->next) graph_oriented_connect(to, conn->to);
+    for(CONNECTION* conn = from->out; conn; conn = conn->next) graph_oriented_connect(to, conn->node);
     // remove all out connections
-    while(from->out) graph_oriented_disconnect(from, from->out->to);
+    while(from->out) graph_oriented_disconnect(from, from->out->node);
 }
 
 void node_transfer_in_connections(NODE* from, NODE* to) {
 
     // copy all in connections
-    for(CONNECTION* conn = from->in; conn; conn = conn->next) graph_oriented_connect(conn->to, to);
+    for(CONNECTION* conn = from->in; conn; conn = conn->next) graph_oriented_connect(conn->node, to);
     // remove all out connections
-    while(from->in) graph_oriented_disconnect(from->in->from, from);
+    while(from->in) graph_oriented_disconnect(from->in->node, from);
 }
 
 NODE* node_expand_to_sequence(NODE* node) {
