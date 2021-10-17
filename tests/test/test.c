@@ -4,6 +4,7 @@
 #include "decoder/decoder.h"
 #include "dijkstra/dijkstra.h"
 #include "checker/checker.h"
+#include "sequence_alignment/sequence_alignment.h"
 
 #define PRINT_K(k)\
         char str[100];\
@@ -81,6 +82,33 @@ int get_bit_test() {
     ctdd_assert( get_bit(&k, 5) == 0 );
     ctdd_assert( get_bit(&k, 6) == 0 );
     ctdd_assert( get_bit(&k, 7) == 1 );
+    return 0;
+}
+
+int numeric_encoding_string_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        char s[10];
+        sprintf(s, "%hhu", k);
+        unsigned long data_len;
+        void* data = encode_numeric_string(s, &data_len);
+        uint8_t* final_s = decode_numeric_string(data, &data_len);
+        ctdd_assert( !memcmp(final_s, s, data_len) );
+        free(final_s);
+        free(data);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        char s[50];
+        sprintf(s, "%lu", k);
+        unsigned long data_len;
+        void* data = encode_numeric_string(s, &data_len);
+        uint8_t* final_s = decode_numeric_string(data, &data_len);
+        ctdd_assert( !memcmp(final_s, s, data_len) );
+        free(final_s);
+        free(data);
+    }
     return 0;
 }
 
@@ -269,7 +297,6 @@ int dijkstra_code_test() {
     node_expand_to_sequence(graph->nodes[2]);
     node_expand_to_sequence(graph->nodes[12]);
 
-    graph_topological_sort(graph);
     char* code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "161312111412161111121") );
     graph_free(graph);
@@ -294,6 +321,7 @@ int dijkstra_code_test() {
     node_expand_to_while(graph->nodes[1]);
     node_expand_to_if_then(graph->nodes[4]);
     node_expand_to_sequence(graph->nodes[7]);
+    graph_topological_sort(graph);
     code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "1614111311121") );
     graph_free(graph);
@@ -303,6 +331,33 @@ int dijkstra_code_test() {
 }
 
 int dijkstra_watermark_code_test() {
+
+    // bento 2017 - dijkstra Fig. 8
+    GRAPH* graph = graph_create(1);
+    node_expand_to_if_then_else(graph->nodes[0]);
+    node_expand_to_while(graph->nodes[2]);
+    node_expand_to_sequence(graph->nodes[3]);
+    node_expand_to_if_then_else(graph->nodes[4]);
+    node_expand_to_if_then(graph->nodes[1]);
+    node_expand_to_sequence(graph->nodes[2]);
+    node_expand_to_sequence(graph->nodes[12]);
+    GRAPH* new = dijkstra_generate("161312111412161111121");
+    ctdd_assert(new);
+    ctdd_assert(dijkstra_is_equal(graph, new));
+    graph_free(graph);
+    graph_free(new);
+
+    // bento 2017 - Fig 5
+    graph = graph_create(1);
+    node_expand_to_if_then_else(graph->nodes[0]);
+    node_expand_to_while(graph->nodes[1]);
+    node_expand_to_if_then(graph->nodes[4]);
+    node_expand_to_sequence(graph->nodes[7]);
+    new = dijkstra_generate("1614111311121");
+    ctdd_assert(new);
+    ctdd_assert( dijkstra_is_equal(graph, new) );
+    graph_free(graph);
+    graph_free(new);
 
     for(uint8_t k = 1; k < 255; k++) {
 
@@ -427,7 +482,6 @@ int watermark_check_rs_analysis_test() {
 
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
         unsigned long size = sizeof(k);
-        PRINT_K(k);
         uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 3);
         uint8_t result = has_x(bit_arr, size);
         if(!result) {
@@ -450,9 +504,17 @@ int watermark_check_rs_analysis_test() {
     return 0;
 }
 
+int sequence_alignment_score_test() {
+
+    ctdd_assert(sequence_alignment_score_needleman_wunsch("ACGGCTC", "ATGGCCTC", -3, 1, -4) == (unsigned long)-1);
+
+    return 0;
+}
+
 int run_tests() {
 
     ctdd_verify(graph_test);
+    ctdd_verify(numeric_encoding_string_test);
     ctdd_verify(get_bit_test);
     ctdd_verify(watermark2014_test);
     ctdd_verify(watermark2014_rs_test);
@@ -467,6 +529,8 @@ int run_tests() {
     ctdd_verify(watermark_check_analysis_test);
     ctdd_verify(watermark_check_rs_test);
     ctdd_verify(watermark_check_rs_analysis_test);
+    ctdd_verify(sequence_alignment_score_test);
+
 	return 0;
 }
 

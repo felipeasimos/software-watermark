@@ -42,6 +42,8 @@ void invert_binary_sequence(uint8_t* data, unsigned long size);
 unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes);
 uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes);
 uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_bytes1, unsigned long num_bytes2);
+void* encode_numeric_string(char* string, unsigned long* data_len);
+void* decode_numeric_string(void* data, unsigned long* data_len);
 
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);

@@ -307,8 +307,7 @@ NODE* node_expand_to_if_then(NODE* node) {
 }
 NODE* node_expand_to_if_then_else(NODE* node) {
 
-    node_expand_to_p_case(node, 2);
-    return node->graph->nodes[node->graph_idx+3];
+    return node_expand_to_p_case(node, 2);
 }
 NODE* node_expand_to_p_case(NODE* node, unsigned long p) {
 

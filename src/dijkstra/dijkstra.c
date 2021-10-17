@@ -357,15 +357,16 @@ char* dijkstra_generate_recursive(char* dijkstra_code, NODE* source) {
 
     if( type >= P_CASE || type == IF_THEN_ELSE ) {
         unsigned long p = type - 4;
-        node_expand_to_p_case(source, p);
-        NODE* next_p_node = source->graph->nodes[source->graph_idx+2];
+        NODE* sink_node = node_expand_to_p_case(source, p);
         NODE* current_node = source->graph->nodes[source->graph_idx+1];
+        NODE* next_p_node = source->graph->nodes[source->graph_idx+2];
+        dijkstra_code+=2;
         for(unsigned long i = 0; i < p; i++) {
-            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, next_p_node);
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code, current_node);
             current_node = next_p_node;
-            next_p_node = next_p_node->graph->nodes[next_p_node->graph_idx+1];
+            next_p_node = i != p-1 ? next_p_node->graph->nodes[next_p_node->graph_idx+1] : next_p_node;
         }
-        return dijkstra_generate_recursive(dijkstra_code+2, next_p_node);
+        return dijkstra_generate_recursive(dijkstra_code, sink_node);
     }
     switch(type) {
         case TRIVIAL:

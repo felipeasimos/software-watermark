@@ -1,5 +1,10 @@
 #include "graph/graph.h"
 
+void graph_print_node_idx(FILE* f, NODE* node) {
+
+    fprintf(f, "%lu", node->graph_idx);
+}
+
 // create graph with N empty nodes;
 GRAPH* graph_create(unsigned long num_nodes) {
 
@@ -38,6 +43,15 @@ void graph_print(GRAPH* graph, void (*print_func)(FILE*, NODE*)) {
         connection_print(graph->nodes[i]->out, print_func);
         printf("\n");
     }
+}
+
+CONNECTION* is_backedge_destination(NODE* node) {
+
+    for(CONNECTION* conn = node->in; conn; conn = conn->next) {
+
+        if(conn->node->graph_idx > node->graph_idx) return conn;
+    }
+    return NULL;
 }
 
 // add node to graph
@@ -203,10 +217,6 @@ void graph_free_info(GRAPH* graph) {
 // free all info from all nodes
 void graph_free_all_info(GRAPH* graph) { 
     for(unsigned long i = 0; i < graph->num_nodes; i++) node_free_all_info(graph->nodes[i]);
-}
-void graph_print_node_idx(FILE* f, NODE* node) {
-
-    fprintf(f, "%lu", node->graph_idx);
 }
 
 // label can be NULL

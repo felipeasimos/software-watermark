@@ -114,6 +114,54 @@ uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_
     return 1;
 }
 
+void* encode_numeric_string(char* string, unsigned long* data_len) {
+
+    if( !string ) return NULL;
+
+    unsigned long size = strlen(string);
+
+    unsigned long offset = size % 4;
+    *data_len = 3 * (size/4) + offset;
+    uint8_t* data = malloc(*data_len);
+    memset(data, 0x00, *data_len);
+
+    unsigned long data_idx = offset == 1 ? 2 : 4;
+    if(!offset) data_idx = 0;
+
+    for(unsigned long i = 0; i < size; i++) {
+
+        if( string[i] ) {
+            for(unsigned long j = 2; j < 8; j++) {
+
+                set_bit(data, data_idx++, get_bit((uint8_t*)string, i*8+j));
+            }
+        }
+    }
+    return data;
+}
+
+void* decode_numeric_string(void* data, unsigned long* data_len) {
+
+    unsigned long num_bits = *data_len * 8;
+    uint8_t offset = get_first_positive_bit_index(data, *data_len);
+    unsigned long str_size = 4 * ((*data_len - offset/8)/3) + ((*data_len - offset/8)% 3);
+
+    if( !(str_size % 4) && offset ) str_size--;
+    uint8_t* str = malloc(str_size);
+    memset(str, 0x00, str_size);
+
+    unsigned long str_idx = 2;
+
+    for(unsigned long i = offset; i < num_bits && str_idx < str_size * 8; i++) {
+
+        set_bit((uint8_t*)str, str_idx++, get_bit(data, i));
+
+        if( !(str_idx % 8) ) str_idx+=2;
+    }
+    *data_len = str_size;
+    return str;
+}
+
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx) {
 
     return possible_backedges->n && !( possible_backedges->n == 1 &&
