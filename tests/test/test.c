@@ -290,12 +290,18 @@ int dijkstra_code_test() {
     // bento 2017 - Fig. 8
     GRAPH* graph = graph_create(1);
     node_expand_to_if_then_else(graph->nodes[0]);
-    node_expand_to_while(graph->nodes[2]);
+    node_expand_to_if_then(graph->nodes[2]);
+    node_expand_to_sequence(graph->nodes[3]);
+    node_expand_to_while(graph->nodes[1]);
+    node_expand_to_sequence(graph->nodes[2]);
+    node_expand_to_if_then_else(graph->nodes[3]);
+    node_expand_to_sequence(graph->nodes[12]);
+    /*node_expand_to_while(graph->nodes[2]);
     node_expand_to_sequence(graph->nodes[3]);
     node_expand_to_if_then_else(graph->nodes[4]);
     node_expand_to_if_then(graph->nodes[1]);
     node_expand_to_sequence(graph->nodes[2]);
-    node_expand_to_sequence(graph->nodes[12]);
+    node_expand_to_sequence(graph->nodes[12]);*/
 
     char* code = dijkstra_get_code(graph);
     ctdd_assert( !strcmp(code, "161312111412161111121") );
@@ -318,8 +324,11 @@ int dijkstra_code_test() {
     // bento 2017 - Fig 5
     graph = graph_create(1);
     node_expand_to_if_then_else(graph->nodes[0]);
-    node_expand_to_while(graph->nodes[1]);
+    /*node_expand_to_while(graph->nodes[1]);
     node_expand_to_if_then(graph->nodes[4]);
+    node_expand_to_sequence(graph->nodes[7]);*/
+    node_expand_to_if_then(graph->nodes[1]);
+    node_expand_to_while(graph->nodes[4]);
     node_expand_to_sequence(graph->nodes[7]);
     graph_topological_sort(graph);
     code = dijkstra_get_code(graph);
@@ -335,14 +344,15 @@ int dijkstra_watermark_code_test() {
     // bento 2017 - dijkstra Fig. 8
     GRAPH* graph = graph_create(1);
     node_expand_to_if_then_else(graph->nodes[0]);
-    node_expand_to_while(graph->nodes[2]);
+    node_expand_to_if_then(graph->nodes[2]);
     node_expand_to_sequence(graph->nodes[3]);
-    node_expand_to_if_then_else(graph->nodes[4]);
-    node_expand_to_if_then(graph->nodes[1]);
+    node_expand_to_while(graph->nodes[1]);
     node_expand_to_sequence(graph->nodes[2]);
+    node_expand_to_if_then_else(graph->nodes[3]);
     node_expand_to_sequence(graph->nodes[12]);
     GRAPH* new = dijkstra_generate("161312111412161111121");
     ctdd_assert(new);
+    graph_write_dot(new, "dot.dot", dijkstra_get_code(graph));
     ctdd_assert(dijkstra_is_equal(graph, new));
     graph_free(graph);
     graph_free(new);
@@ -350,14 +360,21 @@ int dijkstra_watermark_code_test() {
     // bento 2017 - Fig 5
     graph = graph_create(1);
     node_expand_to_if_then_else(graph->nodes[0]);
-    node_expand_to_while(graph->nodes[1]);
-    node_expand_to_if_then(graph->nodes[4]);
+    node_expand_to_if_then(graph->nodes[1]);
+    node_expand_to_while(graph->nodes[4]);
     node_expand_to_sequence(graph->nodes[7]);
     new = dijkstra_generate("1614111311121");
     ctdd_assert(new);
     ctdd_assert( dijkstra_is_equal(graph, new) );
     graph_free(graph);
     graph_free(new);
+
+    // a random graph i generated from a dijkstra code
+    GRAPH* g = dijkstra_generate("161512161213111111716111121151111");
+    char* code = dijkstra_get_code(g);
+    ctdd_assert( !strcmp(code, "161512161213111111716111121151111") );
+    free(code);
+    graph_free(g);
 
     for(uint8_t k = 1; k < 255; k++) {
 

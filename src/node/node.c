@@ -59,11 +59,11 @@ uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to){
 	//delete node_to from node_from's connection's list
     //and update counts if connection existed
     uint8_t deleted=0;
-	if( connection_delete_out_neighbour( node_from->out, node_to ) ) {
+	if( connection_delete_neighbour( node_from->out, node_to ) ) {
         node_from->num_out_neighbours--;
         deleted=1;
     }
-    if( connection_delete_in_neighbour( node_to->in, node_from ) ) {
+    if( connection_delete_neighbour( node_to->in, node_from ) ) {
 
         node_to->num_in_neighbours--;
         deleted=1;
@@ -78,12 +78,12 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
 
 	//insert node_to in node_from's connections list
     if(node_from->out) {
-        connection_insert_out_neighbour( node_from->out, node_to );
+        connection_insert_neighbour( node_from->out, node_to );
     } else {
         node_from->out = connection_create(node_from, node_to);
     }
     if(node_to->in) {
-        connection_insert_in_neighbour( node_to->in, node_from );
+        connection_insert_neighbour( node_to->in, node_from );
     } else {
         node_to->in = connection_create(node_to, node_from);
     }
@@ -95,7 +95,7 @@ void node_oriented_connect(NODE* node_from, NODE* node_to){
 
 CONNECTION* node_get_connection(NODE* node_from, NODE* node_to) {
 
-    return connection_search_out_neighbour(node_from->out, node_to);
+    return connection_search_neighbour(node_from->out, node_to);
 }
 
 void node_disconnect(NODE* node1, NODE* node2){

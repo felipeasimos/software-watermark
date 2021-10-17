@@ -21,15 +21,12 @@ typedef struct CONNECTION{
 CONNECTION* connection_create(NODE* parent, NODE* node);
 
 void connection_insert(CONNECTION* connection, CONNECTION* conn);
-void connection_insert_in_neighbour(CONNECTION* connection_root, NODE* node);
-void connection_insert_out_neighbour(CONNECTION* connection_root, NODE* node);
+void connection_insert_neighbour(CONNECTION* connection_root, NODE* node);
 
-CONNECTION* connection_search_in_neighbour(CONNECTION* connection_node, NODE* graph_node);
-CONNECTION* connection_search_out_neighbour(CONNECTION* connection_node, NODE* graph_node);
+CONNECTION* connection_search_neighbour(CONNECTION* connection_node, NODE* graph_node);
 
 void connection_delete(CONNECTION* conn);
-uint8_t connection_delete_in_neighbour(CONNECTION* connection_node, NODE* graph_node);
-uint8_t connection_delete_out_neighbour(CONNECTION* connection_node, NODE* graph_node);
+uint8_t connection_delete_neighbour(CONNECTION* connection_node, NODE* graph_node);
 
 void connection_free(CONNECTION* connection_root);
 

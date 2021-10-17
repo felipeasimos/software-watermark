@@ -268,7 +268,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             node_set_info(source, source_sink, node_get_info_len(source) + strlen(id_num_str));
             codes[source->graph_idx] = realloc(codes[source->graph_idx], node_get_info_len(source));
             strcat(codes[source->graph_idx], id_num_str);
-            // add the code of each middle node, following the topological order
+            // add the code of each middle node, starting from the last connection
             for(CONNECTION* conn = source_sink->out; conn; conn = conn->next) {
                 dijkstra_merge_codes(codes, source, conn->node, 0);
                 free(codes[conn->node->graph_idx]);
@@ -358,13 +358,10 @@ char* dijkstra_generate_recursive(char* dijkstra_code, NODE* source) {
     if( type >= P_CASE || type == IF_THEN_ELSE ) {
         unsigned long p = type - 4;
         NODE* sink_node = node_expand_to_p_case(source, p);
-        NODE* current_node = source->graph->nodes[source->graph_idx+1];
-        NODE* next_p_node = source->graph->nodes[source->graph_idx+2];
         dijkstra_code+=2;
-        for(unsigned long i = 0; i < p; i++) {
-            dijkstra_code = dijkstra_generate_recursive(dijkstra_code, current_node);
-            current_node = next_p_node;
-            next_p_node = i != p-1 ? next_p_node->graph->nodes[next_p_node->graph_idx+1] : next_p_node;
+        // get last connection from source code and start expanding from it
+        for(CONNECTION* conn = source->out; conn; conn = conn->next) {
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code, conn->node);
         }
         return dijkstra_generate_recursive(dijkstra_code, sink_node);
     }
