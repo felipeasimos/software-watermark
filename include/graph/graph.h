@@ -1,7 +1,13 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
+#define STRINGIFY_(x)
+#define STRINGIFY(x) STRINGIFY_(x)
+#define MAX_NODE_NAME_SIZE 4096
+#define MAX_NODE_NAME_SIZE_STR STRINGIFY(MAX_NODE_NAME_SIZE-1)
+
 #include <stdint.h>
+#include "set/set.h"
 
 struct NODE;
 
@@ -15,6 +21,7 @@ typedef struct GRAPH {
 #include "node/node.h"
 #include "utils/utils.h"
 #include "dijkstra/dijkstra.h"
+#include "hashmap/hashmap.h"
 
 // create graph with N empty nodes;
 GRAPH* graph_create(unsigned long num_nodes);
@@ -96,5 +103,10 @@ void* graph_serialize(GRAPH*, unsigned long* num_bytes);
 
 // deserialize the graph
 GRAPH* graph_deserialize(uint8_t*);
+
+// create graph from dot file
+// dot files should only use "a -> b" syntax to connect nodes
+// only nodes with connections will be considered
+GRAPH* graph_create_from_dot(FILE* f);
 
 #endif

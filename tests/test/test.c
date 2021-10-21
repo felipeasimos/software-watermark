@@ -352,7 +352,6 @@ int dijkstra_watermark_code_test() {
     node_expand_to_sequence(graph->nodes[12]);
     GRAPH* new = dijkstra_generate("161312111412161111121");
     ctdd_assert(new);
-    graph_write_dot(new, "dot.dot", dijkstra_get_code(graph));
     ctdd_assert(dijkstra_is_equal(graph, new));
     graph_free(graph);
     graph_free(new);
@@ -369,7 +368,7 @@ int dijkstra_watermark_code_test() {
     graph_free(graph);
     graph_free(new);
 
-    // a random graph i generated from a dijkstra code
+    // a random graph i generated from a dijkstra code (with a 3-case switch case)
     GRAPH* g = dijkstra_generate("161512161213111111716111121151111");
     char* code = dijkstra_get_code(g);
     ctdd_assert( !strcmp(code, "161512161213111111716111121151111") );
@@ -523,14 +522,16 @@ int watermark_check_rs_analysis_test() {
 
 int sequence_alignment_score_test() {
 
-    ctdd_assert(sequence_alignment_score_needleman_wunsch("ACGGCTC", "ATGGCCTC", -3, 1, -4) == (unsigned long)-1);
+    long score = sequence_alignment_score_needleman_wunsch("GATTACA", "GCATGCG", 1, -1, -1);
+    printf("%ld\n", score);
+    ctdd_assert( score == 0);
 
     return 0;
 }
 
 int run_tests() {
 
-    ctdd_verify(graph_test);
+    /*ctdd_verify(graph_test);
     ctdd_verify(numeric_encoding_string_test);
     ctdd_verify(get_bit_test);
     ctdd_verify(watermark2014_test);
@@ -546,7 +547,7 @@ int run_tests() {
     ctdd_verify(watermark_check_analysis_test);
     ctdd_verify(watermark_check_rs_test);
     ctdd_verify(watermark_check_rs_analysis_test);
-    ctdd_verify(sequence_alignment_score_test);
+    ctdd_verify(sequence_alignment_score_test);*/
 
 	return 0;
 }
@@ -555,6 +556,15 @@ int main() {
 
     srand(time(0));
 	ctdd_setup_signal_handler();
+
+    FILE* file = fopen("dot_test.dot", "r");
+    GRAPH* graph = graph_create_from_dot(file);
+    graph_topological_sort(graph);
+    char* code = dijkstra_get_code(graph);
+    graph_write_dot(graph, "dot.dot", code);
+    graph_free(graph);
+    fclose(file);
+    free(code);
 
 	return ctdd_test(run_tests);
 }

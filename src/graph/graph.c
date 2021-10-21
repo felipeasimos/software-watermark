@@ -78,6 +78,7 @@ void graph_insert(GRAPH* graph, unsigned long idx) {
 // swap the index of two nodes
 void graph_swap(NODE* a, NODE* b) {
 
+    if(a == b) return;
     unsigned long tmp = a->graph_idx;
     a->graph_idx = b->graph_idx;
     b->graph_idx = tmp;
@@ -162,12 +163,15 @@ void graph_topological_sort(GRAPH* graph) {
     STACK* stack = stack_create(graph->num_nodes);
     NODE** ordered_nodes = calloc(graph->num_nodes, sizeof(NODE*));
 
+    unsigned long source_idx = 0;
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
         TOPO_NODE* topo = malloc(sizeof(TOPO_NODE));
         topo->mark = 0;
         topo->check_next = graph->nodes[i]->out;
         node_load_info(graph->nodes[i], topo, sizeof(TOPO_NODE));
+        if(!graph->nodes[i]->num_in_neighbours) source_idx = i;
     }
+    if(source_idx) graph_swap(graph->nodes[0], graph->nodes[source_idx]);
     unsigned long t = 0;
     stack_push(stack, 0);
     ((TOPO_NODE*)node_get_info(graph->nodes[0]))->mark=1;
@@ -395,6 +399,59 @@ GRAPH* graph_deserialize(uint8_t* data) {
             graph_oriented_connect(graph->nodes[i], graph->nodes[j]);
         }
     }
+
+    return graph;
+}
+
+// create graph from dot file
+GRAPH* graph_create_from_dot(FILE* file) {
+
+    SET* set = set_create(1); // set to copy the data
+    fseek(file, 0L, SEEK_SET);
+    // get number of nodes
+    char node1[MAX_NODE_NAME_SIZE];
+    char node2[MAX_NODE_NAME_SIZE];
+    int res = 0;
+    while(( res = fscanf(file, " %" MAX_NODE_NAME_SIZE_STR "s -> %" MAX_NODE_NAME_SIZE_STR "[^;]; \n", node1, node2) ) != EOF) {
+
+        if(res != 2) continue;
+        // the last ':' find in any of the strings is replaced by a null terminator 
+
+        char* to_replace = NULL;
+        if(( to_replace = strrchr(node1, ':') )) *to_replace = '\0';
+        if(( to_replace = strrchr(node2, ':') )) *to_replace = '\0';
+        set_add(set, node1, strlen(node1)+1);
+        set_add(set, node2, strlen(node2)+1);
+    }
+    unsigned long num_nodes = set->n;
+
+    // add labels  to hashmap
+    HASHMAP* hashmap = hashmap_create(num_nodes, 1, 1, NULL);
+    SET_DATA* node = set->set;
+    for(unsigned long i = 0; i < set->n; i++) {
+        hashmap_set(hashmap, node->data, node->data_len, &i, sizeof(i));
+        node = node->next;
+    }
+    set_free(set);
+
+    GRAPH* graph = graph_create(num_nodes);
+    fseek(file, 0L, SEEK_SET);
+    while(( res = fscanf(file, " %" MAX_NODE_NAME_SIZE_STR "s -> %" MAX_NODE_NAME_SIZE_STR "[^;]; ", node1, node2) ) != EOF) {
+
+        if(res != 2) continue;
+        // the last ':' find in any of the strings is replaced by a null terminator 
+
+        char* to_replace = NULL;
+        if(( to_replace = strrchr(node1, ':') )) *to_replace = '\0';
+        if(( to_replace = strrchr(node2, ':') )) *to_replace = '\0';
+        unsigned long node1_len = strlen(node1)+1;
+        unsigned long node2_len = strlen(node2)+1;
+        graph_oriented_connect(
+                graph->nodes[*(unsigned long*)hashmap_get(hashmap, node1, &node1_len)],
+                graph->nodes[*(unsigned long*)hashmap_get(hashmap, node2, &node2_len)]
+        );
+    }
+    hashmap_free(hashmap);
 
     return graph;
 }

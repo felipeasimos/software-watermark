@@ -1,5 +1,26 @@
 #include "utils/utils.h"
 
+uint8_t is_little_endian_machine() {
+
+	uint16_t x = 1;
+
+	// if it is little endian, 1 should be the first byte
+	return ((uint8_t*)(&x))[0];
+}
+
+unsigned long ceil_power_of_2(unsigned long n) {
+
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n |= n >> 32;
+    n++;
+    return n;
+}
+
 STACK* stack_create(unsigned long max_nodes) {
 
     STACK* stack = malloc(sizeof(STACK));
@@ -71,16 +92,31 @@ void set_bit(uint8_t* data, unsigned long idx, uint8_t value) {
     }
 }
 
-void invert_binary_sequence(uint8_t* data, unsigned long size) {
+uint8_t* invert_binary_sequence(uint8_t* data, unsigned long size) {
 
-    unsigned long n_bits = size * 8;
-    for(unsigned long i = 0; i < n_bits; i++) {
+    unsigned long total_n_bits = size * 8;
+    unsigned long half_n_bits = total_n_bits/2;
+    for(unsigned long i = 0; i < half_n_bits; i++) {
 
         uint8_t bit1 = get_bit(data, i);
-        uint8_t bit2 = get_bit(data, n_bits-i-1);
+        uint8_t bit2 = get_bit(data, total_n_bits-i-1);
         set_bit(data, i, bit2);
-        set_bit(data, n_bits-i-1, bit1);
+        set_bit(data, total_n_bits-i-1, bit1);
     }
+    return data;
+}
+
+uint8_t* invert_byte_sequence(uint8_t* data, unsigned long size) {
+
+    unsigned long half_size = size/2;
+    for(unsigned long i = 0; i < half_size; i++) {
+
+        uint8_t byte1 = data[i];
+        uint8_t byte2 = data[size - i - 1];
+        data[size - i - 1] = byte1;
+        data[i] = byte2;
+    }
+    return data;
 }
 
 unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes) {
