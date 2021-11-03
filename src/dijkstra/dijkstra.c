@@ -94,7 +94,7 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
             prime.sink = dest_sink;
             return prime;
         }
-    // while, if or p-case
+    // while, if-then or p-case
     } else if(source_sink->num_out_neighbours > 1 &&
         source->graph_idx < source_sink->out->node->graph_idx &&
         source->graph_idx < source_sink->out->next->node->graph_idx) {

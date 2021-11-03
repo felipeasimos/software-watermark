@@ -22,9 +22,9 @@ MAIN_LIBS :=
 TEST_LIBS :=
 
 # gcov-like coverage command (expect gcov output, not gcov files)
-# Examples: llvm-cov gcov -n (clang), gcov -rnm (gcc)
+# Examples: llvm-cov-7 gcov -n (clang), gcov -rnm (gcc)
 # files with 100% coverage are not showed in the final output
-COVERAGE_COMMAND := llvm-cov gcov -n
+COVERAGE_COMMAND := llvm-cov-7 gcov -n
 
 # libraries locations
 LIBS_LOCATION :=
