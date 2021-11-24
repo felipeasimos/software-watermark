@@ -1,10 +1,10 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#define STRINGIFY_(x)
+#define STRINGIFY_(x) #x
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_NODE_NAME_SIZE 4096
-#define MAX_NODE_NAME_SIZE_STR STRINGIFY(MAX_NODE_NAME_SIZE-1)
+#define MAX_NODE_NAME_SIZE_STR STRINGIFY(MAX_NODE_NAME_SIZE)
 
 #include <stdint.h>
 #include "set/set.h"

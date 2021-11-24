@@ -5,6 +5,7 @@
 #include "dijkstra/dijkstra.h"
 #include "checker/checker.h"
 #include "sequence_alignment/sequence_alignment.h"
+#include "code_generation/code_generation.h"
 
 #define PRINT_K(k)\
         char str[100];\
@@ -523,23 +524,7 @@ int watermark_check_rs_analysis_test() {
 int sequence_alignment_score_test() {
 
     long score = sequence_alignment_score_needleman_wunsch("GATTACA", "GTCGACGCA", 1, -1, -2);
-    printf("%ld\n", score);
     ctdd_assert( score == -3);
-
-    return 0;
-}
-
-int tmp_test() {
-    FILE* file = fopen("dot_test.dot", "r");
-    GRAPH* graph = graph_create_from_dot(file);
-    graph_topological_sort(graph);
-    ctdd_assert(dijkstra_check(graph));
-    
-    char* code = dijkstra_get_code(graph);
-    graph_write_dot(graph, "dot.dot", code);
-    graph_free(graph);
-    fclose(file);
-    free(code);
 
     return 0;
 }
@@ -563,7 +548,6 @@ int run_tests() {
     ctdd_verify(watermark_check_rs_test);
     ctdd_verify(watermark_check_rs_analysis_test);
     ctdd_verify(sequence_alignment_score_test);
-    //ctdd_verify(tmp_test);
 
 	return 0;
 }

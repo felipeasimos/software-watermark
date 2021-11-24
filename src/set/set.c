@@ -8,7 +8,7 @@ SET* set_create(uint8_t copy) {
     set->copy = copy;
     return set;
 }
-#include <stdio.h>
+
 void set_add(SET* set, void* data, unsigned long data_len) {
 
     if(set_contains(set, data, data_len)) return;

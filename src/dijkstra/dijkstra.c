@@ -175,6 +175,7 @@ int dijkstra_check(GRAPH* graph) {
     // the decoding and encoding processses
 
     if(graph->num_connections >= 2 * graph->num_nodes - 1) return 0;
+    if(graph->num_connections == 0) return 1;
 
     // allocate memory to save sink node address
     for(unsigned long i = 0; i < graph->num_nodes; i++) node_load_info(graph->nodes[i], graph->nodes[i], sizeof(NODE*));
@@ -290,6 +291,12 @@ char* dijkstra_get_code(GRAPH* graph) {
     // the decoding and encoding processses
 
     if(graph->num_connections >= 2 * graph->num_nodes - 1) return 0;
+    if(graph->num_connections == 0) {
+        char* code = malloc(2);
+        code[0]='1';
+        code[1]='\0';
+        return code;
+    }
 
     // allocate memory to save sink node address
     // 'info_len' will actually be the size of the string kept in the static array below

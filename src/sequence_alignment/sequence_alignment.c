@@ -39,12 +39,6 @@ long sequence_alignment_score_needleman_wunsch(char* seq1, char* seq2, long matc
             MAX_SCORE(p, j);
         }
     }
-    for(unsigned long i =0; i < seq1_len; i++) {
 
-        for(unsigned long j = 0; j < seq2_len; j++) {
-            printf("%5ld ", scores[i][j]);
-        }
-        printf("\n");
-    }
     return scores[seq1_len-1][seq2_len-1];
 }

@@ -85,11 +85,12 @@ TARGET_LIB_FINAL := $(APP_DIR)/$(TARGET_LIB)
 TEST_TARGET_FINAL := $(ROOT_DIR)/$(TEST_TARGET)
 
 # tests, static analysis and code coverage
+VALGRIND_COMMAND:=valgrind -q --exit-on-first-error=yes --error-exitcode=1 --tool=memcheck\
+		--show-reachable=yes --leak-check=yes --track-origins=yes
 GCOV_COMMAND:=$(COVERAGE_COMMAND) $(TESTS_OBJ) $(OBJECTS) 2>/dev/null | grep -Eo "('.*'|[[:digit:]]{1,3}.[[:digit:]]{2}%)" | paste -d " " - - | sort -k2 -nr
 UNTESTED_DETECTOR_COMMAND:=$(GCOV_COMMAND) | grep -v "100.00%" | grep -v "^'tests/" | awk '{ print "\x1b[38;2;255;25;25;1m" $$1 " \x1b[0m\x1b[38;2;255;100;100;1m" $$2 "\x1b[0m" }'
 COVERAGE_COMMAND:=@$(UNTESTED_DETECTOR_COMMAND); $(GCOV_COMMAND) | awk '{ sum += $$2; count[NR] = $$2 } END { if(NR%2) { median=count[(NR+1)/2]; } else { median=count[NR/2]; } if( NR==0 ) { NR=1; } print "\x1b[32mCode Coverage\x1b[0m:\n\t\x1b[33mAverage\x1b[0m: " sum/NR "%\n\x1b[35m\tMedian\x1b[0m: " median  }'
-RUN_TESTS_COMMAND:=@valgrind -q --exit-on-first-error=yes --error-exitcode=1 --tool=memcheck\
-		--show-reachable=yes --leak-check=yes --track-origins=yes $(TEST_TARGET_FINAL) #--gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
+RUN_TESTS_COMMAND:=@$(VALGRIND_COMMAND) $(TEST_TARGET_FINAL) #--gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
 STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=naming \
 	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
