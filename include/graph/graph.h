@@ -7,7 +7,6 @@
 #define MAX_NODE_NAME_SIZE_STR STRINGIFY(MAX_NODE_NAME_SIZE)
 
 #include <stdint.h>
-#include "set/set.h"
 
 struct NODE;
 
@@ -18,6 +17,7 @@ typedef struct GRAPH {
     unsigned long num_connections;
 } GRAPH;
 
+#include "set/set.h"
 #include "node/node.h"
 #include "utils/utils.h"
 #include "dijkstra/dijkstra.h"

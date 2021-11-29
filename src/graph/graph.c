@@ -406,36 +406,16 @@ GRAPH* graph_deserialize(uint8_t* data) {
 // create graph from dot file
 GRAPH* graph_create_from_dot(FILE* file) {
 
-    SET* set = set_create(1); // set to copy the data
-    fseek(file, 0L, SEEK_SET);
+    HASHMAP* hashmap = hashmap_create(1, 1, NULL);
+
     // get number of nodes
     char node1[MAX_NODE_NAME_SIZE];
     char node2[MAX_NODE_NAME_SIZE];
     int res = 0;
-    while(( res = fscanf(file, " %" MAX_NODE_NAME_SIZE_STR "s -> %" MAX_NODE_NAME_SIZE_STR "[^;]; \n", node1, node2) ) != EOF) {
 
-        if(res != 2) continue;
-        // the last ':' find in any of the strings is replaced by a null terminator 
-
-        char* to_replace = NULL;
-        if(( to_replace = strrchr(node1, ':') )) *to_replace = '\0';
-        if(( to_replace = strrchr(node2, ':') )) *to_replace = '\0';
-        set_add(set, node1, strlen(node1)+1);
-        set_add(set, node2, strlen(node2)+1);
-    }
-    unsigned long num_nodes = set->n;
-
-    // add labels  to hashmap
-    HASHMAP* hashmap = hashmap_create(num_nodes, 1, 1, NULL);
-    SET_DATA* node = set->set;
-    for(unsigned long i = 0; i < set->n; i++) {
-        hashmap_set(hashmap, node->data, node->data_len, &i, sizeof(i));
-        node = node->next;
-    }
-    set_free(set);
-
-    GRAPH* graph = graph_create(num_nodes);
+    GRAPH* graph = graph_create(HASHMAP_SIZE);
     fseek(file, 0L, SEEK_SET);
+    unsigned long num_nodes = 0;
     while(( res = fscanf(file, " %" MAX_NODE_NAME_SIZE_STR "s -> %" MAX_NODE_NAME_SIZE_STR "[^;]; ", node1, node2) ) != EOF) {
 
         if(res != 2) continue;
@@ -446,12 +426,26 @@ GRAPH* graph_create_from_dot(FILE* file) {
         if(( to_replace = strrchr(node2, ':') )) *to_replace = '\0';
         unsigned long node1_len = strlen(node1)+1;
         unsigned long node2_len = strlen(node2)+1;
+
+        // add node to hashmap if it doesn't exists yet
+        if( !hashmap_find(hashmap, node1, node1_len) ) {
+            hashmap_set(hashmap, node1, node1_len, &num_nodes, sizeof(unsigned long));
+            num_nodes++;
+        }
+        if( !hashmap_find(hashmap, node2, node2_len) ) {
+            hashmap_set(hashmap, node2, node2_len, &num_nodes, sizeof(unsigned long));
+            num_nodes++;
+        }
+
         graph_oriented_connect(
                 graph->nodes[*(unsigned long*)hashmap_get(hashmap, node1, &node1_len)],
                 graph->nodes[*(unsigned long*)hashmap_get(hashmap, node2, &node2_len)]
         );
     }
     hashmap_free(hashmap);
+
+    graph->num_nodes = num_nodes;
+    graph->nodes = realloc(graph->nodes, graph->num_nodes * sizeof(NODE*));
 
     return graph;
 }

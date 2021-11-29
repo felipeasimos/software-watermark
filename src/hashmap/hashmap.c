@@ -11,19 +11,18 @@ unsigned long djb2(uint8_t* key, unsigned long key_len) {
 
 unsigned long hashmap_get_idx(HASHMAP* hashmap, void* key, unsigned long key_len) {
 
-    return hashmap->hash_function(key, key_len) % hashmap->n;
+    return hashmap->hash_function(key, key_len) % HASHMAP_SIZE;
 }
 
-HASHMAP* hashmap_create(unsigned long n, uint8_t copy_key, uint8_t copy_data, unsigned long (*hash)(void*, unsigned long)) {
+HASHMAP* hashmap_create(uint8_t copy_key, uint8_t copy_data, unsigned long (*hash)(void*, unsigned long)) {
 
     HASHMAP* hashmap = malloc(sizeof(HASHMAP));
     // find a power of 2 to use as the hash table size
-    hashmap->n = ceil_power_of_2(n);
     hashmap->copy_key = copy_key;
     hashmap->copy_data = copy_data;
     hashmap->hash_function = hash ? hash : (unsigned long(*)(void*, unsigned long))djb2;
-    hashmap->hashmap = calloc(hashmap->n, sizeof(HASHMAP_NODE*));
-    for(unsigned long i = 0; i < hashmap->n; i++) hashmap->hashmap[i] = NULL;
+    hashmap->hashmap = calloc(HASHMAP_SIZE, sizeof(HASHMAP_NODE*));
+    for(unsigned long i = 0; i < HASHMAP_SIZE; i++) hashmap->hashmap[i] = NULL;
     return hashmap;
 }
 
@@ -111,7 +110,7 @@ void hashmap_destroy(HASHMAP* hashmap, void* key, unsigned long key_len) {
 }
 
 void hashmap_free(HASHMAP* hashmap) {
-    for(unsigned long i = 0; i < hashmap->n; i++) {
+    for(unsigned long i = 0; i < HASHMAP_SIZE; i++) {
         for(HASHMAP_NODE* node = hashmap->hashmap[i]; node; node = hashmap->hashmap[i]) {
 
             hashmap->hashmap[i] = node->next;
