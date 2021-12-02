@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <math.h>
+
 #define HASHMAP_SIZE 512
+#define HASHMAP_MULTIPLICATION_CONSTANT 0.2
 
 typedef struct HASHMAP_NODE {
     struct HASHMAP_NODE* prev;

@@ -31,7 +31,6 @@ void ask_for_comparison(char* dijkstra_code) {
     long highest_score = ~ULONG_MAX;
     char highest_score_func[MAX_SIZE]={0};
     char highest_score_code[MAX_SIZE]={0};
-    GRAPH* highest_score_graph = NULL;
     DIR *dir;
     struct dirent *ent;
     if((dir = opendir("/home/felipe/Documents/uff/inmetro/waterwark/watermark")) != NULL) {
@@ -54,11 +53,11 @@ void ask_for_comparison(char* dijkstra_code) {
                             memset(highest_score_func, 0x00, MAX_SIZE);
                             strncpy(highest_score_func, &ent->d_name[1], len-5);
                             strcpy(highest_score_code, current_dijkstra_code);
-                            if(highest_score_graph) graph_free(highest_score_graph);
-                            highest_score_graph = g;
                         }
                         free(current_dijkstra_code);
                     }
+                    graph_free(g);
+                    fclose(f);
                 }
                 remove(ent->d_name);
             }
@@ -81,10 +80,27 @@ void ask_for_comparison(char* dijkstra_code) {
     }
 }
 
-uint8_t get_uint8_t() {
+uint8_t get_uint8_t(const char* msg) {
     uint8_t n;
-    scanf("%c", &n);
-    return n-'0';
+    printf("%s", msg);
+    scanf("%hhu", &n);
+    return n;
+}
+
+unsigned long get_ulong(const char* msg) {
+
+    unsigned long n;
+    printf("%s", msg);
+    scanf("%lu", &n);
+    return n;
+}
+
+char* get_string(const char* msg) {
+
+    char* s = calloc(MAX_SIZE + 1, sizeof(char));
+    printf("%s", msg);
+    scanf(" %" MAX_SIZE_STR "s", s);
+    return s;
 }
 
 int main() {
@@ -96,60 +112,51 @@ int main() {
     printf("5) run removal test with reed solomon\n");
     printf("6) show report matrix\n");
     printf("else) exit\n");
-    switch(get_uint8_t()) {
+    switch(get_uint8_t("input an option: ")) {
         case 1: {
-            printf("Input number to encode: ");
-            char s[MAX_SIZE+1];
-            scanf(" %" MAX_SIZE_STR "s", s);
+            char* s = get_string("Input numberic string to encode: ");
             unsigned long data_len=strlen(s);
             void* data = encode_numeric_string(s, &data_len);
+
             GRAPH* g = watermark_encode(data, data_len);
-            char* dijkstra_code_raw = dijkstra_get_code(g);
-            char* dijkstra_code = malloc(strlen(dijkstra_code_raw) + strlen(s) + 4);
-            dijkstra_code[0]='\0';
-            strncpy(dijkstra_code, dijkstra_code_raw, strlen(dijkstra_code_raw) + strlen(s) + 4);
-            strcat(dijkstra_code, " - ");
-            strcat(dijkstra_code, s);
+            char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
-            ask_for_comparison(dijkstra_code_raw);
-            free(data);
+            ask_for_comparison(dijkstra_code);
+            
             free(dijkstra_code);
             graph_free(g);
+            free(s);
+            free(data);
             break;
         }
         case 2: {
-            printf("Input number to encode: ");
-            unsigned long n;
-            char s[MAX_SIZE+1];
-            scanf("%lu", &n);
+            unsigned long n = get_ulong("Input number to encode: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
             GRAPH* g = watermark_encode(&n, sizeof(n));
-            char* dijkstra_code_raw = dijkstra_get_code(g);
-            char* dijkstra_code = malloc(strlen(dijkstra_code_raw) + strlen(s) + 4);
-            dijkstra_code[0]='\0';
-            strncpy(dijkstra_code, dijkstra_code_raw, strlen(dijkstra_code_raw) + strlen(s) + 4);
-            strcat(dijkstra_code, " - ");
-            strcat(dijkstra_code, s);
-            invert_byte_sequence((uint8_t*)&n, sizeof(n));
-            sprintf(s, "%lu", n);
-            strcat(dijkstra_code, s);
+            char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
-            ask_for_comparison(dijkstra_code_raw);
+            ask_for_comparison(dijkstra_code);
+            
             free(dijkstra_code);
             graph_free(g);
+
             break;
         }
         case 3: {
-            printf("Input dijkstra code: ");
-            char s[MAX_SIZE+1];
-            scanf("%s", s);
+            char* s = get_string("Input dijkstra code: ");
             GRAPH* g = dijkstra_generate(s);
+            if(!g) {
+                printf("This isn't a valid dijkstra code!\n");
+                free(s);
+                break;
+            }
             graph_print(g, NULL);
             graph_write_dot(g, "dot.dot", s);
             ask_for_comparison(s);
             graph_free(g);
+            free(s);
             break;
         }
         case 4: {

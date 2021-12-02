@@ -445,6 +445,8 @@ GRAPH* graph_create_from_dot(FILE* file) {
     hashmap_free(hashmap);
 
     graph->num_nodes = num_nodes;
+    // free all unused nodes
+    for(unsigned long i = num_nodes; i < HASHMAP_SIZE; i++) node_free(graph->nodes[i]);
     graph->nodes = realloc(graph->nodes, graph->num_nodes * sizeof(NODE*));
 
     return graph;

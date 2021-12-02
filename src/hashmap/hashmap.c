@@ -11,7 +11,9 @@ unsigned long djb2(uint8_t* key, unsigned long key_len) {
 
 unsigned long hashmap_get_idx(HASHMAP* hashmap, void* key, unsigned long key_len) {
 
-    return hashmap->hash_function(key, key_len) % HASHMAP_SIZE;
+    // get fractional part of hashed key and multiply by the hash size
+    double n;
+    return HASHMAP_SIZE * (modf(hashmap->hash_function(key, key_len) * HASHMAP_MULTIPLICATION_CONSTANT, &n));
 }
 
 HASHMAP* hashmap_create(uint8_t copy_key, uint8_t copy_data, unsigned long (*hash)(void*, unsigned long)) {
