@@ -318,17 +318,71 @@ GRAPH* graph_copy(GRAPH* graph) {
     for(unsigned long i = 0; i < new_graph->num_nodes; i++) {
 
         // copy data
-        node_alloc(new_graph->nodes[i], graph->nodes[i]->data_len);
-        memcpy(new_graph->nodes[i]->data, graph->nodes[i]->data, new_graph->nodes[i]->data_len);
+        node_alloc(new_graph->nodes[i], node_get_data_len(graph->nodes[i]));
+        memcpy(new_graph->nodes[i]->data, node_get_data(graph->nodes[i]), new_graph->nodes[i]->data_len);
         for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
 
             graph_oriented_connect(
                 new_graph->nodes[i],
                 new_graph->nodes[conn->node->graph_idx]
-                    );
+            );
         }
     }
     return new_graph;
+}
+
+// copy the graph and all the data inside
+GRAPH* graph_deep_copy(GRAPH* graph) {
+
+    GRAPH* copy = graph_create(graph->num_nodes);
+
+    for(unsigned long i = 0; i < copy->num_nodes; i++) {
+
+        NODE* copy_node = copy->nodes[i];
+        unsigned long num_info = graph->nodes[i]->num_info;
+
+        // if this node has no info
+        if(!num_info) {
+            node_alloc(copy_node, node_get_data_len(graph->nodes[i]));
+            memcpy(copy_node->data, node_get_data(graph->nodes[i]), copy_node->data_len);
+        } else {
+            // get first info struct
+            INFO_NODE* src_info_node = graph->nodes[i]->data;
+
+            node_alloc(copy_node, sizeof(INFO_NODE));
+            INFO_NODE* copy_info_node = copy_node->data;
+
+            while(num_info--) {
+
+                // set values for current INFO_NODE structs
+                // allocate space for data
+                copy_info_node->data_len = src_info_node->data_len;
+                copy_info_node->data = malloc(copy_info_node->data_len);
+                // allocate info
+                copy_info_node->info_len = src_info_node->info_len;
+                copy_info_node->info = malloc( copy_info_node->info_len );
+                memcpy(copy_info_node->info, src_info_node->info, src_info_node->info_len);
+
+                copy_info_node = copy_info_node->data;
+                src_info_node = src_info_node->data;
+            }
+
+            copy_node->num_info = graph->nodes[i]->num_info;
+            // finally, copy data
+            copy_info_node = node_get_info_struct(copy_node);
+            src_info_node = node_get_info_struct(graph->nodes[i]);
+            memcpy(copy_info_node->data, src_info_node->data, sizeof(copy_info_node->data_len));
+        }
+
+        for(CONNECTION* conn = graph->nodes[i]->out; conn; conn = conn->next) {
+
+            graph_oriented_connect(
+                copy->nodes[i],
+                copy->nodes[conn->node->graph_idx]
+            );
+        }
+    }
+    return copy;
 }
 
 // serialize the graph

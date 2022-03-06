@@ -216,6 +216,7 @@ int watermark2017_decode_analysis_test() {
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode_analysis(graph, &size);
+        graph_free_info(graph);
         uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
         ctdd_assert(size == 1);
         ctdd_assert(binary_sequence_equal(&k, result_seq, sizeof(k), size));
@@ -228,6 +229,7 @@ int watermark2017_decode_analysis_test() {
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode_analysis(graph, &size);
+        graph_free_info(graph);
         uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result_seq, sizeof(k), size));
         free(result);
@@ -244,6 +246,7 @@ int watermark2017_rs_decode_analysis_test() {
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
         unsigned long size=3;
         uint8_t* result = watermark_rs_decode_analysis(graph, &size);
+        graph_free_info(graph);
         uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
         ctdd_assert(size == 1);
         ctdd_assert(binary_sequence_equal(&k, result_seq, sizeof(k), size));
@@ -256,6 +259,7 @@ int watermark2017_rs_decode_analysis_test() {
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
         unsigned long size=24;
         uint8_t* result = watermark_rs_decode_analysis(graph, &size);
+        graph_free_info(graph);
         uint8_t* result_seq = get_sequence_from_bit_arr(result, size, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result_seq, sizeof(k), size));
         free(result);
@@ -448,6 +452,7 @@ int watermark_check_analysis_test() {
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
+        graph_free_info(graph);
         uint8_t result = has_x(bit_arr, size);
         if(!result) {
             PRINT_K(k);
@@ -461,6 +466,7 @@ int watermark_check_analysis_test() {
         GRAPH* graph = watermark_encode(&k, sizeof(k));
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
+        graph_free_info(graph);
         uint8_t result = has_x(bit_arr, size);
         free(bit_arr);
         graph_free(graph);
@@ -500,6 +506,7 @@ int watermark_check_rs_analysis_test() {
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 3);
+        graph_free_info(graph);
         uint8_t result = has_x(bit_arr, size);
         if(!result) {
             PRINT_K(k);
@@ -513,6 +520,7 @@ int watermark_check_rs_analysis_test() {
         GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 24);
+        graph_free_info(graph);
         uint8_t result = has_x(bit_arr, size);
         free(bit_arr);
         graph_free(graph);
@@ -523,8 +531,7 @@ int watermark_check_rs_analysis_test() {
 
 int sequence_alignment_score_test() {
 
-    long score = sequence_alignment_score_needleman_wunsch("GATTACA", "GTCGACGCA", 1, -1, -2);
-    ctdd_assert( score == -3);
+    watermark_needleman_wunsch("GATTACA", "GTCGACGCA", 10, -10, -1);
 
     return 0;
 }

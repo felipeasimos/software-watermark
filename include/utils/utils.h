@@ -17,6 +17,23 @@ typedef struct QUEUE {
     unsigned long n;
 } QUEUE;
 
+typedef enum STATUS_BIT {
+    BIT_0='0',
+    BIT_1='1',
+    BIT_MUTE='m',
+    BIT_0_BACKEDGE='b',
+    BIT_1_BACKEDGE='B',
+    BIT_1_FORWARD_EDGE_AND_BIT_0='f',
+    BIT_1_FORWARD_EDGE_AND_BIT_1='F',
+    BIT_UNKNOWN='x'
+} STATUS_BIT;
+
+typedef struct UTILS_NODE {
+    unsigned long backedge_idx;
+    STATUS_BIT checker_bit;
+    unsigned long bit_idx;
+} UTILS_NODE;
+
 #include "graph/graph.h"
 
 // system
@@ -55,5 +72,7 @@ void* decode_numeric_string(void* data, unsigned long* data_len);
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
+
+// translate struct used in decoding and checking analysis to a common structure
 
 #endif

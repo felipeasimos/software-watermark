@@ -3,7 +3,14 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
-long sequence_alignment_score_needleman_wunsch(char* seq1, char* seq2, long mismatch, long gap, long match);
+typedef struct {
+
+    long score;
+    unsigned long entry_point;
+} NW_RESULT;
+
+NW_RESULT watermark_needleman_wunsch(char* function_code, char* watermark_code, long match, long mismatch, long gap);
 
 #endif

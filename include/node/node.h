@@ -39,7 +39,7 @@ typedef struct INFO_NODE {
 #include "graph/graph.h"
 
 //creates empty node
-NODE* node_empty();
+NODE* node_empty(GRAPH* graph, unsigned long graph_idx);
 
 //allocate memory for node data
 void node_alloc(NODE*, unsigned long);

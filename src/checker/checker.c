@@ -1,19 +1,5 @@
 #include "checker/checker.h"
 
-typedef enum CHECKER_BIT {
-    BIT_0='0',
-    BIT_1='1',
-    BIT_MUTE='m',
-    BIT_0_BACKEDGE='b',
-    BIT_1_BACKEDGE='B',
-    BIT_1_FORWARD_EDGE_AND_BIT_0='f',
-    BIT_1_FORWARD_EDGE_AND_BIT_1='F'
-} CHECKER_BIT;
-
-typedef struct CHECKER_NODE {
-    unsigned long backedge_idx;
-} CHECKER_NODE;
-
 uint8_t node_only_has_hamiltonian_edge(NODE* node) {
 
     if(node->graph_idx == node->graph->num_nodes-1) {
@@ -24,7 +10,7 @@ uint8_t node_only_has_hamiltonian_edge(NODE* node) {
 }
 
 // return '1', '0' or 'x' for unknown or 'm' for mute node
-CHECKER_BIT watermark_check_get_bit(GRAPH* graph, unsigned long idx, uint8_t bit, uint8_t last_four_only_have_hamiltonian, uint8_t can_have_removed_backedge) {
+STATUS_BIT watermark_check_get_bit(GRAPH* graph, unsigned long idx, uint8_t bit, uint8_t last_four_only_have_hamiltonian, uint8_t can_have_removed_backedge) {
 
     CONNECTION* backedge = NULL;
     // if node is mute, ignore it
@@ -74,11 +60,11 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
     for(unsigned long i = 0; i < graph->num_nodes; i++) if(graph_get_forward(graph->nodes[i])) num_forward_edges++;
     if(n_bits != graph->num_nodes - 2 - num_forward_edges) return 0;
 
-    // load CHECKER_NODE struct to all nodes
-    CHECKER_NODE checker_nodes[graph->num_nodes];
+    // load UTILS_NODE struct to all nodes
+    UTILS_NODE checker_nodes[graph->num_nodes];
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
         checker_nodes[i].backedge_idx = ULONG_MAX;
-        node_load_info(graph->nodes[i], &checker_nodes[i], sizeof(CHECKER_NODE));
+        node_load_info(graph->nodes[i], &checker_nodes[i], sizeof(UTILS_NODE));
     }
 
     unsigned long i = starting_idx+1;
@@ -86,7 +72,7 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
     STACK* odd_stack = stack_create(n_bits);
     STACK* even_stack = stack_create(n_bits);
     stack_push(odd_stack, 0);
-    ((CHECKER_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
+    ((UTILS_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
 
     unsigned long history[graph->num_nodes];
     history[0] = 0;
@@ -106,7 +92,7 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
         STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
         STACK* other_stack = possible_backedges == even_stack ? odd_stack : even_stack;
 
-        CHECKER_BIT checker_flag = watermark_check_get_bit(
+        STATUS_BIT checker_flag = watermark_check_get_bit(
                 graph,
                 graph_idx,
                 bit,
@@ -136,13 +122,13 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
                 CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
                 if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->node->graph_idx) & 1)) ||
                 ( !bit && ((graph_idx - backedge_conn->node->graph_idx) & 1) )) ||
-                ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
+                ((UTILS_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
                     graph_unload_info(graph);
                     stack_free(odd_stack);
                     stack_free(even_stack);
                     return 0;
                 }
-                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
+                stack_pop_until(possible_backedges, ((UTILS_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
                 stack_pop_until(other_stack, history[backedge_conn->node->graph_idx]);
                 continue;
             case BIT_1_FORWARD_EDGE_AND_BIT_0:
@@ -161,16 +147,18 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
                     return 0;
                 }
                 break;
+            case BIT_UNKNOWN:
+                break;
         }
         // save stacks
         // odd
         if(is_odd) {
-            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
+            ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
             stack_push(odd_stack, graph_idx);
             history[graph_idx] = even_stack->n;
         // even
         } else {
-            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
+            ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
             stack_push(even_stack, graph_idx);
             history[graph_idx] = odd_stack->n;
         }
@@ -202,6 +190,7 @@ uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, un
     // decode using checker
     unsigned long total_n_bits = data_with_parity_n_bits;
     uint8_t* bits = watermark_check_analysis(graph, data_with_parity, &total_n_bits);
+    graph_free_info(graph);
     unsigned long payload_n_bits = total_n_bits - num_parity_symbols*16;
 
     // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
@@ -252,11 +241,11 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
     bits[0]='1';
     unsigned long bit_arr_idx=1;
 
-    // load CHECKER_NODE struct to all nodes
-    CHECKER_NODE checker_nodes[graph->num_nodes];
+    // load UTILS_NODE struct to all nodes
     for(unsigned long i = 0; i < graph->num_nodes; i++) {
-        checker_nodes[i].backedge_idx = ULONG_MAX;
-        node_load_info(graph->nodes[i], &checker_nodes[i], sizeof(CHECKER_NODE));
+        UTILS_NODE* utils_node = malloc(sizeof(UTILS_NODE));
+        utils_node->backedge_idx = ULONG_MAX;
+        node_load_info(graph->nodes[i], utils_node, sizeof(UTILS_NODE));
     }
 
     unsigned long i = starting_idx+1;
@@ -264,7 +253,9 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
     STACK* odd_stack = stack_create(n_bits);
     STACK* even_stack = stack_create(n_bits);
     stack_push(odd_stack, 0);
-    ((CHECKER_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
+    ((UTILS_NODE*)node_get_info(graph->nodes[0]))->backedge_idx = 0;
+    ((UTILS_NODE*)node_get_info(graph->nodes[0]))->checker_bit = BIT_1;
+    ((UTILS_NODE*)node_get_info(graph->nodes[0]))->bit_idx = 0;
 
     unsigned long history[graph->num_nodes];
     history[0] = 0;
@@ -284,12 +275,14 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
         STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
         STACK* other_stack = possible_backedges == even_stack ? odd_stack : even_stack;
 
-        CHECKER_BIT checker_flag = watermark_check_get_bit(
+        STATUS_BIT checker_flag = watermark_check_get_bit(
                 graph,
                 graph_idx,
                 bit,
                 last_four_nodes_only_have_hamiltonian_edges,
                 has_possible_backedge(possible_backedges, graph, graph_idx));
+        ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->checker_bit = checker_flag;
+        ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->bit_idx = i;
         switch(checker_flag) {
             case BIT_0:
             case BIT_1:
@@ -307,11 +300,11 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
                 CONNECTION* backedge_conn = graph_get_backedge(graph->nodes[graph_idx]);
                 if( !backedge_conn || (( bit && !((graph_idx - backedge_conn->node->graph_idx) & 1)) ||
                 ( !bit && ((graph_idx - backedge_conn->node->graph_idx) & 1) )) ||
-                ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
+                ((UTILS_NODE*)node_get_info(backedge_conn->node))->backedge_idx >= possible_backedges->n) {
                     bits[bit_arr_idx++] = 'x';
                     break;
                 }
-                stack_pop_until(possible_backedges, ((CHECKER_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
+                stack_pop_until(possible_backedges, ((UTILS_NODE*)node_get_info(backedge_conn->node))->backedge_idx);
                 stack_pop_until(other_stack, history[backedge_conn->node->graph_idx]);
                 bits[bit_arr_idx++] = (checker_flag == BIT_0_BACKEDGE) ? '0' : '1';
                 continue;
@@ -319,24 +312,28 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
                 bits[bit_arr_idx++] = !bit ? 'x' : '1';
                 if(i!=total_number_of_bits-1) {
                     bits[bit_arr_idx++] = get_bit(data, ++i) ? 'x' : '0';
+                    ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx+1]))->checker_bit = BIT_MUTE;
                 }
                 break;
             case BIT_1_FORWARD_EDGE_AND_BIT_1:
                 bits[bit_arr_idx++] = !bit ? 'x' : '1';
                 if(i!=total_number_of_bits-1) {
                     bits[bit_arr_idx++] = !get_bit(data, ++i) ? 'x' : '1';
+                    ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx+1]))->checker_bit = BIT_MUTE;
                 }
+                break;
+            case BIT_UNKNOWN:
                 break;
         }
         // save stacks
         // odd
         if(is_odd) {
-            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
+            ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = odd_stack->n;
             stack_push(odd_stack, graph_idx);
             history[graph_idx] = even_stack->n;
         // even
         } else {
-            ((CHECKER_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
+            ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->backedge_idx = even_stack->n;
             stack_push(even_stack, graph_idx);
             history[graph_idx] = odd_stack->n;
         }
@@ -344,7 +341,6 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
         if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx+=2;
     }
     // bit sequence may be smaller than expected due to mute nodes
-    graph_unload_info(graph);
     stack_free(odd_stack);
     stack_free(even_stack);
     return bits;

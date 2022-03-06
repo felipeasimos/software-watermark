@@ -95,10 +95,7 @@ STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=nam
 	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
 
 SHELL := /bin/bash
-.PHONY: help lib folders clean debug release test profile main compilemain
-
-# build lib, run tests, compile and run main
-all: | debug lib main
+.PHONY: help clean debug release main
 
 help:
 	# release - produce optimized lib
@@ -124,12 +121,13 @@ clangd:
 release: CFLAGS += -O2
 release: | clean lib 
 
-compilemain: LDFLAGS = $(MAIN_LIBS)
+compilemain: LDFLAGS += $(MAIN_LIBS)
 compilemain: release
 	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
 
-main: release compilemain
-	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)
+main: CFLAGS += -g -O0 -DDEBUG
+main: compilemain
+	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(VALGRIND_COMMAND) $(TARGET)
 
 lib: folders $(TARGET_LIB_FINAL)
 

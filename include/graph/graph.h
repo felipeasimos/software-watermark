@@ -98,6 +98,9 @@ void graph_write_dot(GRAPH*, const char* filename, const char* label);
 // copy the graph
 GRAPH* graph_copy(GRAPH*);
 
+// copy the graph and all the data inside
+GRAPH* graph_deep_copy(GRAPH*);
+
 // serialize the graph
 void* graph_serialize(GRAPH*, unsigned long* num_bytes);
 

@@ -350,6 +350,8 @@ unsigned long get_lower_bound_for_symbol(unsigned long n_symbols) {
     return get_higher_bound_for_symbol(n_symbols-1);
 }
 
+
+
 void removal_attack() {
 
     for(unsigned long n_removals = 1; n_removals < 2; n_removals++) {
