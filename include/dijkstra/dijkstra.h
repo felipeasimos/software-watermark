@@ -7,13 +7,13 @@ struct NODE;
 
 typedef enum {
     INVALID,
-    TRIVIAL,
-    SEQUENCE,
-    IF_THEN,
-    WHILE,
-    REPEAT,
-    IF_THEN_ELSE,
-    P_CASE,
+    TRIVIAL=1,
+    SEQUENCE=2,
+    IF_THEN=3,
+    WHILE=4,
+    REPEAT=5,
+    IF_THEN_ELSE=6,
+    P_CASE=7,
 } STATEMENT_GRAPH;
 
 typedef struct PRIME_SUBGRAPH {

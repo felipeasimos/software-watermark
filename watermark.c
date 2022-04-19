@@ -18,7 +18,7 @@
 #define SIZE_PERCENTAGE 0.8
 
 #define MATCH 1
-#define MISMATCH -100
+#define MISMATCH -2
 #define GAP -1
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
@@ -498,7 +498,7 @@ int main() {
             graph_free(g);
             free(s);
             break;
-        }/*
+        }
         case 4: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
@@ -508,7 +508,7 @@ int main() {
             scanf("%lu", &n_symbols);
             removal_attack_for_bits(n_removals, n_symbols);
             break;
-        }
+        }/*
         case 5: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;

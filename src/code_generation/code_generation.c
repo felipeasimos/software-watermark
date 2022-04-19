@@ -116,6 +116,9 @@ CODE* code_gen_expression(CODE_GEN* code_gen) {
 
         code_append_str(identifier, " = ");
         code_append(identifier, code_gen_value_or_variable(code_gen));
+        code_append_str(identifier, " ");
+        code_append_str(identifier, (char*)code_gen_get_operation(code_gen));
+        code_append_str(identifier, " ");
     } else {
         code_append_str(identifier, " ");
         code_append_str(identifier, (char*)code_gen_get_operation(code_gen));
