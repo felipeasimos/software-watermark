@@ -1,146 +1,115 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
+#define MAX_NODE_NAME_SIZE 4096
+#define MAX_NODE_NAME_SIZE_STR STRINGIFY(MAX_NODE_NAME_SIZE)
+
 #include <stdint.h>
 
-struct CONNECTION; //just so we can point to CONNECTION struct before including connection.h
+struct NODE;
 
-//a node from the graph, with a simple linked list of its connections and with a pointer to the next node in the list
-typedef struct GRAPH{
+typedef struct GRAPH {
 
-	void* data;		
-	unsigned long data_len; //variables that store actual information
-
-	struct CONNECTION* connections; //start of simple linked list of connections
-	struct GRAPH* next; //next node in the node double linked list
-	struct GRAPH* prev; //previous node in the node double linked list
+    struct NODE** nodes;
+    unsigned long num_nodes;
+    unsigned long num_connections;
 } GRAPH;
 
-typedef struct INFO_NODE {
+#include "set/set.h"
+#include "node/node.h"
+#include "utils/utils.h"
+#include "dijkstra/dijkstra.h"
+#include "hashmap/hashmap.h"
 
-    // value of data, stored previously in the node
-    void* data;
-    unsigned long data_len;
+// create graph with N empty nodes;
+GRAPH* graph_create(unsigned long num_nodes);
 
-    // info used in a process
-    void* info;
-    unsigned long info_len;
-} INFO_NODE;
+// get node, returns NULL if out of bounds
+NODE* graph_get(GRAPH* graph, unsigned long i);
 
-#include "connection/connection.h" //we can't include it before 'struct CONNECTION;'
+// free graph and all structures in it
+void graph_free(GRAPH* graph);
 
-//creates empty graph
-GRAPH* graph_empty();
+// print graph
+void graph_print(GRAPH* graph, void (*print_func)(FILE*, NODE*));
 
-//allocate memory for graph data
-void graph_alloc(GRAPH*, unsigned long);
+// add node to graph
+void graph_add(GRAPH* graph);
 
-//create node with data
-GRAPH* graph_create(void* data, unsigned long data_len);
+// insert node at index
+void graph_insert(GRAPH* graph, unsigned long idx);
 
-//properly deallocate memory of pointers in the struct (except pointer to other nodes)
-//and free given pointer
-void graph_free_node(GRAPH*); //depends on: connection_free()
+// swap the index of two nodes
+void graph_swap(NODE*, NODE*);
 
-//insert graph_to_insert in graph_root list
-//if graph_root is NULL, graph_to_insert->prev points to nothing
-//if graph_to_insert is NULL, graph_root->next points to nothing (handling its sucessor pointer)
-void graph_insert(GRAPH* graph_root, GRAPH* graph_to_insert);
+// remove all connections that this node is a part of
+void graph_isolate(NODE* node);
 
-//search for graph node with given data in the given GRAPH list
-GRAPH* graph_search(GRAPH*, void* data, unsigned long data_len);
+// delete node
+void graph_delete(NODE* node);
 
-//return connection from graph_from node to graph_to node
-//bascially a wrapper around connection_search()
-//also return NULL if no connection is found
-CONNECTION* graph_connection(GRAPH* graph1, GRAPH* graph2); //depends on: connection_search()
+// connect node to another
+void graph_oriented_connect(NODE* from, NODE* to);
 
-//close the connection from graph_from to graph_to if it exists
-//it does nothing to graph_to connection (connection struct)
-void graph_oriented_disconnect(GRAPH* graph_from, GRAPH* graph_to);//depends on: connection_delete()
+// check if nodes are connected
+CONNECTION* graph_get_connection(NODE* from, NODE* to);
 
-//create a connection from graph_from to graph_to
-//it does not create a connection from graph_to to graph_from
-void graph_oriented_connect(GRAPH* graph_from, GRAPH* graph_to); //depends on:  connection_insert()
+// return backedge connection (that goes to a node with lower index)
+// if it exists
+CONNECTION* graph_get_backedge(NODE* node);
 
-//close connection between two graph nodes,
-//making so them don't point to each other anymore
-//if they don't have a connection to begin with, nothing happens
-void graph_disconnect(GRAPH*, GRAPH*); //depends on: graph_oriented_disconnect()
+// return forward edge connection (that goes to a node with greater index)
+// if it exists
+CONNECTION* graph_get_forward(NODE* node);
 
-//connect two graphs together,
-//turning them into connections
-//of one another
-void graph_connect(GRAPH*,GRAPH*); //depends on: graph_oriented_connect()
+// disconnect node from another
+// returns true if connection existed
+uint8_t graph_oriented_disconnect(NODE* from, NODE* to);
 
-//delete all connections this node has with other nodes
-//(graph_to_isolate will still be part of the simple linked list, but will have no connections and no
-//other node is going to have it as connection)
-void graph_isolate(GRAPH* graph_to_isolate); //depends on: graph_disconnect()
+// sort topologically, ignoring back edges
+void graph_topological_sort(GRAPH*);
 
-//delete graph_to_delete node from graph
-//returns graph_to_delete antecessor, and if the antecessor is NULL
-//return sucessor, if its also NULL, then just return NULL ¯\_(ツ)_/¯
-GRAPH* graph_delete(GRAPH* graph_to_delete); //depends on: graph_isolate()
+// unload info from all nodes
+void graph_unload_info(GRAPH*);
 
-//free the whole graph, properly deallocationg everything
-void graph_free(GRAPH*); //depends on: graph_delete()
+// unload all info from all nodes
+void graph_unload_all_info(GRAPH*);
 
-//print graph node
-//given function takes in 'data' and 'data_len' attributes from node
-//and should print them as you like
-//if no function is given, the data is printed as if it was an unsigned long
-void graph_print_node(GRAPH*, void (*)(void*, unsigned long));
+// free info from all nodes
+void graph_free_info(GRAPH*);
 
-//print the whole graph
-//basically calls graph_print_node a lot
-//print_func functions as in graph_print_node
-void graph_print(GRAPH*, void (*)(void*, unsigned long)); //depends on: graph_print_node()
+// free all info from all nodes
+void graph_free_all_info(GRAPH*);
 
-//check if graph node is isolated, returns 1 if it is, 0 otherwise
-short graph_check_isolated(GRAPH*);
+// label can be NULL
+void graph_write_hamiltonian_dot_generic(GRAPH*, const char* filename, const char* label, void (*print_func)(FILE*, NODE*));
 
-//how many nodes points to graph_node
-unsigned long graph_order_to(GRAPH* graph_root, GRAPH* graph_node);
+// label can be NULL
+void graph_write_hamiltonian_dot(GRAPH*, const char* filename, const char* label);
 
-//how many nodes graph_node points to
-unsigned long graph_order_from(GRAPH* graph_node);
+// label can be NULL
+void graph_write_dot_generic(GRAPH*, const char* filename, const char* label, void (*print_func)(FILE*, NODE*));
 
-//return number of neighbors of this node 
-unsigned long graph_order(GRAPH* graph_root, GRAPH* graph_node);
+// label can be NULL
+void graph_write_dot(GRAPH*, const char* filename, const char* label);
 
-//return number of nodes
-unsigned long graph_num_nodes(GRAPH* graph);
+// copy the graph
+GRAPH* graph_copy(GRAPH*);
 
-//return number of connections
-unsigned long graph_num_connections(GRAPH* graph);
+// copy the graph and all the data inside
+GRAPH* graph_deep_copy(GRAPH*);
 
-// load data, make current data nested
-void graph_load_info(GRAPH* graph, void* info, unsigned long info_len);
+// serialize the graph
+void* graph_serialize(GRAPH*, unsigned long* num_bytes);
 
-// unload data, make nested data the main one
-void graph_unload_info(GRAPH* graph);
+// deserialize the graph
+GRAPH* graph_deserialize(uint8_t*);
 
-// call 'graph_unload_info' for all nodes
-void graph_unload_all_info(GRAPH* graph);
-
-void* graph_get_info(GRAPH* graph);
-
-unsigned long graph_get_info_len(GRAPH* graph);
-
-// return deep copy of the graph
-GRAPH* graph_copy(GRAPH* graph_root);
-
-// load copy graph in the given graph
-void graph_load_copy(GRAPH* graph);
-
-// return bytes representing a graph, it can be used to save it to a file
-void* graph_serialize(GRAPH* graph, unsigned long* num_bytes);
-
-// return graph from a given byte sequence with a graph serialized in it
-GRAPH* graph_deserialize(uint8_t* data);
+// create graph from dot file
+// dot files should only use "a -> b" syntax to connect nodes
+// only nodes with connections will be considered
+GRAPH* graph_create_from_dot(FILE* f);
 
 #endif

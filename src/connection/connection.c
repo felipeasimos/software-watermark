@@ -1,48 +1,36 @@
 #include "connection/connection.h"
 
-CONNECTION* connection_create(GRAPH* node){
+CONNECTION* connection_create(NODE* parent, NODE* node) {
 
 	//allocate memory for struct
 	CONNECTION* connection = malloc(sizeof(CONNECTION));
 
-	//set all values inside struct to zero
-	memset( connection, 0x00, sizeof(CONNECTION) );
-
-	//set weight to one by default
-	connection->weight = 1;
-    connection->parent = node;
+    connection->next = connection->prev = NULL;
+    connection->parent = parent;
+    connection->node = node;
 
 	return connection;
 }
 
-void connection_insert_node(CONNECTION* connection_root, GRAPH* new_connection) {
+void connection_insert(CONNECTION* root, CONNECTION* new_connection) {
 
-	//if one of the arguments is NULL nothing happens	
-	if( !connection_root || !new_connection ) return;
-
-	//create new connection struct
-	CONNECTION* new_connection_node = connection_create(connection_root->parent);
-
-	//make it point to new_connection
-	new_connection_node->node = new_connection;
-
-	//set new connection as connection_root's sucessor and
-	//connection_root->next's antecessor
-	new_connection_node->next = connection_root->next;
-	connection_root->next = new_connection_node;
+    new_connection->next = root;
+    root->prev = new_connection;
+    new_connection->prev = NULL;
+    if(root->parent->in == root) {
+        root->parent->in = new_connection;
+    } else if(root->parent->out == root) {
+        root->parent->out = new_connection;
+    }
 }
 
-void connection_insert(CONNECTION* connection, CONNECTION* new_connection) {
+void connection_insert_neighbour(CONNECTION* connection_root, NODE* node) {
 
-    if(!connection || !new_connection) return;
-
-	//set new connection as connection_root's sucessor and
-	//connection_root->next's antecessor
-	new_connection->next = connection->next;
-	connection->next = new_connection;
+    CONNECTION* conn = connection_create(connection_root->parent, node);
+    connection_insert(connection_root, conn);
 }
 
-CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_node){
+CONNECTION* connection_search_neighbour(CONNECTION* connection_node, NODE* graph_node){
 
 	//if one of the arguments is NULL nothing happens
 	if( !connection_node || !graph_node ) return NULL;
@@ -59,97 +47,45 @@ CONNECTION* connection_search_node(CONNECTION* connection_node, GRAPH* graph_nod
 	return NULL;
 }
 
-CONNECTION* connection_search_different_node(CONNECTION* connection, GRAPH** list_of_nodes, unsigned long n) {
+void connection_delete(CONNECTION* conn) {
 
-    if( !connection || !list_of_nodes || !n ) return NULL;
+    if(!conn) return;
+    if(conn->prev) conn->prev->next = conn->next;
+    if(conn->next) conn->next->prev = conn->prev;
 
-    for(; connection; connection = connection->next) {
-
-        uint8_t different_from_all=1;
-        for(unsigned long i = 0; i < n; i++) {
-            if( list_of_nodes[i] == connection->node ) {
-
-                different_from_all=0;
-            }
-        }
-        if(different_from_all) return connection;
+    // in case this is the root pointer
+    if( conn->parent->out == conn ) {
+        conn->parent->out = conn->next;
+    } else if( conn->parent->in == conn ) {
+        conn->parent->in = conn->next;
     }
-    return NULL;
+    free(conn);
 }
 
-void connection_delete_node(CONNECTION* connection_node, GRAPH* graph_node){
+uint8_t connection_delete_neighbour(CONNECTION* conn_root, NODE* node) {
 
-	//if one of the given arguments is NULL, nothing happens
-	if( !connection_node || !graph_node ) return;
-
-    if(connection_node->node == graph_node) {
-
-        connection_node->parent->connections = connection_node->next;
-        free(connection_node);
-        return;
-    }
-
-	for(;
-	connection_node->next;	//iterates through connections until current_connection
-	connection_node = connection_node->next ){
-
-		if( connection_node->next->node == graph_node ){
-
-			CONNECTION* tmp = connection_node->next; //save found node
-			connection_node->next = tmp->next; //points to found node sucessor
-			free(tmp); //deallocate found node's memory
-			return; //end function here
-		}
-	}
+    CONNECTION* conn = connection_search_neighbour(conn_root, node);
+    connection_delete(conn);
+    return !!conn;
 }
 
-void connection_delete(CONNECTION* connection_node, CONNECTION* conn) {
- 
-	//if one of the given arguments is NULL, nothing happens
-	if( !connection_node || !conn ) return;
+void connection_free(CONNECTION* conn){
 
-    if(connection_node == conn) {
+	if( !conn ) return;
 
-        connection_node->parent->connections = connection_node->next;
-        free(connection_node);
-        return;
-    }
+    CONNECTION* conn_next = conn;
+    for(CONNECTION* conn = conn_next; conn; conn = conn_next) {
 
-	for(;
-	connection_node->next;	//iterates through connections until current_connection
-	connection_node = connection_node->next ){
-
-		if( connection_node->next == conn ){
-
-			CONNECTION* tmp = connection_node->next; //save found node
-			connection_node->next = tmp->next; //points to found node sucessor
-			free(tmp); //deallocate found node's memory
-			return; //end function here
-		}
-	}   
+        conn_next = conn_next->next;
+        free(conn);
+    } 
 }
 
-void connection_free(CONNECTION* connection_root){
-
-	//if connection_root is NULL, nothing happens
-	if( !connection_root ) return;
-
-	//delete all nodes after connection_root until there is none left
-	while( connection_root->next ) connection_delete_node(connection_root, connection_root->next->node);
-
-	//free connection_root
-	free( connection_root );
-}
-
-void connection_print(CONNECTION* connection, void(*print_func)(void*,unsigned long)){
+void connection_print(CONNECTION* connection, void(*print_func)(FILE*, NODE*)){
 
 	//iterate through list and print each node the connections represent
-	for(; connection; connection = connection->next) graph_print_node(connection->node, print_func);
-}
-
-unsigned long connection_num(CONNECTION* connection) {
-
-    unsigned long n=0;
-    for(; connection; connection = connection->next) n++;
-    return n;
+	for(; connection; connection = connection->next) {
+        node_print(connection->node, print_func);
+        printf(" ");
+    }
 }

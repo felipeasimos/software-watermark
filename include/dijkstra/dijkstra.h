@@ -1,15 +1,35 @@
 #ifndef DIJKSTRA_H
 #define DIJKSTRA_H
 
+#include <stdint.h>
+
+struct NODE;
+
+typedef enum {
+    INVALID,
+    TRIVIAL=1,
+    SEQUENCE=2,
+    IF_THEN=3,
+    WHILE=4,
+    REPEAT=5,
+    IF_THEN_ELSE=6,
+    P_CASE=7,
+} STATEMENT_GRAPH;
+
+typedef struct PRIME_SUBGRAPH {
+
+    struct NODE* sink;
+    STATEMENT_GRAPH type;
+} PRIME_SUBGRAPH;
+
 #include "graph/graph.h"
-#include "metrics/metrics.h" 
-#include <string.h>
 
-// it frees the graph given
-int watermark_is_dijkstra(GRAPH* source);
+int dijkstra_check(GRAPH* graph);
 
-unsigned long* watermark_dijkstra_code(GRAPH*, unsigned long* size);
+char* dijkstra_get_code(GRAPH* watermark);
 
-int watermark_dijkstra_equal(GRAPH*, GRAPH*);
+int dijkstra_is_equal(GRAPH*, GRAPH*);
+
+GRAPH* dijkstra_generate(char* code);
 
 #endif

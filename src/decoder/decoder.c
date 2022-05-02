@@ -1,451 +1,139 @@
 #include "decoder/decoder.h"
 
-typedef struct DECODER_NODE {
-
-	// both 0 based idx, ready to use
-	unsigned long hamiltonian_idx;
-
-    // idx of the bit represented by this node
-    unsigned long bit_idx;
-
-    // the bit represented by this node
-    // follows the values in include/utils/utils.h
-    char bit;
-	unsigned long stack_idx;
-
-} DECODER_NODE;
-
-typedef struct DECODER {
-
-	#ifdef DEBUG
-		GRAPH* graph;
-	#endif
-
-	GRAPH* current_node;
-
-	STACKS stacks;
-
-	unsigned long n_bits;
-} DECODER;
-
-void decoder_graph_to_utils_nodes(GRAPH* graph) {
-
-    for(GRAPH* node = graph; node; node = node->next) {
-
-        if(node->data && node->data_len) {
-
-            DECODER_NODE* decoder_node = node->data;
-            UTILS_NODE utils_node = {
-                .h_idx = decoder_node->hamiltonian_idx+1,
-                .bit_idx = decoder_node->bit_idx,
-                .bit = decoder_node->bit
-            };
-            graph_alloc(node, sizeof(utils_node));
-            memcpy(node->data, &utils_node, node->data_len);
-        }
-    }
-}
-
-void label_new_current_node(DECODER* decoder, GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit, uint8_t is_2017) {
-
-	// get parity	
-	uint8_t is_odd = !(h_idx & 1);
-
-	// get indexes
-	unsigned long stack_idx = get_parity_stack(&decoder->stacks, is_odd)->n;
-	DECODER_NODE wm_node_info = {
-        .hamiltonian_idx = h_idx,
-        .stack_idx = stack_idx,
-        .bit_idx = bit_idx,
-        .bit = bit
-    };
-
-    // node that are origin of a backedge can't be backedge destinations
-    // but this restriction only applies to 2017
-	if( !is_2017 || !get_backedge(node) ) add_node_to_stacks(&decoder->stacks, node, h_idx, is_odd);
-
-	// get DECODER_NODE on the node
-	graph_alloc(node, sizeof(DECODER_NODE));
-	memcpy(node->data, &wm_node_info, node->data_len);
-}
-
-DECODER* decoder_create(GRAPH* graph, unsigned long n_bits) {
-
-	DECODER* decoder = malloc( sizeof(DECODER) );
-	decoder->current_node = graph;
-
-	create_stacks(&decoder->stacks, n_bits);
-
-	decoder->n_bits = n_bits;
-
-	#ifdef DEBUG
-		decoder->graph = graph;
-	#endif
-
-	return decoder;
-}
-
-uint8_t is_inner_node(DECODER* decoder, GRAPH* node) {
-
-	DECODER_NODE* node_info = node->data;
-	uint8_t is_odd = !(node_info->hamiltonian_idx & 1);
-
-	PSTACK* stack = get_parity_stack(&decoder->stacks, is_odd);
-
-	return !( node_info->stack_idx < stack->n && stack->stack[node_info->stack_idx] == node );
-}
-
-uint8_t* get_bit_array2014(DECODER* decoder) {
-
-	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
-
-	// iterate over every node but the last
-	for(unsigned long i=0; i < decoder->n_bits; i++ ) {
-
-		// check if there is a backedge ( connection with non-zero data_len is a valid backedge)
-		GRAPH* dest_node = get_backedge(decoder->current_node);
-		if( dest_node ) {
-
-			DECODER_NODE* dest = ((DECODER_NODE*)dest_node->data);
-
-			// check if it is inner node
-			if( is_inner_node(decoder, dest_node) ) {
-				#ifdef DEBUG
-					fprintf(stderr, "Invalid backedge detected!\n");
-				#endif
-				free(bit_arr);
-				return NULL;
-			}
-
-			pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-			// 1 if diff is odd, 0 otherwise
-			bit_arr[i] = (i - dest->hamiltonian_idx) & 1;
-
-		// check if this is the first node (the input graph must have the first
-		// hamiltonian node as the first node in the list)
-		} else if( !decoder->current_node->prev ) {
-
-			bit_arr[i]=1;
-
-		// else the node could always have connected to the first node (since it is
-		// never an inner vertex). Since it didn't, it means it has the value inverse
-		// to the one it would have if it connected to the first node
-		} else {
-			// if a bit is 1, the backedge should go to a node with different parity
-			// if a bit is 0, the backedge should go to a node with the same parity
-			// since there is no backedge here, and we can always connect to the first
-			// node, we just need to see what is the current node's parity, to know
-			// the bit it encodes (it is the value which can't be represented by an
-			// backedge to the first node)
-
-			// 1 - current_node = i. If i is odd, the bit is 0, if i is even the bit is 1.
-			bit_arr[i] = !(i & 1);
-
-			// however, if there was a possible backedge for the even stack, this only means
-			// that the graph is invalid
-			if( get_parity_stack(&decoder->stacks, 0)->n ) {
-				free(bit_arr);
-				return NULL;
-			}
-		}
-
-		label_new_current_node(decoder, decoder->current_node, i, i, bit_arr[i] + '0', 0);
-        decoder->current_node = decoder->current_node->next;
-	}
-
-	return bit_arr;
-}
-
-unsigned long get_node_idx(GRAPH* node) {
-
-	return ((DECODER_NODE*)node->data)->hamiltonian_idx;
-}
-
-uint8_t* get_bit_array2017(DECODER* decoder) {
-
-	uint8_t* bit_arr = malloc( sizeof(uint8_t) * decoder->n_bits );
-	memset(bit_arr, 0x00, sizeof(uint8_t) * decoder->n_bits);
-
-	// if positive, decrement it, if it is zero the current node is a forward destination
-	int forward_flag = -1;
-
-	bit_arr[0]=1;
-
-	unsigned long h_idx=1;
-
-	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0, 0, '1', 1);
-	decoder->current_node = next;
-
-	// iterate over every node but the last
-	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
-
-        // if 'forward_flag' == 0, this is the destination of a forward edge
-        if( forward_flag != 0 ) {
-
-			if( get_forward_edge(decoder->current_node) ) {
-				bit_arr[i] = 1;
-				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
-				bit_arr[i] = 1;
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				DECODER_NODE* dest = dest_node->data;
-
-				// check if it is inner node
-				if( is_inner_node(decoder, dest_node) ) {
-					#ifdef DEBUG
-						fprintf(stderr, "Invalid backedge detected!\n");
-					#endif
-					free(bit_arr);
-					return NULL;
-				}
-
-				pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-			} else {
-				bit_arr[i] = 0;
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				if(dest_node) {
-
-					// check if it is inner node
-					if( is_inner_node(decoder, dest_node) ) {
-						#ifdef DEBUG
-							fprintf(stderr, "Invalid backedge detected!\n");
-						#endif
-						free(bit_arr);
-						return NULL;
-					}
-					DECODER_NODE* dest = dest_node->data;
-					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-				}
-			}
-		} else {
-			i--;
-		}
-
-		GRAPH* next = decoder->current_node->next;
-		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : '0' + bit_arr[i], 1);
-		decoder->current_node = next;
-		h_idx++;
-
-		if( forward_flag >= 0 ) forward_flag--;
-	}
-
-	return bit_arr;
-
-}
-
-uint8_t* get_bit_sequence(uint8_t* bit_arr, unsigned long n_bits) {
-
-	unsigned long num_bytes = n_bits / 8 + !!( n_bits % 8 ); 
-	uint8_t* data = malloc( sizeof(uint8_t) * num_bytes );
-	memset(data, 0x00, num_bytes);
-
-	// get trailing_zeros in first byte
-	uint8_t offset = n_bits % 8 ? 8 - (n_bits % 8) : 0;
-
-	for( unsigned long i = 0; i < n_bits; i++ ) set_bit( data, i+offset, bit_arr[i] );
-
-	return data;
-}
-
-void decoder_free(DECODER* decoder) {
-
-	free_stacks(&decoder->stacks);
-	free(decoder);
-} 
-
-void* _watermark_decode(GRAPH* graph, unsigned long* num_bytes, unsigned long n_bits, uint8_t* (*bit_array_func)(DECODER* decoder)) {
-
-	if( !is_graph_structure_valid(graph) ) return NULL;
-
-	// 1. get number of bits and set nodes to null
-	*num_bytes = n_bits/8 + !!(n_bits%8);
-
-	// 2. create decoder struct
-	DECODER* decoder = decoder_create(graph, n_bits);
-
-	// 3. get bit array (nodes are labeled as they are evaluated)
-	uint8_t* bit_arr = bit_array_func(decoder);
-
-	if( !bit_arr ) return NULL;
-
-	// 4. turn bit array into bit sequence
-	uint8_t* data = get_bit_sequence( bit_arr, n_bits);
-
-	free(bit_arr);
-	decoder_free(decoder);
-
-	return data;
-}
-
-void* _watermark_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes, void* (*decode_func)(GRAPH*, unsigned long*)) {
-
-	uint8_t* data = decode_func(graph, num_bytes);
-
-	// make num_bytes equal to the actual data payload size
-	*num_bytes -= num_rs_bytes * sizeof(uint16_t);
-	
-	int result = rs_decode(data, *num_bytes, (uint16_t*)( data + *num_bytes ), num_rs_bytes);
-
-	// if there were no errors or they were corrected
-	if( result >= 0 ) return data;
-
-	// if there were errors and they could not be corrected
-	free(data);
-	return NULL;
-}
-
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
-	return _watermark_decode(graph, num_bytes, get_num_bits2014(graph), get_bit_array2014);
-}
+    unsigned long n_bits = graph->num_nodes-1;
+    uint8_t bits[n_bits];
+    bits[0] = 1;
+    for(unsigned long i = 1; i < n_bits; i++) {
 
-void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
+        // if this node has two out connections
+        if(graph->nodes[i]->num_out_neighbours == 2) {
 
-	return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2014_decode);
-}
-
-void* watermark2017_decode(GRAPH* graph, unsigned long* num_bytes) {
-
-	return _watermark_decode(graph, num_bytes, get_num_bits(graph), get_bit_array2017);
-}
-
-void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_bytes) {
-
-	return _watermark_decode_with_rs(graph, num_bytes, num_rs_bytes, watermark2017_decode);
-}
-
-void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
-
-	if( !num_bytes ) return NULL;
-
-    unsigned long n_bits = get_num_bits(graph);
-
-	// 1. get size of bit_arr array and set nodes to null
-	*num_bytes = n_bits;
-
-	// 2. create decoder struct
-	DECODER* decoder = decoder_create(graph, n_bits);
-
-	uint8_t* bit_arr = malloc( sizeof(char) * decoder->n_bits );
-	memset(bit_arr, 'x', sizeof(char) * decoder->n_bits);
-
-	// if positive, decrement it, if it is zero the current node is a forward destination
-	int forward_flag = -1;
-
-	bit_arr[0]='1';
-
-	unsigned long h_idx=1;
-
-	GRAPH* next = decoder->current_node->next;
-	label_new_current_node(decoder, decoder->current_node, 0, 0, '1', 1);
-	decoder->current_node = next;
-
-	// iterate over every node but the last
-	for(unsigned long i=1; i < decoder->n_bits; i++ ) {
-
-        if(!decoder->current_node) {
-            break;
-        }
-
-		if( forward_flag != 0 ) {
-
-			if( get_forward_edge(decoder->current_node) ) {
-				bit_arr[i] = '1';
-				forward_flag = 2;
-			} else if( get_backedge(decoder->current_node) && !( (h_idx - get_node_idx(get_backedge(decoder->current_node))-1) & 1 ) ) {
-				bit_arr[i] = '1';
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				DECODER_NODE* dest = dest_node->data;
-
-				// check if it is inner node
-				if( is_inner_node(decoder, dest_node) ) {
-					#ifdef DEBUG
-						fprintf(stderr, "Invalid backedge detected!\n");
-					#endif
-					free(bit_arr);
-					bit_arr[i]='x';
-				} else {
-				    pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-                }
-
-			} else {
-				bit_arr[i] = '0';
-				GRAPH* dest_node = get_backedge(decoder->current_node);
-				if(dest_node) {
-
-					// check if it is inner node
-					if( is_inner_node(decoder, dest_node) ) {
-						#ifdef DEBUG
-							fprintf(stderr, "Invalid backedge detected!\n");
-						#endif
-						free(bit_arr);
-						bit_arr[i]='x';
-					}
-					DECODER_NODE* dest = dest_node->data;
-					pop_stacks(&decoder->stacks, dest->stack_idx, dest->hamiltonian_idx);
-				}
-			}
-		} else {
-			i--;
-		}
-
-		GRAPH* next = decoder->current_node->next;	
-		label_new_current_node(decoder, decoder->current_node, h_idx, i, !forward_flag ? UTILS_MUTE_NODE : bit_arr[i], 1);
-		decoder->current_node = next;
-		h_idx++;
-
-		if( forward_flag >= 0 ) forward_flag--;
-	}
-    decoder_free(decoder);
-
-	return bit_arr;
-}
-
-void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_parity_symbols) {
-
-    uint8_t* result = watermark2017_decode_analysis(graph, num_bytes);
-
-    unsigned long result_n_bits = *num_bytes;
-    unsigned long result_num_bytes = result_n_bits / 8 + !!(result_n_bits % 8);
-    unsigned long result_total_n_bits = result_num_bytes * 8;
-    uint8_t* final_result = malloc(sizeof(uint8_t) * result_num_bytes);
-    memset(final_result, 0x00, result_num_bytes);
-
-    // turn 'result' into an actual bit sequence, turn 'x' into a random bit value
-    srand(time(NULL));
-    for(unsigned long i = 0; i < result_n_bits; i++) {
-
-        if( result[ result_n_bits - i - 1 ] == UTILS_UNKNOWN_NODE ) {
-
-            // set to wrong bit
-            set_bit(final_result, result_total_n_bits - i - 1, !!(result[ result_n_bits - i - 1 ] - '0'));
+            // get backedge
+            CONNECTION* conn = graph_get_backedge(graph->nodes[i]);
+            bits[i] = ( graph->nodes[i]->graph_idx - conn->node->graph_idx ) & 1;
         } else {
-            // set to result bit
-            set_bit(final_result, result_total_n_bits - i - 1, result[ result_n_bits - i - 1 ] - '0');
+            bits[i] = 0;
         }
     }
+    void* data = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    return data;
+}
 
-    // use reed solomon on 'final_result'
-    unsigned long payload_num_bytes = result_num_bytes - num_rs_parity_symbols * sizeof(uint16_t);
+void* watermark_decode(GRAPH* graph, unsigned long* num_bytes) {
 
-	int res = rs_decode(final_result, payload_num_bytes, (uint16_t*)( (uint8_t*)final_result + payload_num_bytes ), num_rs_parity_symbols);
+    unsigned long n_bits = graph->num_nodes-2;
+    uint8_t bits[n_bits];
+    bits[0] = 1;
+    unsigned long i = 1;
 
-    // if there were no errors or they were corrected
-	if( res >= 0 ) {
+    for(unsigned long graph_idx = 1; graph_idx < n_bits; graph_idx++, i++) {
 
-        // convert 'final_result' values into array of bits
-        free(result);
-        unsigned long payload_total_n_bits = payload_num_bytes * 8;
-        unsigned long payload_n_bits = payload_total_n_bits - get_trailing_zeroes(final_result, payload_total_n_bits/8);
-        *num_bytes = payload_n_bits;
-        result = malloc( sizeof(uint8_t) * payload_n_bits );
-        for(unsigned long i = 0; i < payload_n_bits; i++)
-            result[ payload_n_bits - i - 1 ] = '0' + get_bit(final_result, payload_total_n_bits - i - 1);
-        free(final_result);
-    } else {
-        // an error happened
-        free(final_result);
+        // if it isn't a mute node
+        if(!( graph_idx > 1 && graph_get_connection(graph->nodes[graph_idx-2], graph->nodes[graph_idx])) ) {
+
+            // if it has a forward edge
+            if( graph_idx < n_bits && graph_get_connection(graph->nodes[graph_idx], graph->nodes[graph_idx+2]) ) {
+                bits[i]=1;
+            } else {
+                CONNECTION* backedge = graph_get_backedge(graph->nodes[graph_idx]);
+                bits[i] = backedge && (( graph_idx - backedge->node->graph_idx ) & 1);
+            }
+        } else {
+            i--;
+        }
     }
-    return result;   
+    // if the second last node is a forward edge destination, the
+    // third last node also needs to be ignored
+    uint8_t is_prev_last_forward_destination = !!( n_bits > 2 && graph_get_connection(graph->nodes[n_bits-2], graph->nodes[n_bits]) );
+    n_bits = i-is_prev_last_forward_destination;
+    // bit sequence may be smaller than expected due to mute nodes
+    void* data = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    return data;
+}
+
+void* watermark2014_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
+
+    unsigned long data_len;
+    uint8_t* data = watermark2014_decode(graph, &data_len);
+    return remove_rs_code(data, data_len, num_parity_symbols);
+}
+
+void* watermark_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
+
+    unsigned long data_len;
+    uint8_t* data = watermark_decode(graph, &data_len);
+    return remove_rs_code(data, data_len, num_parity_symbols);
+}
+
+void* _watermark_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
+
+    // load UTILS_NODE in every node
+    for(unsigned long i = 0; i < graph->num_nodes; i++) {
+        UTILS_NODE* utils_node = malloc(sizeof(UTILS_NODE));
+        node_load_info(graph->nodes[i], utils_node, sizeof(UTILS_NODE));
+    }
+
+    unsigned long n_bits = graph->num_nodes-2;
+    uint8_t bits[n_bits];
+    bits[0] = 1;
+    unsigned long i = 1;
+
+    for(unsigned long graph_idx = 1; graph_idx < n_bits; graph_idx++, i++) {
+
+        // if it isn't a mute node
+        if(!( graph_idx > 1 && graph_get_connection(graph->nodes[graph_idx-2], graph->nodes[graph_idx])) ) {
+
+            // if it has a forward edge
+            if( graph_idx < n_bits && graph_get_connection(graph->nodes[graph_idx], graph->nodes[graph_idx+2]) ) {
+                ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->checker_bit = BIT_1;
+                bits[i]=1;
+            } else {
+                CONNECTION* backedge = graph_get_backedge(graph->nodes[graph_idx]);
+                bits[i] = backedge && (( graph_idx - backedge->node->graph_idx ) & 1);
+                ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->checker_bit = bits[i] == '1' ? BIT_1 : BIT_0;
+            }
+        } else {
+            ((UTILS_NODE*)node_get_info(graph->nodes[graph_idx]))->checker_bit = BIT_MUTE;
+            i--;
+        }
+    }
+    // if the second last node is a forward edge destination, the
+    // third last node also needs to be ignored
+    uint8_t is_prev_last_forward_destination = !!( n_bits > 2 && graph_get_connection(graph->nodes[n_bits-2], graph->nodes[n_bits]) );
+    n_bits = i-is_prev_last_forward_destination;
+    // bit sequence may be smaller than expected due to mute nodes
+    void* data = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    return data;
+}
+void* watermark_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {
+
+    uint8_t* data = _watermark_decode_analysis(graph, num_bytes);
+    unsigned long starting_idx = get_first_positive_bit_index(data, *num_bytes);
+    unsigned long n_bits = (*num_bytes)*8 - starting_idx;
+    
+    uint8_t* bits = malloc(n_bits);
+    for(unsigned long i = 0; i < n_bits; i++) {
+        bits[i] = get_bit(data, starting_idx+i);
+    }
+    free(data);
+    *num_bytes = n_bits;
+    return bits;
+}
+
+void* watermark_rs_decode_analysis(GRAPH* graph, unsigned long* num_parity_symbols) {
+
+    uint8_t* data = watermark_rs_decode(graph, num_parity_symbols);
+
+    unsigned long starting_idx = get_first_positive_bit_index(data, *num_parity_symbols);
+    unsigned long n_bits = (*num_parity_symbols)*8 - starting_idx;
+    
+    uint8_t* bits = malloc(n_bits);
+    for(unsigned long i = 0; i < n_bits; i++) {
+        bits[i] = get_bit(data, starting_idx+i);
+    }
+    free(data);
+    *num_parity_symbols = n_bits;
+    return bits;
 }

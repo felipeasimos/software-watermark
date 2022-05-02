@@ -1,106 +1,78 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "graph/graph.h"
+#include <stdlib.h>
 #include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
 
-typedef struct PSTACK {
+typedef struct STACK {
 
-	GRAPH** stack;
-	unsigned long n;
-} PSTACK;
+    unsigned long* stack;
+    unsigned long n;
+} STACK;
 
-typedef struct HSTACK {
+typedef struct QUEUE {
+    unsigned long* queue;
+    unsigned long n;
+} QUEUE;
 
-	unsigned long* stack;
-} HSTACK;
+typedef enum STATUS_BIT {
+    BIT_0='0',
+    BIT_1='1',
+    BIT_MUTE='m',
+    BIT_0_BACKEDGE='b',
+    BIT_1_BACKEDGE='B',
+    BIT_1_FORWARD_EDGE_AND_BIT_0='f',
+    BIT_1_FORWARD_EDGE_AND_BIT_1='F',
+    BIT_UNKNOWN='x'
+} STATUS_BIT;
 
-typedef struct STACKS {
-
-	PSTACK odd;
-	PSTACK even;
-	HSTACK history;
-} STACKS;
-
-// keep some information about the node that can
-// be used by tests
 typedef struct UTILS_NODE {
-
-    // hamiltonian idx 1-based
-    unsigned long h_idx;
-
-    // bit arr idx 0-based
+    unsigned long backedge_idx;
+    STATUS_BIT checker_bit;
     unsigned long bit_idx;
-
-    // '1'/'0' or 'm' if mute or 'x' if unknown
-    char bit;
 } UTILS_NODE;
-#define UTILS_MUTE_NODE 'm'
-#define UTILS_UNKNOWN_NODE 'x'
 
-void utils_print_node(void* data, unsigned long data_len);
+#include "graph/graph.h"
 
-void utils_print_stacks(STACKS* stacks, void (*print_func)(void* data, unsigned long data_len));
+// system
+uint8_t is_little_endian_machine();
 
-unsigned long invert_unsigned_long(unsigned long i);
+// math
+unsigned long ceil_power_of_2(unsigned long n);
 
-// 1. first node has only a hamiltonian edge, and no less
-// 2. only final node has no outgoing connections (so there can only be one node without outgoing connections)
-// 3. every node has less than three outgoing connections
-// 4. no connections to the same node
-uint8_t is_graph_structure_valid(GRAPH* graph);
+// stack
+STACK* stack_create(unsigned long max_nodes);
+void stack_push(STACK*, unsigned long);
+unsigned long stack_pop(STACK*);
+void stack_pop_until(STACK*, unsigned long size);
+unsigned long stack_get(STACK*);
+void stack_free(STACK*);
+void stack_print(STACK*);
 
-void create_stacks(STACKS* stacks, unsigned long n_bits);
+// queue
+QUEUE* queue_create(unsigned long max_nodes);
+void queue_push(QUEUE*, unsigned long);
+unsigned long queue_pop(QUEUE*);
+unsigned long queue_get(QUEUE*);
+void queue_free(QUEUE*);
 
-void free_stacks(STACKS* stacks);
-
-uint8_t get_bit(uint8_t* data, unsigned long bit_idx);
-
-void set_bit( uint8_t* data, unsigned long i, uint8_t value );
-
-unsigned long get_num_bits2014(GRAPH* graph);
-
-// also free the data of each node
-unsigned long get_num_bits(GRAPH* graph);
-
-GRAPH* get_backedge(GRAPH* node);
-
-GRAPH* get_backedge_with_info(GRAPH* node);
-
-
-GRAPH* get_forward_edge(GRAPH* node);
-
-GRAPH* get_forward_edge_with_info(GRAPH* node);
-
-CONNECTION* get_hamiltonian_connection(GRAPH* node);
-
-GRAPH* get_next_hamiltonian_node(GRAPH* node);
-
-GRAPH* get_next_hamiltonian_node2014(GRAPH* node);
-
-PSTACK* get_parity_stack(STACKS* stacks, uint8_t is_odd);
-
-void add_node_to_stacks(STACKS* stacks, GRAPH* node, unsigned long h_idx, unsigned long is_odd);
-
-// 0 based idx
-void pop_stacks(STACKS* stacks, unsigned long backedge_p_idx, unsigned long backedge_h_idx);
-
-void add_backedge2014(STACKS* stacks, GRAPH* source_node, uint8_t bit, uint8_t is_odd);
-
-void add_backedge(STACKS* stacks, GRAPH* source_node, uint8_t prev_has_backedge_in_this_stack, uint8_t bit, uint8_t is_odd);
-
-unsigned long get_trailing_zeroes(uint8_t* data, unsigned long data_len);
-
+// binary sequence
+uint8_t get_bit(uint8_t* data, unsigned long idx);
+void set_bit(uint8_t* data, unsigned long idx, uint8_t value);
+uint8_t* invert_binary_sequence(uint8_t* data, unsigned long size);
+uint8_t* invert_byte_sequence(uint8_t* data, unsigned long size);
+unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes);
+uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes);
+uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_bytes1, unsigned long num_bytes2);
 void* encode_numeric_string(char* string, unsigned long* data_len);
+void* decode_numeric_string(void* data, unsigned long* data_len);
 
-uint8_t* decode_numeric_string(void* data, unsigned long* data_len);
+// 2017 codec-specific
+uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
+unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 
-void add_idx(GRAPH* node, unsigned long h_idx, unsigned long bit_idx, char bit);
-
-int has_possible_backedge2017(STACKS* stacks, GRAPH* node, uint8_t is_odd, uint8_t bit);
-
-uint8_t* bin_to_bit_arr(uint8_t* bin, unsigned long* bin_len);
-
-uint8_t* bit_arr_to_bin(uint8_t* bit_arr, unsigned long* bit_arr_len);
+// translate struct used in decoding and checking analysis to a common structure
 
 #endif

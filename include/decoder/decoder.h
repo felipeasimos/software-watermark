@@ -1,25 +1,18 @@
 #ifndef DECODER_H
 #define DECODER_H
 
-#include "utils/utils.h"
-#include <stdint.h>
+#include "graph/graph.h"
 #include "rs_api/rs.h"
-#include "time.h"
-
-void decoder_graph_to_utils_nodes(GRAPH* graph);
-
-void decoder_print_node(void* data, unsigned long data_len);
 
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes);
+void* watermark_decode(GRAPH*, unsigned long* num_bytes);
 
-void* watermark2014_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_uint16s);
+// 'num_parity_symbols' will hold the size of the binary sequence
+// afterwards
+void* watermark2014_rs_decode(GRAPH*, unsigned long* num_parity_symbols);
+void* watermark_rs_decode(GRAPH*, unsigned long* num_parity_symbols);
 
-void* watermark2017_decode(GRAPH* graph, unsigned long* num_bytes);
-
-void* watermark2017_decode_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_uint16s);
-
-void* watermark2017_decode_analysis(GRAPH* graph, unsigned long* num_bytes);
-
-void* watermark2017_decode_analysis_with_rs(GRAPH* graph, unsigned long* num_bytes, unsigned long num_rs_uint16s);
+void* watermark_decode_analysis(GRAPH*, unsigned long* num_bytes);
+void* watermark_rs_decode_analysis(GRAPH*, unsigned long* num_parity_symbols);
 
 #endif
