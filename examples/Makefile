@@ -1,8 +1,11 @@
 CC=clang
-TARGET=sort
-SRC=sort.c
+SRC=$(wildcard *.c)
+TARGET=$(SRC:.c=)
 
-build:
-	$(CC) -g $(SRC) -o $(TARGET)
-run: build
-	valgrind --quiet ./$(TARGET)
+.PHONY: build run
+$(TARGET): %: %.c
+	$(CC) -g -O0 -o $@ $<
+
+build: $(TARGET)
+run: $(TARGET)
+	$(foreach f,$^,valgrind --quiet ./$(f);)
