@@ -58,23 +58,22 @@ PRIME_SUBGRAPH dijkstra_is_pcase_or_if_else_prime(NODE* source_sink) {
     // check if p-case of if-else
     if( source_sink->num_out_neighbours >= 2 ) {
       // condition: direct connections all point to same node
-      NODE* tmp_sink = dijkstra_get_sink(source_sink->out->node);
-      if(tmp_sink->num_out_neighbours == 0) {
+      NODE* middle_node_sink = dijkstra_get_sink(source_sink->out->node);
+      if(middle_node_sink->num_out_neighbours != 1) {
         return prime;
       }
       prime.type = source_sink->num_out_neighbours == 2 ? IF_THEN_ELSE : P_CASE;
-      prime.sink = tmp_sink->out->node;
+      prime.sink = dijkstra_get_sink(middle_node_sink->out->node);
       for(CONNECTION* conn = source_sink->out; conn; conn = conn->next) {
 
           NODE* node = conn->node;
           NODE* node_sink = dijkstra_get_sink(node);
-          if( node_sink->num_out_neighbours != 1 || node_sink->out->node != prime.sink ) {
+          if( node_sink->num_out_neighbours != 1 || dijkstra_get_sink(node_sink->out->node) != prime.sink ) {
               prime.type = INVALID;
               prime.sink = NULL;
               return prime;
           }
       }
-      prime.sink = dijkstra_get_sink(prime.sink);
     }
     return prime;
 }
@@ -98,15 +97,51 @@ PRIME_SUBGRAPH dijkstra_is_if_prime(NODE* source_sink) {
   return prime;
 }
 
-PRIME_SUBGRAPH dijkstra_is_sequence_prime(NODE* source_sink) {
+PRIME_SUBGRAPH dijkstra_is_sequence_prime(NODE* source, NODE* source_sink) {
 
   PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
   if( source_sink->num_out_neighbours == 1 && dijkstra_num_out_backedges(source_sink) == 0 ) {
 
     NODE* node = source_sink->out->node;
-    NODE* node_sink = dijkstra_get_sink(source_sink->out->node);
-    // direct connection can't have forward edges to it
-    if( dijkstra_num_out_backedges(node_sink) == 0 && dijkstra_num_in_neighbors(node) == 1) {
+    NODE* node_sink = dijkstra_get_sink(node);
+
+    if( graph_get_backedge(node_sink) // node has backedge
+      ) {
+
+        NODE* backedge_node_sink = dijkstra_get_sink(graph_get_backedge(node_sink)->node);
+        // avoid closing cycles, by only contracting a sequence with a node with a backedge
+        // in this specific scenario:
+        //  .-------.
+        // 4 -> 5 -> 6
+        // `------------> 7 -> 8 -> ...
+        // where the source for sequence is 5       
+        if( node_sink->num_out_neighbours == 1 && // node has only one outgoing connection (while loop)
+            graph_get_connection(backedge_node_sink, source) && // backedge node connects directly to source
+            backedge_node_sink->num_out_neighbours == 2
+          ) {
+          prime.type = SEQUENCE;
+          prime.sink = node_sink;
+          return prime;
+        }
+
+        // avoid closing cycles, by only contracting a sequence with a node with a backedge
+        // in this specific scenario:
+        //  .-------.
+        // 4 -> 5 -> 6 -> 7 -> ...
+        // where the source for sequence is 5
+        if( node_sink->num_out_neighbours == 2 && // node has two outgoing connection (repeat loop)
+            graph_get_connection(backedge_node_sink, source) && // backedge node connects directly to source
+            backedge_node_sink->num_out_neighbours == 1
+          ) {
+          prime.type = SEQUENCE;
+          prime.sink = node_sink;
+          return prime;
+        }
+      return prime;
+    }
+
+    // must have only one in neighbour
+    if( dijkstra_num_in_neighbors(node) == 1 ) {
       prime.type = SEQUENCE;
       prime.sink = node_sink;
       return prime;
@@ -118,7 +153,7 @@ PRIME_SUBGRAPH dijkstra_is_sequence_prime(NODE* source_sink) {
 PRIME_SUBGRAPH dijkstra_is_while_prime(NODE* source, NODE* source_sink) {
 
   PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
-  if( source_sink->num_out_neighbours == 2 && dijkstra_num_in_backedges(source) ) {
+  if( dijkstra_num_out_neighbors(source_sink) == 2 && dijkstra_num_in_backedges(source) ) {
 
     NODE* node1 = source_sink->out->node;
     NODE* node2 = source_sink->out->next->node;
@@ -140,9 +175,12 @@ PRIME_SUBGRAPH dijkstra_is_while_prime(NODE* source, NODE* source_sink) {
 PRIME_SUBGRAPH dijkstra_is_repeat_prime(NODE* source, NODE* source_sink) {
 
   PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
-  if( source_sink->num_out_neighbours == 1 && dijkstra_num_in_backedges(source) ) {
+  if( source_sink->num_out_neighbours == 1 && dijkstra_num_in_backedges(source) > 0 ) {
 
     NODE* middle_node_sink = dijkstra_get_sink(source_sink->out->node);
+    if( middle_node_sink->num_out_neighbours != 2 || dijkstra_num_out_backedges(middle_node_sink) != 1 ) {
+      return prime;
+    } 
     prime.type = REPEAT;
     prime.sink = middle_node_sink->out->node->graph_idx < middle_node_sink->graph_idx ?
       dijkstra_get_sink(middle_node_sink->out->next->node) :
@@ -170,7 +208,7 @@ PRIME_SUBGRAPH dijkstra_is_non_trivial_prime(NODE* source) {
     }
 
     // 3. check if this is a sequence
-    if( (prime = dijkstra_is_sequence_prime(source_sink)).type != INVALID ) {
+    if( (prime = dijkstra_is_sequence_prime(source, source_sink)).type != INVALID ) {
       return prime;
     }
 
@@ -209,9 +247,15 @@ int dijkstra_check(GRAPH* graph) {
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
             // contract
             node_set_info(node, prime.sink, sizeof(NODE*));
+            // fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
+            // graph_print(graph, dijkstra_print_node);
+            // graph_write_dot_generic(graph, "dot.dot", "161312111412161111121", dijkstra_print_node);
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 node_set_info(node, prime.sink, sizeof(NODE*));
+                // fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
+                // graph_print(graph, dijkstra_print_node);
+                // graph_write_dot_generic(graph, "dot.dot", "161312111412161111121", dijkstra_print_node);
             }
         }
     }
@@ -245,6 +289,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
         case SEQUENCE: {
             dijkstra_merge_codes(codes, source, source_sink->out->node, prime.type);
             free(codes[source_sink->out->node->graph_idx]);
+            codes[source_sink->out->node->graph_idx] = NULL;
             break;
         }
         // add code from if block and final node
@@ -256,6 +301,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[middle_node->graph_idx]);
             free(codes[final_node->graph_idx]);
+            codes[middle_node->graph_idx] = codes[final_node->graph_idx] = NULL;
             break;
         }
         // add code from while block and final node
@@ -267,6 +313,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[connect_back_node->graph_idx]);
             free(codes[final_node->graph_idx]);
+            codes[connect_back_node->graph_idx] = codes[final_node->graph_idx] = NULL;
             break;
         }
         case REPEAT: {
@@ -277,6 +324,7 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[middle_node->graph_idx]);
             free(codes[final_node->graph_idx]);
+            codes[middle_node->graph_idx] = codes[final_node->graph_idx] = NULL;
             break;
         }
         case IF_THEN_ELSE:
@@ -293,10 +341,12 @@ void dijkstra_update_code(NODE* source, PRIME_SUBGRAPH prime, char* codes[]) {
             for(CONNECTION* conn = source_sink->out; conn; conn = conn->next) {
                 dijkstra_merge_codes(codes, source, conn->node, 0);
                 free(codes[conn->node->graph_idx]);
+                codes[conn->node->graph_idx] = NULL;
             }
             // add final node code
             dijkstra_merge_codes(codes, source, final_node, 0);
             free(codes[final_node->graph_idx]);
+            codes[final_node->graph_idx] = NULL;
             break;
         }
         case INVALID:
@@ -340,17 +390,19 @@ char* dijkstra_get_code(GRAPH* graph) {
         NODE* node = graph->nodes[graph->num_nodes-1-i];
 
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
-
             dijkstra_update_code(node, prime, codes);
             node_set_info(node, prime.sink, node_get_info_len(node));
+            fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
+            graph_print(graph, dijkstra_print_node);
+            graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
 
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 dijkstra_update_code(node, prime, codes);
                 node_set_info(node, prime.sink, node_get_info_len(node));
-                fprintf(stderr, "type: %d, idx: %lu\n", prime.type, node->graph_idx);
+                fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
                 graph_print(graph, dijkstra_print_node);
-
+                graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
             }
         }
     }
