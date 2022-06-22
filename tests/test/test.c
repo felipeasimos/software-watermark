@@ -309,6 +309,7 @@ int dijkstra_code_test() {
     node_expand_to_sequence(graph->nodes[12]);*/
 
     char* code = dijkstra_get_code(graph);
+    fprintf(stderr, "%s\n", code);
     ctdd_assert( !strcmp(code, "161312111412161111121") );
     graph_free(graph);
     free(code);
