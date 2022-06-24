@@ -316,7 +316,7 @@ int dijkstra_code_test() {
     uint8_t k = 29;
     graph = watermark_encode(&k, sizeof(k));
     code = dijkstra_get_code(graph);
-    ctdd_assert( !strcmp(code, "151131151121") );
+    ctdd_assert( !strcmp(code, "151151311121") );
     graph_free(graph);
     free(code);
     // 28
@@ -376,7 +376,10 @@ int dijkstra_watermark_code_test() {
     // a random graph i generated from a dijkstra code (with a 3-case switch case)
     GRAPH* g = dijkstra_generate("161512161213111111716111121151111");
     char* code = dijkstra_get_code(g);
+    new = dijkstra_generate(code);
     graph_write_dot(g, "original.dot", code);
+    graph_write_dot(new, "dot.dot", code);
+    fprintf(stderr, "code: %s\n", code);
     ctdd_assert( !strcmp(code, "161512161213111111716111121151111") );
     free(code);
     graph_free(g);
@@ -393,10 +396,10 @@ int dijkstra_watermark_code_test() {
 
         uint8_t res = *result == k;
         if(!res) {
+          char* str = dijkstra_get_code(new);
           fprintf(stderr, "%hhu %hhu\n", *result, k);
           fprintf(stderr, "original(%s)\n", code);
           graph_print(original, NULL);
-          char* str = dijkstra_get_code(new);
           fprintf(stderr, "new(%s):\n", str);
           free(str);
           graph_print(new, NULL);

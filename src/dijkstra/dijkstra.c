@@ -105,19 +105,22 @@ PRIME_SUBGRAPH dijkstra_is_sequence_prime(NODE* source, NODE* source_sink) {
     NODE* node = source_sink->out->node;
     NODE* node_sink = dijkstra_get_sink(node);
 
+    // must have only one in neighbour
+    if( dijkstra_num_in_neighbors(node) != 1 ) return prime;
+
     if( graph_get_backedge(node_sink) // node has backedge
       ) {
 
         NODE* backedge_node_sink = dijkstra_get_sink(graph_get_backedge(node_sink)->node);
         // avoid closing cycles, by only contracting a sequence with a node with a backedge
         // in this specific scenario:
-        //  .-------.
+        //  <-------.
         // 4 -> 5 -> 6
         // `------------> 7 -> 8 -> ...
-        // where the source for sequence is 5       
+        // where the source for sequence is 5
         if( node_sink->num_out_neighbours == 1 && // node has only one outgoing connection (while loop)
             graph_get_connection(backedge_node_sink, source) && // backedge node connects directly to source
-            backedge_node_sink->num_out_neighbours == 2
+            backedge_node_sink->num_out_neighbours == 2 // backedge node has two outgoing connections (while loop)
           ) {
           prime.type = SEQUENCE;
           prime.sink = node_sink;
@@ -126,13 +129,16 @@ PRIME_SUBGRAPH dijkstra_is_sequence_prime(NODE* source, NODE* source_sink) {
 
         // avoid closing cycles, by only contracting a sequence with a node with a backedge
         // in this specific scenario:
-        //  .-------.
+        //  <-------.
         // 4 -> 5 -> 6 -> 7 -> ...
-        // where the source for sequence is 5
-        if( node_sink->num_out_neighbours == 2 && // node has two outgoing connection (repeat loop)
-            graph_get_connection(backedge_node_sink, source) && // backedge node connects directly to source
-            backedge_node_sink->num_out_neighbours == 1
+        // where the source for sequence is 4
+        if( node_sink->num_out_neighbours == 1 && // node has one outgoing connection (repeat loop)
+            dijkstra_num_in_backedges(source) == 1 && // source has one in backedge (repeat loop)
+            graph_get_backedge(dijkstra_get_sink(node_sink->out->node)) && // middle node has backedge (repeat loop)
+            dijkstra_get_sink(node_sink->out->node) == node && // middle node doesn't expand (repeat loop)
+            graph_get_backedge(dijkstra_get_sink(node_sink->out->node))->node == source // middle node connects back to source
           ) {
+
           prime.type = SEQUENCE;
           prime.sink = node_sink;
           return prime;
@@ -271,10 +277,24 @@ void dijkstra_merge_codes(char* codes[], NODE* a, NODE* b, STATEMENT_GRAPH type)
     // update size
     node_set_info(a, dijkstra_get_sink(a), node_get_info_len(a) + node_get_info_len(b) - !type);
     codes[a->graph_idx] = realloc(codes[a->graph_idx], node_get_info_len(a));
-    if(type) {
+    if(type != REPEAT && type) {
         char str[node_get_info_len(a)];
         sprintf(str, "%d%s", type, codes[b->graph_idx]);
         strcat(codes[a->graph_idx], str);
+    } else if(type == REPEAT) {
+        // a is source
+        // b is middle_node
+        fprintf(stderr, "source node: %s\n", codes[a->graph_idx]);
+        fprintf(stderr, "middle node: %s\n", codes[b->graph_idx]);
+        char str[node_get_info_len(a)];
+        // see which was expanded
+        if( strcmp(codes[a->graph_idx], "1") ) {
+          sprintf(str, "1%d%s", type, codes[a->graph_idx]);
+        } else {
+          sprintf(str, "1%d%s", type, codes[b->graph_idx]);
+        }
+        memcpy(codes[a->graph_idx], str, node_get_info_len(a));
+        fprintf(stderr, "result: %s\n", codes[a->graph_idx]);
     } else {
         strcat(codes[a->graph_idx], codes[b->graph_idx]);
     }
@@ -392,7 +412,7 @@ char* dijkstra_get_code(GRAPH* graph) {
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
             dijkstra_update_code(node, prime, codes);
             node_set_info(node, prime.sink, node_get_info_len(node));
-            fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
+            fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
             graph_print(graph, dijkstra_print_node);
             graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
 
@@ -400,7 +420,7 @@ char* dijkstra_get_code(GRAPH* graph) {
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 dijkstra_update_code(node, prime, codes);
                 node_set_info(node, prime.sink, node_get_info_len(node));
-                fprintf(stderr, "idx: %lu, type: %d\n", node->graph_idx, prime.type);
+                fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
                 graph_print(graph, dijkstra_print_node);
                 graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
             }
@@ -465,9 +485,11 @@ char* dijkstra_generate_recursive(char* dijkstra_code, NODE* source) {
             return dijkstra_generate_recursive(dijkstra_code, sink_node);
         }
         case REPEAT: {
+            // check if source or middle_node have been expanded
             NODE* sink_node = node_expand_to_repeat(source);
-            NODE* middle_node = source->graph->nodes[source->graph_idx+1];
-            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, middle_node);
+            // NODE* middle_node = source->graph->nodes[source->graph_idx+1];
+            // dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, middle_node);
+            dijkstra_code = dijkstra_generate_recursive(dijkstra_code+2, source);
             return dijkstra_generate_recursive(dijkstra_code, sink_node);
         }
         case IF_THEN_ELSE:
