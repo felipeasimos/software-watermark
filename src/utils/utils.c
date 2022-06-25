@@ -205,19 +205,23 @@ uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned 
     // new: there can't be a backedge [w <- v] if [w' <- v-1] exists
     // watermarks like these shouldn't be valid:
     // 0b1011 = 11
-    //          1<<  1<<
+    //   .---------.
+    //  /   .----.  \
+    // v    v    |   \
     // 0 -> 1 -> 2 -> 3 -> 4 -> 5
     // since in the dijkstra graphs article it is pretty clear that
     // the middle node of a repeat block is not expandable:
-    //     <<
+    // .----.
+    // v    |
     // X -> R -> X
     // However, in the example above, node 3 clearly part of the inner
     // repeat block. Changing [w <- v] to [w' <- v-1] corrects this.
     // while blocks are not affected since they always have the same static structure
     // which doesn't allow for inner backedges:
-    //      <<
-    // R -> X   X
-    // >>
+    // .----.
+    // v    |
+    // R -> X   
+    //  `------> X
     if(graph_get_backedge(graph->nodes[current_idx-1])) return 0;
 
     return possible_backedges->n && !( possible_backedges->n == 1 &&
