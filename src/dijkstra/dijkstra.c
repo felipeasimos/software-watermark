@@ -181,12 +181,14 @@ PRIME_SUBGRAPH dijkstra_is_while_prime(NODE* source, NODE* source_sink) {
 PRIME_SUBGRAPH dijkstra_is_repeat_prime(NODE* source, NODE* source_sink) {
 
   PRIME_SUBGRAPH prime = { .sink = NULL, .type = INVALID};
-  if( source_sink->num_out_neighbours == 1 && dijkstra_num_in_backedges(source) > 0 ) {
+  if( source_sink->num_out_neighbours == 1 && dijkstra_num_in_backedges(source) > 0 ) { // we don't know where this backedge comes from though
 
     NODE* middle_node_sink = dijkstra_get_sink(source_sink->out->node);
-    if( middle_node_sink->num_out_neighbours != 2 || dijkstra_num_out_backedges(middle_node_sink) != 1 ) {
-      return prime;
-    } 
+
+    if( middle_node_sink->num_out_neighbours != 2 ) return prime;
+    if( dijkstra_num_out_backedges(middle_node_sink) != 1 ) return prime;
+    if( graph_get_backedge(middle_node_sink)->node != source ) return prime;
+
     prime.type = REPEAT;
     prime.sink = middle_node_sink->out->node->graph_idx < middle_node_sink->graph_idx ?
       dijkstra_get_sink(middle_node_sink->out->next->node) :
@@ -284,8 +286,6 @@ void dijkstra_merge_codes(char* codes[], NODE* a, NODE* b, STATEMENT_GRAPH type)
     } else if(type == REPEAT) {
         // a is source
         // b is middle_node
-        fprintf(stderr, "source node: %s\n", codes[a->graph_idx]);
-        fprintf(stderr, "middle node: %s\n", codes[b->graph_idx]);
         char str[node_get_info_len(a)];
         // see which was expanded
         if( strcmp(codes[a->graph_idx], "1") ) {
@@ -294,7 +294,6 @@ void dijkstra_merge_codes(char* codes[], NODE* a, NODE* b, STATEMENT_GRAPH type)
           sprintf(str, "1%d%s", type, codes[b->graph_idx]);
         }
         memcpy(codes[a->graph_idx], str, node_get_info_len(a));
-        fprintf(stderr, "result: %s\n", codes[a->graph_idx]);
     } else {
         strcat(codes[a->graph_idx], codes[b->graph_idx]);
     }
@@ -412,17 +411,17 @@ char* dijkstra_get_code(GRAPH* graph) {
         if(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID ) {
             dijkstra_update_code(node, prime, codes);
             node_set_info(node, prime.sink, node_get_info_len(node));
-            fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
-            graph_print(graph, dijkstra_print_node);
-            graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
+            // fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
+            // graph_print(graph, dijkstra_print_node);
+            // graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
 
             // repeat until no prime is found in this node
             while(( prime = dijkstra_is_non_trivial_prime(node) ).type != INVALID) {
                 dijkstra_update_code(node, prime, codes);
                 node_set_info(node, prime.sink, node_get_info_len(node));
-                fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
-                graph_print(graph, dijkstra_print_node);
-                graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
+                // fprintf(stderr, "\nidx: %lu, type: %d\n", node->graph_idx, prime.type);
+                // graph_print(graph, dijkstra_print_node);
+                // graph_write_dot_generic(graph, "dot.dot", NULL, dijkstra_print_node);
             }
         }
     }

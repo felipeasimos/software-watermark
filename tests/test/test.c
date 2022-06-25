@@ -376,10 +376,6 @@ int dijkstra_watermark_code_test() {
     // a random graph i generated from a dijkstra code (with a 3-case switch case)
     GRAPH* g = dijkstra_generate("161512161213111111716111121151111");
     char* code = dijkstra_get_code(g);
-    new = dijkstra_generate(code);
-    graph_write_dot(g, "original.dot", code);
-    graph_write_dot(new, "dot.dot", code);
-    fprintf(stderr, "code: %s\n", code);
     ctdd_assert( !strcmp(code, "161512161213111111716111121151111") );
     free(code);
     graph_free(g);
@@ -570,7 +566,7 @@ int run_tests() {
     ctdd_verify(watermark_check_rs_analysis_test);
     ctdd_verify(sequence_alignment_score_test);
 
-	return 0;
+    return 0;
 }
 
 int main() {
