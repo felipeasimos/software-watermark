@@ -83,6 +83,23 @@ int get_bit_test() {
     ctdd_assert( get_bit(&k, 5) == 0 );
     ctdd_assert( get_bit(&k, 6) == 0 );
     ctdd_assert( get_bit(&k, 7) == 1 );
+    uint8_t arr[]={(uint8_t)179, (uint8_t)1};
+    ctdd_assert( get_bit((uint8_t*)&arr, 0) == 1 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 1) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 2) == 1 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 3) == 1 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 4) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 5) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 6) == 1 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 7) == 1 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 8) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 9) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 10) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 11) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 12) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 13) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 14) == 0 );
+    ctdd_assert( get_bit((uint8_t*)&arr, 15) == 1 );
     return 0;
 }
 

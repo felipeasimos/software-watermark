@@ -97,9 +97,10 @@ void show_report_matrix() {
     unsigned long totals[n_rows];
     memset(totals, 0x00, sizeof(totals));
 
+    printf("lost bits\\bits in key\n");
     printf("        ");
     for(unsigned long i = 0; i < n_columns; i++) {
-        printf("%-5lu", i);
+        printf("%-5lu", i+1);
         if( i != n_columns-1) printf(" & ");
     }
 
@@ -138,53 +139,29 @@ void write_to_report_matrix(unsigned long* matrix, unsigned long n_rows, unsigne
     fclose(file);
 }
 
-unsigned long _check(GRAPH* graph, GRAPH* copy) {
+unsigned long _check(void* result, void* identifier, unsigned long result_len, unsigned long identifier_len) {
 
-    NODE* graph_node = graph->nodes[0];
-    NODE* copy_node = copy->nodes[0];
+  unsigned long bit_idx_identifier = get_first_positive_bit_index(identifier, identifier_len);
+  unsigned long bit_idx_result = get_first_positive_bit_index(result, result_len);
 
-    unsigned long errors=0;
-    while(graph_node && copy_node && graph_node->data && copy_node->data) {
+  unsigned long total_num_bits_identifier = identifier_len * 8;
+  unsigned long total_num_bits_result = result_len * 8;
 
-#ifdef DEBUG
-        graph_write_hamiltonian_dot(graph, "dot.dot", NULL);
-        graph_write_hamiltonian_dot(copy, "dot.dot", NULL);
-        fprintf(stderr, "graph idx: %lu, copy idx: %lu\n", graph_node->graph_idx, copy_node->graph_idx);
-#endif
+  unsigned long errors = 0;
 
-        UTILS_NODE* graph_utils = node_get_info(graph_node);
-        UTILS_NODE* copy_utils = node_get_info(copy_node);
+  while(bit_idx_identifier < total_num_bits_identifier && bit_idx_result < total_num_bits_result) {
 
-        // if one of them if mute, skip it
-        if(graph_utils->checker_bit == BIT_MUTE) {
-            graph_node = graph_get(graph, graph_node->graph_idx+1);
-        } else if(copy_utils->checker_bit == BIT_MUTE) {
-            copy_node = graph_get(copy, copy_node->graph_idx+1);
-        // make sure they point to the same bit index
-        } else if( copy_utils->bit_idx < graph_utils->bit_idx ) {
-            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
-        } else if( graph_utils->bit_idx < copy_utils->bit_idx ) {
-            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
-        // at this point on, they are pointing to the same index, so they must always both skip
-        } else {
-            // if one of them is unknown, increment error
-            if(graph_utils->checker_bit == BIT_UNKNOWN || graph_utils->checker_bit == BIT_UNKNOWN) {
-                errors++;
-            // if they are different, increment error
-            } else if( graph_utils->checker_bit != copy_utils->checker_bit ) {
-                errors++;
-            }
-            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
-            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
-            
-        }
+    if( get_bit(identifier, bit_idx_identifier) != get_bit(result, bit_idx_result)) {
+      errors++;
     }
+    bit_idx_result++;
+    bit_idx_identifier++;
+  }
 
-    return errors;
+  return errors;
 }
 
 unsigned long _test_with_removed_connections(
-        STATISTICS* statistics,
         void* identifier,
         unsigned long identifier_len,
         GRAPH* graph,
@@ -193,28 +170,25 @@ unsigned long _test_with_removed_connections(
     // get copy and remove some of its connections
     GRAPH* copy = graph_copy(graph);
     for(CONN_LIST* l = conns; l; l = l->next) {
-        graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+      graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
     }
 
+    invert_byte_sequence(identifier, identifier_len);
+    printf("identifier:%lu\n", *(unsigned long*)identifier);
+    invert_byte_sequence(identifier, identifier_len);
+
     unsigned long num_bytes = identifier_len;
-    unsigned long errors = 0;
-    
-    free(watermark_check_analysis(copy, identifier, &num_bytes));
-    num_bytes = identifier_len;
-    free(watermark_check_analysis(graph, identifier, &num_bytes));
-    //free(watermark2017_decode_analysis(copy, &num_bytes));
-    //decoder_graph_to_utils_nodes(copy);
-    errors = _check(graph, copy);
-    /*if(errors > 0) {
-        printf("errors: %lu\n", errors);
-        graph_print(graph, utils_print_node);
-        graph_print(copy, utils_print_node);
-    }*/
-    graph_free_info(copy);
+    void* result = watermark_decode(copy, &num_bytes);
+
+    invert_byte_sequence(result, num_bytes);
+    printf("result: %hhu\n", *(uint8_t*)result);
+    invert_byte_sequence(result, num_bytes);
+
+    unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
+    free(result);
     graph_free(copy);
 
-    if( errors > statistics->worst_case ) statistics->worst_case = errors;
-
+    printf("errors: %lu\n", errors);
     return errors;
 }
 
@@ -224,14 +198,16 @@ void _multiple_removal_test(
     void* identifier,
     unsigned long identifier_len,
     CONN_LIST* non_hamiltonian_edges,
-    GRAPH* graph,
     NODE* node,
     CONNECTION* conn) {
+
+    GRAPH* graph = node->graph;
 
     if(!n_removals) {
 
         statistics->total++;
-        statistics->errors += _test_with_removed_connections(statistics, identifier, identifier_len, graph, non_hamiltonian_edges);
+        statistics->errors = _test_with_removed_connections(identifier, identifier_len, graph, non_hamiltonian_edges);
+        if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
     } else {
 
         NODE* initial_node = node;
@@ -240,19 +216,20 @@ void _multiple_removal_test(
 
             if(node->out) {
 
+                // if this is a hamiltonian edge, skip it
                 CONNECTION* c = ( node->out->node == graph_get(graph, node->graph_idx+1) ? node->out->next : node->out );
+                // if this is the first node in the loop, start from the connection given by 'conn'
                 if(node == initial_node) c = (conn ? conn : c);
                  
                 for(; c; c = c->next) {
 
-                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, conn);
+                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
                     _multiple_removal_test(
                         n_removals-1,
                         statistics,
                         identifier,
                         identifier_len,
-                        non_hamiltonian_edges,
-                        graph,
+                        list,
                         node,
                         c->next);
 
@@ -266,16 +243,16 @@ void _multiple_removal_test(
 
 void multiple_removal_test(unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
 
-    _multiple_removal_test(n_removals, statistics, identifier, identifier_len, NULL, graph, graph->nodes[0], NULL);
+    _multiple_removal_test(n_removals, statistics, identifier, identifier_len, NULL, graph->nodes[0], NULL);
 }
 
 void attack(unsigned long n_removals, unsigned long n_symbols) {
 
-    for(unsigned long n_removal = 0; n_removal < n_removals; n_removal++) {
+    for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
 
         unsigned long matrix[n_symbols][n_symbols];
         memset(matrix, 0x00, sizeof(matrix));
-        for(unsigned long n_bits = 0; n_bits < n_symbols; n_bits++) {
+        for(unsigned long n_bits = 1; n_bits <= n_symbols; n_bits++) {
 
             printf("number of bits: %lu\n", n_bits);
             unsigned long lower_bound = get_lower_bound(n_bits);
@@ -297,10 +274,10 @@ void attack(unsigned long n_removals, unsigned long n_symbols) {
                 graph_free(graph);
                 identifiers_evaluated++;
 
-                matrix[statistics.worst_case][n_bits]++;
+                matrix[statistics.worst_case][n_bits-1]++;
             }
         }
-        write_to_report_matrix((unsigned long*)&matrix, n_removals, n_symbols);
+        write_to_report_matrix((unsigned long*)&matrix, n_symbols, n_symbols);
     }
 }
 
