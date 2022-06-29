@@ -162,6 +162,7 @@ unsigned long _check(void* result, void* identifier, unsigned long result_len, u
 }
 
 unsigned long _test_with_removed_connections(
+        uint8_t improved,
         void* identifier,
         unsigned long identifier_len,
         GRAPH* graph,
@@ -181,7 +182,12 @@ unsigned long _test_with_removed_connections(
     }
 
     unsigned long num_bytes = identifier_len;
-    void* result = watermark_decode_improved(copy, identifier, &num_bytes);
+    void* result = NULL;
+    if(improved) {
+      result = watermark_decode_improved(copy, identifier, &num_bytes);
+    } else {
+      result = watermark_decode(copy, &num_bytes);
+    }
 
     unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
 #ifdef DEBUG
@@ -214,6 +220,7 @@ unsigned long _test_with_removed_connections(
 }
 
 void _multiple_removal_test(
+    uint8_t improved,
     unsigned long n_removals,
     STATISTICS* statistics,
     void* identifier,
@@ -227,7 +234,7 @@ void _multiple_removal_test(
     if(!n_removals) {
 
         statistics->total++;
-        statistics->errors = _test_with_removed_connections(identifier, identifier_len, graph, non_hamiltonian_edges);
+        statistics->errors = _test_with_removed_connections(improved, identifier, identifier_len, graph, non_hamiltonian_edges);
         if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
     } else {
 
@@ -247,6 +254,7 @@ void _multiple_removal_test(
                     if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
                     CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
                     _multiple_removal_test(
+                        improved,
                         n_removals-1,
                         statistics,
                         identifier,
@@ -263,12 +271,12 @@ void _multiple_removal_test(
     }
 }
 
-void multiple_removal_test(unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
+void multiple_removal_test(uint8_t improved, unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
 
-    _multiple_removal_test(n_removals, statistics, identifier, identifier_len, NULL, graph->nodes[0], NULL);
+    _multiple_removal_test(improved, n_removals, statistics, identifier, identifier_len, NULL, graph->nodes[0], NULL);
 }
 
-void attack(unsigned long n_removals, unsigned long n_symbols) {
+void attack(uint8_t improved, unsigned long n_removals, unsigned long n_symbols) {
 
     for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
 
@@ -291,7 +299,7 @@ void attack(unsigned long n_removals, unsigned long n_symbols) {
 
                 GRAPH* graph = watermark_encode(&identifier, identifier_len);
 
-                multiple_removal_test(n_removal, graph, &statistics, &identifier, identifier_len);
+                multiple_removal_test(improved, n_removal, graph, &statistics, &identifier, identifier_len);
 
                 graph_free(graph);
                 identifiers_evaluated++;
@@ -303,26 +311,15 @@ void attack(unsigned long n_removals, unsigned long n_symbols) {
     }
 }
 
-void removal_attack_for_bits(unsigned long n_removals, unsigned long n_symbols) {
+void removal_attack(unsigned long n_removals, unsigned long n_symbols) {
 
-    attack(n_removals, n_symbols);
+    attack(0, n_removals, n_symbols);
     show_report_matrix();
 }
 
-void removal_attack_with_rs_for_bits(unsigned long n_removals, unsigned long n_symbols) {
-    n_removals = n_symbols;
-    show_report_matrix();
-}
+void removal_attack_improved_decoding(unsigned long n_removals, unsigned long n_symbols) {
 
-void removal_attack_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
-
-    n_removals = n_symbols;
-    show_report_matrix();
-}
-
-void removal_attack_with_rs_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
-
-    n_removals = n_symbols;
+    attack(1, n_removals, n_symbols);
     show_report_matrix();
 }
 
@@ -445,11 +442,9 @@ int main() {
     printf("1) encode string\n");
     printf("2) encode number\n");
     printf("3) generate graph from dijkstra code\n");
-    printf("4) run removal test for bits\n");
-    printf("5) run removal test with reed solomon for bits\n");
-    printf("6) run removal test for numeric strings\n");
-    printf("7) run removal test with reeed solomon for numeric strings\n");
-    printf("8) show report matrix\n");
+    printf("4) run removal test\n");
+    printf("5) run removal test with improved decoding\n");
+    printf("6) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -505,9 +500,9 @@ int main() {
             printf("input maximum number of bits: ");
             unsigned long n_symbols;
             scanf("%lu", &n_symbols);
-            removal_attack_for_bits(n_removals, n_symbols);
+            removal_attack(n_removals, n_symbols);
             break;
-        }/*
+        }
         case 5: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
@@ -515,31 +510,12 @@ int main() {
             printf("input maximum number of bits: ");
             unsigned long n_symbols;
             scanf("%lu", &n_symbols);
-            removal_attack_with_rs_for_bits(n_removals, n_symbols);
+            removal_attack_improved_decoding(n_removals, n_symbols);
             break;
         }
         case 6: {
-            printf("input maximum number of removals: ");
-            unsigned long n_removals;
-            scanf("%lu", &n_removals);
-            printf("input maximum number of chars: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack_for_symbols(n_removals, n_symbols);
-            break;
-        }
-        case 7: {
-            printf("input maximum number of removals: ");
-            unsigned long n_removals;
-            scanf("%lu", &n_removals);
-            printf("input maximum number of chars: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack_with_rs_for_symbols(n_removals, n_symbols);
-        }
-        case 8: {
             show_report_matrix();
-        }*/
+        }
     }
 
     return 0;
