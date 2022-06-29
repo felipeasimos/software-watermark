@@ -54,7 +54,8 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
     uint8_t four_last_are_mute = watermark_decode_improved_four_last_are_mute(graph);
 
     uint8_t node_29_was_the_last = 0;
-    unsigned long forward_edges = 0;
+    uint8_t node_27_was_the_last = 0;
+    unsigned long forward_edges_left = graph->num_nodes - 2 - (data_num_bits - data_begin);
     uint8_t forward_destination = 0;
     for(unsigned long graph_idx = 1; graph_idx < n_bits; graph_idx++, i++) {
 
@@ -70,7 +71,7 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
 
             // 2.2 if it has a forward edge, it encodes a bit 1
             if( graph_idx < n_bits && graph_get_connection(graph->nodes[graph_idx], graph->nodes[graph_idx+2]) ) {
-                forward_edges++;
+                forward_edges_left--;
                 bits[i]=1;
             // 2.1/2.4 encode bit according to backedge
             } else if( graph_get_backedge(graph->nodes[graph_idx]) ){
@@ -79,10 +80,19 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
                 // pop stacks
                 if(backedge) {
                   NODE* backedge_node = backedge->node;
-                  stack_pop_until(possible_backedges, backedge_node->graph_idx); // pop backedge and all nodes on top of it
-                  stack_pop_until(other_stack, history[backedge_node->graph_idx]);
+                  // look for backedge node index in the stack
+                  unsigned long backedge_index = 0;
+                  for(unsigned long i = 0; i < possible_backedges->n; i++) {
+                    if(possible_backedges->stack[i] == backedge_node->graph_idx) {
+                      backedge_index = i;
+                      break;
+                    }
+                  }
+                  stack_pop_until(possible_backedges, backedge_index); // pop backedge and all nodes on top of it
+                  stack_pop_until(other_stack, history[backedge_index]);
                 }
                 node_29_was_the_last = 0;
+                node_27_was_the_last = 0;
                 continue;
             // 2.5 if hamiltonian edge [v -> v+1] doesn't exist, v encodes 1
             } else if( !graph_get_connection(graph->nodes[graph_idx], graph->nodes[graph_idx+1]) ) {
@@ -91,12 +101,16 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
             } else if( !graph_get_connection(graph->nodes[graph_idx+1], graph->nodes[graph_idx+2]) ) {
               bits[i] = 1;
               forward_destination = 3;
-              forward_edges++;
+              forward_edges_left--;
             // 2.7 if node is fourth to last and four last nodes are mute, v encodes 1
-            } else if(four_last_are_mute && graph_idx == graph->num_nodes-4 && graph->num_nodes-2 > data_num_bits - data_begin - forward_edges && bit) {
+            } else if(four_last_are_mute && graph_idx == graph->num_nodes-4 && forward_edges_left && bit) {
               bits[i] = 1;
+              node_27_was_the_last = 1;
+              forward_destination = 3;
+              forward_edges_left--;
+              continue;
             // 2.8 if node is third to last and four last nodes are mute, v encodes 0
-            } else if(four_last_are_mute && graph_idx == graph->num_nodes-3 && graph->num_nodes-2 > data_num_bits - data_begin - forward_edges && get_bit(data, data_begin+i-1)) {
+            } else if(four_last_are_mute && graph_idx == graph->num_nodes-3 && node_27_was_the_last) {
               bits[i] = 0;
             // 2.9 v is the first in a sequence of three nodes without back or forward edges, v should encode 1 and
             // it isn't possible to create a backedge in v, v encodes 0
@@ -105,7 +119,7 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
               bits[i] = 1;
               node_29_was_the_last = 1;
               forward_destination = 3;
-              forward_edges++;
+              forward_edges_left--;
               continue;
             // 2.10 if v - 1 is the node above, this one encodes 0
             } else if( node_29_was_the_last ) {
@@ -117,6 +131,7 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
         } else {
             i--;
         }
+        node_27_was_the_last = 0;
         node_29_was_the_last = 0;
 
         // if this is not a inner forward node

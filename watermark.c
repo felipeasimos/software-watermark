@@ -170,14 +170,20 @@ unsigned long _test_with_removed_connections(
 
     // get copy and remove some of its connections
     GRAPH* copy = graph_copy(graph);
+#ifdef DEBUG
+    uint8_t has_forward_removal = 0;
+#endif
     for(CONN_LIST* l = conns; l; l = l->next) {
       graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
 #ifdef DEBUG
+#ifdef VERBOSE
       if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
         printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
       } else {
+        has_forward_removal = 1;
         printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
       }
+#endif
 #endif
     }
 
@@ -191,7 +197,7 @@ unsigned long _test_with_removed_connections(
 
     unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
 #ifdef DEBUG
-    if(errors > 1) {
+    if(errors > 1 || ( has_forward_removal && errors == 1 )) {
       printf("errors: %lu\n", errors);
       printf("identifier: ");
       for(unsigned long i = get_first_positive_bit_index(identifier, identifier_len); i < identifier_len * 8; i++) {
@@ -206,10 +212,12 @@ unsigned long _test_with_removed_connections(
       printf("\n");
       graph_print(copy, NULL);
     } else {
+#ifdef VERBOSE
       for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
         printf("%hhu", get_bit(result, i));
       }
       printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
+#endif
     }
 #endif
 
