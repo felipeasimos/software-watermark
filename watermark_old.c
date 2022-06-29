@@ -1,334 +1,65 @@
-#include "encoder/encoder.h"
 #include "decoder/decoder.h"
+#include "encoder/encoder.h"
 #include "checker/checker.h"
-#include "utils/utils.h"
+#include "set/set.h"
+#include "code_generation/code_generation.h"
+#include "sequence_alignment/sequence_alignment.h"
+#include "dijkstra/dijkstra.h"
+#include <dirent.h>
 
 #define MAX_SIZE 4095
 #define STRINGIFY_(x) #x
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
-#define MAX_N_BITS 25
+#define MAX_N_BITS 12
 #define MAX_N_SYMBOLS 5
 #define MAX_RS_REMOVALS 4
+#define SIZE_PERCENTAGE 0.8
+
+#define MATCH 1
+#define MISMATCH -2
+#define GAP -1
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
 
-uint8_t get_uint8_t() {
+typedef struct CONN_LIST {
 
-	uint8_t n;
-	scanf(" %hhu", &n);
-	return n;
-}
-
-void encode_string() {
-
-	char s[MAX_SIZE+1]={0};
-	printf("input numeric string to be encoded (max size is %lu): ", (unsigned long) MAX_SIZE);
-	scanf(" %" MAX_SIZE_STR "s", s);
-
-    unsigned long data_len;
-    void* data = encode_numeric_string(s, &data_len);
-
-	GRAPH* g = watermark2017_encode(data, data_len);
-
-    graph_print(g, NULL);
-	char* code = watermark_get_code2014(g);
-
-	printf("code generated:\n");
-	printf("%s\n", code);
-
-    free(data);
-	graph_free(g);
-	free(code);
-}
-
-uint8_t is_little_endian_machine() {
-
-	uint16_t x = 1;
-
-	// if it is little endian, 1 should be the first byte
-	return ((uint8_t*)(&x))[0];
-}
-
-void encode_number() {
-
-	unsigned long n;
-	printf("input positive number to be encoded: ");
-	scanf(" %lu", &n);
-
-	if( is_little_endian_machine() ) {
-
-		// reverse number
-		unsigned long tmp;
-		for( uint8_t i = 0; i < sizeof(n); i++ ) {
-
-			((uint8_t*)(&tmp))[i] = ((uint8_t*)(&n))[sizeof(n) - i - 1];
-		}
-		n = tmp;
-	}
-
-	GRAPH* g = watermark_encode(&n, sizeof(n));
-
-    graph_print(g, NULL);
-	
-    char* code = watermark_get_code2017(g);
-
-    printf("%s\n", code);
-
-	graph_free(g);
-	free(code);
-}
-
-
-
-void _save_successfull_distortion_attack(GRAPH* copy, unsigned long number_encoded, double error_percentage) {
-
-    unsigned long num_bytes_copy=0;
-    uint8_t* data_copy = graph_serialize(copy, &num_bytes_copy);
-
-    char filename[50]={0};
-    sprintf(filename, "tests/%lu_%F.dat", number_encoded, error_percentage);
-
-    FILE* f = fopen(filename, "wb");
-
-    if(!f || fwrite(data_copy, 1, num_bytes_copy, f) < num_bytes_copy) {
-
-        fprintf(stderr, "ERROR WHEN WRITING %s", filename);
-    }
-
-    free(data_copy);
-    fclose(f);
-}
-
-typedef struct _CONN_LIST {
-
-    struct _CONN_LIST* next;
+struct CONN_LIST* next;
     CONNECTION* conn;
-} _CONN_LIST;
+} CONN_LIST;
 
-_CONN_LIST* _conn_list_copy(_CONN_LIST* l) {
+CONN_LIST* conn_list_copy(CONN_LIST* l) {
 
     if(!l) return NULL;
-    _CONN_LIST* list = malloc(sizeof(_CONN_LIST));
+    CONN_LIST* list = malloc(sizeof(CONN_LIST));
     list->conn = l->conn;
-    list->next = _conn_list_copy(l->next);
+    list->next = conn_list_copy(l->next);
     return list;
 }
 
-_CONN_LIST* _conn_list_create(_CONN_LIST* l, CONNECTION* new_conn) {
+CONN_LIST* conn_list_create(CONN_LIST* l, CONNECTION* new_conn) {
 
-    _CONN_LIST* list = malloc(sizeof(_CONN_LIST));
+    CONN_LIST* list = malloc(sizeof(CONN_LIST));
     list->conn = new_conn;
-    list->next = _conn_list_copy(l);
+    list->next = conn_list_copy(l);
     return list;
 }
 
-void _conn_list_free(_CONN_LIST* list) {
+void conn_list_free(CONN_LIST* list) {
 
     if(!list) return;
-    _conn_list_free(list->next);
+    conn_list_free(list->next);
     free(list);
 }
 
-/*unsigned long _check(void* bit_sequence, unsigned long bit_seq_size, uint8_t* bit_arr, unsigned long bit_arr_size) {
+typedef struct STATISTICS {
+    unsigned long total;
+    unsigned long errors;
+    unsigned long worst_case;
+} STATISTICS;
 
-    unsigned long correct = 0;
-    unsigned long bit_seq_num_bits = bit_seq_size * 8;
-    for(unsigned long i = 0; i < bit_arr_size; i++) {
-
-        if(bit_arr[bit_arr_size - i - 1] == 'x') continue;
-
-        uint8_t arr_value = !!(bit_arr[bit_arr_size - i - 1] - '0');
-        uint8_t seq_value = !!get_bit(bit_sequence, bit_seq_num_bits - i - 1);
-        if(  seq_value != arr_value ) continue;
-        correct++;
-    }
-    return correct;
-}*/
-
-unsigned long _check(GRAPH* graph, GRAPH* copy) {
-
-    GRAPH* graph_node = graph;
-    GRAPH* copy_node = copy;
-
-    unsigned long errors=0;
-    while(graph_node->data && copy_node->data) {
-
-        UTILS_NODE* graph_utils = graph_node->data;
-        UTILS_NODE* copy_utils = copy_node->data;
-
-        // if one of them if mute, skip it
-        if(graph_utils->bit == UTILS_MUTE_NODE) {
-            graph_node = graph_node->next;
-        } else if(copy_utils->bit == UTILS_MUTE_NODE) {
-            copy_node = copy_node->next;
-        // make sure they point to the same bit index
-        } else if( copy_utils->bit_idx < graph_utils->bit_idx ) {
-            copy_node = copy_node->next;
-        } else if( graph_utils->bit_idx < copy_utils->bit_idx ) {
-            graph_node = graph_node->next;
-        // at this point on, they are pointing to the same index, so they must always both skip
-        } else {
-            // if one of them is unknown, increment error
-            if(graph_utils->bit == UTILS_UNKNOWN_NODE || graph_utils->bit == UTILS_UNKNOWN_NODE) {
-                errors++;
-            // if they are different, increment error
-            } else if( graph_utils->bit != copy_utils->bit ) {
-                errors++;
-            }
-            graph_node = graph_node->next;
-            copy_node = copy_node->next;
-            
-        }
-    }
-
-    return errors;
-}
-unsigned long check_symbol_arrs(uint8_t* result, uint8_t* identifier, unsigned long result_len, unsigned long identifier_len) {
-
-    unsigned long errors = 0;
-    for(unsigned long i = 0; i < identifier_len && i < result_len; i++) {
-        if( result[i] != identifier[i] || result[i] == UTILS_UNKNOWN_NODE || identifier[i]== UTILS_UNKNOWN_NODE ) errors++;
-    }
-
-    if( identifier_len > result_len ) errors += identifier_len - result_len;
-    return errors;
-}
-
-unsigned long _test_with_removed_connections(
-        void* identifier,
-        unsigned long identifier_len,
-        unsigned long* worst_case,
-        GRAPH* graph,
-        _CONN_LIST* conns,
-        uint8_t rs) {
-
-    graph_load_copy(graph);
-
-    for(_CONN_LIST* l = conns; l; l = l->next) {
-        GRAPH* copy_node_from = graph_get_info(l->conn->parent);
-        GRAPH* copy_node_to = graph_get_info(l->conn->node);
-
-        graph_oriented_disconnect(copy_node_from, copy_node_to);
-    }
-    GRAPH* copy = graph_get_info(graph);
-
-    graph_unload_all_info(graph);
-
-    unsigned long num_bytes = identifier_len;
-    unsigned long errors = 0;
-    if(rs) {
-
-        // turn result to string of ascii numbers
-        // 'result' = bit arr of encoded ascii numbers
-        //uint8_t* result = watermark2017_decode_analysis_with_rs(copy, &num_bytes, num_bytes+1);
-        uint8_t* result = watermark_check_analysis_with_rs(copy, identifier, &num_bytes, num_bytes+1);
-        //unsigned long result_len = num_bytes;
-        //decoder_graph_to_utils_nodes(copy);
-        //checker_graph_to_utils_nodes(copy);
-
-        // prepare identifier (currently it is an encoded ascii array)
-        identifier = decode_numeric_string(identifier, &identifier_len);
-
-        // 'bin_result' = encoded ascii numbers
-        uint8_t* bin_result = bit_arr_to_bin(result, &num_bytes);
-        //unsigned long bin_result_len = num_bytes;
-
-        // 'final_result' = decoded ascii numbers
-        uint8_t* final_result = decode_numeric_string(bin_result, &num_bytes);
-        errors = check_symbol_arrs(final_result, identifier, num_bytes, identifier_len);
-
-        /*if(errors >= MAX_N_SYMBOLS) {
-            printf("errors: %lu\n", errors);
-            printf("identifier (decoded ascii numbers): %lu\n\t", identifier_len);
-            for(unsigned long i = 0; i < identifier_len; i++) printf("%hhu('%c')[%lu] ", ((uint8_t*)identifier)[i], ((uint8_t*)identifier)[i], i);
-            printf("\n");
-
-            printf("result (bit arr of encoded ascii numbers): %lu\n\t", result_len);
-            for(unsigned long i = 0; i < result_len; i++) printf("%hhu[%lu] ", result[i], i);
-            printf("\n");
-
-            printf("bin result (encoded ascii numbers): %lu\n\t", bin_result_len);
-            for(unsigned long i = 0; i < bin_result_len; i++) printf("%hhu[%lu] ", bin_result[i], i);
-            printf("\n");
-            
-            printf("final result (decoded ascii numbers): %lu\n\t", num_bytes);
-            for(unsigned long i = 0; i < num_bytes; i++) printf("%hhu('%c')[%lu] ", final_result[i],
-                    final_result[i] == 'x' || ( final_result[i] <= '9' && final_result[i] >= '0') ? final_result[i] : 'm'
-                    ,i);
-            printf("\n\n");
-            graph_print(graph, utils_print_node);
-            graph_print(copy, utils_print_node);
-            exit(0);
-        }*/
-        free(result);
-        free(bin_result);
-        free(final_result);
-        free(identifier);
-    } else {
-
-        free(watermark_check_analysis(copy, identifier, &num_bytes));
-        //free(watermark2017_decode_analysis(copy, &num_bytes));
-        checker_graph_to_utils_nodes(copy);
-        //decoder_graph_to_utils_nodes(copy);
-        errors = _check(graph, copy);
-        /*if(errors > 0) {
-            printf("errors: %lu\n", errors);
-            graph_print(graph, utils_print_node);
-            graph_print(copy, utils_print_node);
-        }*/
-    }
-    graph_free(copy);
-
-    if( errors > *worst_case ) *worst_case = errors;
-
-    return errors;
-}
-
-void _multiple_removal_test(
-        unsigned long n_removals,
-        unsigned long* total,
-        unsigned long* errors,
-        unsigned long* worst_case,
-        void* identifier,
-        unsigned long identifier_len,
-        GRAPH* root,
-        GRAPH* node,
-        CONNECTION* conn,
-        _CONN_LIST* l,
-        uint8_t rs) {
-
-    if(!n_removals) {
-
-        (*total)++;
-        (*errors) += _test_with_removed_connections(identifier, identifier_len, worst_case, root, l, rs);
- 
-    } else {
-        GRAPH* initial_node = node;
-
-        for(; node; node = node->next) {
-
-            if(node->connections) {
-
-                CONNECTION* c = ( node->connections->node == node->next ? node->connections->next : node->connections );
-                if(node == initial_node) c = (conn ? conn : c);
-                 
-                for(; c; c = c->next) {
-
-                    _CONN_LIST* list = _conn_list_create(l, c);
-
-                    _multiple_removal_test(n_removals-1, total, errors, worst_case, identifier, identifier_len, root, node, c->next, list, rs);
-
-                    _conn_list_free(list);
-                }
-            }
-
-        }
-    }
-}
-
-unsigned long get_higher_bound(unsigned long n_bits) {
+unsigned long get_upper_bound(unsigned long n_bits) {
 
     return 1 << (n_bits);
 }
@@ -338,211 +69,479 @@ unsigned long get_lower_bound(unsigned long n_bits) {
     return 1 << (n_bits-1);
 }
 
-unsigned long get_higher_bound_for_symbol(unsigned long n_symbols) {
+unsigned long get_upper_bound_for_symbol(unsigned long n_symbols) {
 
-    unsigned long higher_bound = 1;
-    for(unsigned long i=0; i < n_symbols; i++) higher_bound *= 10;
-    return higher_bound;
+    unsigned long upper_bound = 1;
+    for(unsigned long i=0; i < n_symbols; i++) upper_bound *= 10;
+    return upper_bound;
 }
 
 unsigned long get_lower_bound_for_symbol(unsigned long n_symbols) {
 
-    return get_higher_bound_for_symbol(n_symbols-1);
+    return get_upper_bound_for_symbol(n_symbols-1);
 }
 
+unsigned long invert_unsigned_long(unsigned long n) {
 
-
-void removal_attack() {
-
-    for(unsigned long n_removals = 1; n_removals < 2; n_removals++) {
-
-        char filename[50]={0};
-        sprintf(filename, "tests/report_rm_%lu.plt", n_removals);
-        FILE* file = fopen(filename, "w");
-
-        printf("number of removals: %lu\n", n_removals);
-
-        unsigned long matrix[MAX_N_BITS][MAX_N_BITS] = {{0}};
-
-        for(unsigned long n_bits = 1; n_bits < MAX_N_BITS; n_bits++) {
-
-            printf("\tnumber of bits: %lu\n", n_bits);
-
-            unsigned long lower_bound = get_lower_bound(n_bits);
-
-            unsigned long higher_bound = get_higher_bound(n_bits);
-
-            double identifiers_evaluated = 0;
-            double error_mean_sum = 0;
-            double worst_case_mean_sum = 0;
-
-            for(unsigned long i = lower_bound; i < higher_bound; i++) {
-
-                unsigned long total = 0;
-                unsigned long errors = 0;
-                unsigned long worst_case = 0;
-
-                unsigned long identifier = invert_unsigned_long(i);
-                unsigned long identifier_len = sizeof(unsigned long);
-
-                GRAPH* graph = watermark2017_encode(&identifier, identifier_len);
-                _multiple_removal_test(n_removals, &total, &errors, &worst_case, &identifier, identifier_len, graph, graph, NULL, NULL, 0);
-                graph_free(graph);
-                identifiers_evaluated++;
-
-                error_mean_sum += ((double)errors)/total;
-                worst_case_mean_sum += worst_case;
-                matrix[worst_case][n_bits]++;
-            }
-            fprintf(file, "%lu %F %F\n", n_bits, error_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
-            fflush(file);
-        }
-        fclose(file);
-
-        FILE* matrix_file = fopen("tests/report_matrix.plt", "wb");
-        unsigned long max_n_bits = MAX_N_BITS;
-        fwrite(&max_n_bits, sizeof(unsigned long), 1, matrix_file);
-        fwrite(&max_n_bits, sizeof(unsigned long), 1, matrix_file);
-        fwrite(&matrix, sizeof(unsigned long), MAX_N_BITS * MAX_N_BITS, matrix_file);
-        fclose(matrix_file);
-    }
+    invert_byte_sequence((uint8_t*)&n, sizeof(n));
+    return n;
 }
-
-void removal_attack_with_rs() {
-
-    unsigned long matrix[MAX_N_SYMBOLS][MAX_RS_REMOVALS] = {{0}};
-
-    for(unsigned long n_removals = 1; n_removals < MAX_RS_REMOVALS; n_removals++) {
-
-        char filename[50]={0};
-        sprintf(filename, "tests/report_rm_%lu.plt", n_removals);
-        FILE* file = fopen(filename, "w");
-
-        printf("number of removals: %lu\n", n_removals);
-
-        for(unsigned long n_symbols = 1; n_symbols < MAX_N_SYMBOLS; n_symbols++) {
-
-            printf("\tnumber of symbols: %lu\n", n_symbols);
-
-            unsigned long lower_bound = get_lower_bound_for_symbol(n_symbols);
-
-            unsigned long higher_bound = get_higher_bound_for_symbol(n_symbols);
-
-            double identifiers_evaluated = 0;
-            double error_mean_sum = 0;
-            double worst_case_mean_sum = 0;
-
-            for(unsigned long i = lower_bound; i < higher_bound; i++) {
-
-                unsigned long total = 0;
-                unsigned long errors = 0;
-                unsigned long worst_case = 0;
-
-                char i_str[MAX_N_SYMBOLS]={0};
-                sprintf(i_str, "%lu", i);
-                unsigned long identifier_len = n_symbols;
-                uint8_t* identifier = encode_numeric_string(i_str, &identifier_len);
-
-                GRAPH* graph = watermark2017_encode_with_rs(identifier, identifier_len, identifier_len+1);
-
-                //_multiple_removal_test(n_removals, &total, &errors, &worst_case, i_str, n_symbols, graph, graph, NULL, NULL, 1);
-                _multiple_removal_test(n_removals, &total, &errors, &worst_case, identifier, identifier_len, graph, graph, NULL, NULL, 1);
-                graph_free(graph);
-                free(identifier);
-                identifiers_evaluated++;
-
-                error_mean_sum += ((double)errors)/total;
-                worst_case_mean_sum += worst_case;
-                matrix[worst_case][n_removals]++;
-            }
-            fprintf(file, "%lu %F %F\n", n_symbols, error_mean_sum/identifiers_evaluated, worst_case_mean_sum/identifiers_evaluated);
-            fflush(file);
-        }
-        fclose(file);
-
-        FILE* matrix_file = fopen("tests/report_matrix.plt", "wb");
-        unsigned long max_n_symbols = MAX_N_SYMBOLS;
-        unsigned long max_rs_removals = MAX_RS_REMOVALS;
-        fwrite(&max_n_symbols, sizeof(unsigned long), 1, matrix_file);
-        fwrite(&max_rs_removals, sizeof(unsigned long), 1, matrix_file);
-        fwrite(&matrix, sizeof(unsigned long), MAX_N_SYMBOLS * MAX_RS_REMOVALS, matrix_file);
-        fclose(matrix_file);
-    }
-}
-
 
 void show_report_matrix() {
-    
-    char filename[MAX_SIZE]={0};
 
-    printf("Insert the filepath of the matrix you want to read: ");
-    scanf(" %s", filename);
+    FILE* file = fopen("tests/report_matrix.plt", "rb");
+    unsigned long n_rows, n_columns;
+    fread(&n_rows, sizeof(unsigned long), 1, file);
+    fread(&n_columns, sizeof(unsigned long), 1, file);
 
-    FILE* file = fopen(filename, "rb");
-
-    unsigned long y, x;
-    fread(&y, sizeof(unsigned long), 1, file);
-    fread(&x, sizeof(unsigned long), 1, file);
-    unsigned long sums[x];
-    memset(sums, 0x00, sizeof(sums));
+    unsigned long totals[n_rows];
+    memset(totals, 0x00, sizeof(totals));
 
     printf("        ");
-    for(unsigned long j = 0; j < x; j++) {
-
-        printf("%-5lu", j);
-        if(j != y-1) printf(" & ");
+    for(unsigned long i = 0; i < n_columns; i++) {
+        printf("%-5lu", i);
+        if( i != n_columns-1) printf(" & ");
     }
-    printf("\n");
 
-    for(unsigned long i = 0; i < y; i++) {
+    printf("\n");
+    for(unsigned long i = 0; i < n_rows; i++) {
+
         printf("%-5lu & ", i);
-        for(unsigned long j = 0; j < x; j++) {
+        for(unsigned long j = 0; j < n_columns; j++) {
+
             unsigned long n;
             fread(&n, sizeof(unsigned long), 1, file);
-            sums[j]+=n;
+            totals[j]+=n;
             printf("%-5lu", n);
-            if(j != x-1) printf(" & ");
+            if(j != n_columns-1) printf(" & ");
         }
         printf("\\\\ \\hline\n");
     }
     printf("Total & ");
-    for(unsigned long j = 0; j < x; j++) {
+    for(unsigned long j = 0; j < n_columns; j++) {
 
-        printf("%-5lu", sums[j]);
-        if( j != x - 1 ) {
+        printf("%-5lu", totals[j]);
+        if( j != n_columns - 1 ) {
             printf(" & ");
         }
     }
     printf("\\\\ \\hline\n");
-
     fclose(file);
 }
 
+void write_to_report_matrix(unsigned long* matrix, unsigned long n_rows, unsigned long n_columns) {
+
+    FILE* file = fopen("tests/report_matrix.plt", "wb");
+    fwrite(&n_rows, sizeof(unsigned long), 1, file);
+    fwrite(&n_columns, sizeof(unsigned long), 1, file);
+    fwrite(matrix, sizeof(unsigned long), n_rows * n_columns, file);
+    fclose(file);
+}
+
+unsigned long _check(GRAPH* graph, GRAPH* copy) {
+
+    NODE* graph_node = graph->nodes[0];
+    NODE* copy_node = copy->nodes[0];
+
+    unsigned long errors=0;
+    while(graph_node && copy_node && graph_node->data && copy_node->data) {
+
+#ifdef DEBUG
+        graph_write_hamiltonian_dot(graph, "dot.dot", NULL);
+        graph_write_hamiltonian_dot(copy, "dot.dot", NULL);
+        fprintf(stderr, "graph idx: %lu, copy idx: %lu\n", graph_node->graph_idx, copy_node->graph_idx);
+#endif
+
+        UTILS_NODE* graph_utils = node_get_info(graph_node);
+        UTILS_NODE* copy_utils = node_get_info(copy_node);
+
+        // if one of them if mute, skip it
+        if(graph_utils->checker_bit == BIT_MUTE) {
+            graph_node = graph_get(graph, graph_node->graph_idx+1);
+        } else if(copy_utils->checker_bit == BIT_MUTE) {
+            copy_node = graph_get(copy, copy_node->graph_idx+1);
+        // make sure they point to the same bit index
+        } else if( copy_utils->bit_idx < graph_utils->bit_idx ) {
+            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
+        } else if( graph_utils->bit_idx < copy_utils->bit_idx ) {
+            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
+        // at this point on, they are pointing to the same index, so they must always both skip
+        } else {
+            // if one of them is unknown, increment error
+            if(graph_utils->checker_bit == BIT_UNKNOWN || graph_utils->checker_bit == BIT_UNKNOWN) {
+                errors++;
+            // if they are different, increment error
+            } else if( graph_utils->checker_bit != copy_utils->checker_bit ) {
+                errors++;
+            }
+            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
+            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
+            
+        }
+    }
+
+    return errors;
+}
+
+unsigned long _test_with_removed_connections(
+        STATISTICS* statistics,
+        void* identifier,
+        unsigned long identifier_len,
+        GRAPH* graph,
+        CONN_LIST* conns) {
+
+    // get copy and remove some of its connections
+    GRAPH* copy = graph_copy(graph);
+    for(CONN_LIST* l = conns; l; l = l->next) {
+        graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+    }
+
+    unsigned long num_bytes = identifier_len;
+    unsigned long errors = 0;
+    
+    free(watermark_check_analysis(copy, identifier, &num_bytes));
+    num_bytes = identifier_len;
+    free(watermark_check_analysis(graph, identifier, &num_bytes));
+    //free(watermark2017_decode_analysis(copy, &num_bytes));
+    //decoder_graph_to_utils_nodes(copy);
+    errors = _check(graph, copy);
+    /*if(errors > 0) {
+        printf("errors: %lu\n", errors);
+        graph_print(graph, utils_print_node);
+        graph_print(copy, utils_print_node);
+    }*/
+    graph_free_info(copy);
+    graph_free(copy);
+
+    if( errors > statistics->worst_case ) statistics->worst_case = errors;
+
+    return errors;
+}
+
+void _multiple_removal_test(
+    unsigned long n_removals,
+    STATISTICS* statistics,
+    void* identifier,
+    unsigned long identifier_len,
+    CONN_LIST* non_hamiltonian_edges,
+    GRAPH* graph,
+    NODE* node,
+    CONNECTION* conn) {
+
+    if(!n_removals) {
+
+        statistics->total++;
+        statistics->errors += _test_with_removed_connections(statistics, identifier, identifier_len, graph, non_hamiltonian_edges);
+    } else {
+
+        NODE* initial_node = node;
+
+        for(; node; node = graph_get(graph, node->graph_idx+1)) {
+
+            if(node->out) {
+
+                CONNECTION* c = ( node->out->node == graph_get(graph, node->graph_idx+1) ? node->out->next : node->out );
+                if(node == initial_node) c = (conn ? conn : c);
+                 
+                for(; c; c = c->next) {
+
+                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, conn);
+                    _multiple_removal_test(
+                        n_removals-1,
+                        statistics,
+                        identifier,
+                        identifier_len,
+                        non_hamiltonian_edges,
+                        graph,
+                        node,
+                        c->next);
+
+                    conn_list_free(list);
+                }
+            }
+
+        }
+    }
+}
+
+void multiple_removal_test(unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
+
+    _multiple_removal_test(n_removals, statistics, identifier, identifier_len, NULL, graph, graph->nodes[0], NULL);
+}
+
+void attack(unsigned long n_removals, unsigned long n_symbols) {
+
+    for(unsigned long n_removal = 0; n_removal < n_removals; n_removal++) {
+
+        unsigned long matrix[n_symbols][n_symbols];
+        memset(matrix, 0x00, sizeof(matrix));
+        for(unsigned long n_bits = 0; n_bits < n_symbols; n_bits++) {
+
+            printf("number of bits: %lu\n", n_bits);
+            unsigned long lower_bound = get_lower_bound(n_bits);
+            unsigned long upper_bound = get_upper_bound(n_bits);
+
+            double identifiers_evaluated = 0;
+
+            for(unsigned long i = lower_bound; i < upper_bound; i++) {
+
+                STATISTICS statistics = {0};
+
+                unsigned long identifier = invert_unsigned_long(i);
+                unsigned long identifier_len = sizeof(unsigned long);
+
+                GRAPH* graph = watermark_encode(&identifier, identifier_len);
+
+                multiple_removal_test(n_removal, graph, &statistics, &identifier, identifier_len);
+
+                graph_free(graph);
+                identifiers_evaluated++;
+
+                matrix[statistics.worst_case][n_bits]++;
+            }
+        }
+        write_to_report_matrix((unsigned long*)&matrix, n_removals, n_symbols);
+    }
+}
+
+void removal_attack_for_bits(unsigned long n_removals, unsigned long n_symbols) {
+
+    attack(n_removals, n_symbols);
+    show_report_matrix();
+}
+
+void removal_attack_with_rs_for_bits(unsigned long n_removals, unsigned long n_symbols) {
+    n_removals = n_symbols;
+    show_report_matrix();
+}
+
+void removal_attack_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
+
+    n_removals = n_symbols;
+    show_report_matrix();
+}
+
+void removal_attack_with_rs_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
+
+    n_removals = n_symbols;
+    show_report_matrix();
+}
+
+int ask_for_comparison(char* dijkstra_code) {
+
+    printf("would you like to find a function that best fits this watermark?[y/n] ");
+    char choice;
+    scanf(" %c", &choice);
+
+    if(choice!='y' && choice!='Y') return 0;
+
+    char str[MAX_SIZE];
+    printf("\npath to the C file to be analyzed: ");
+    scanf(" %s", str);
+
+    char str2[strlen("./cfg.sh    2>/dev/null") + strlen(str) + 1];
+    str2[0]='\0';
+    strcat(str2, "./cfg.sh ");
+    strcat(str2, str);
+    strcat(str2, " 2>/dev/null");
+    system(str2);
+
+    long highest_score = LONG_MIN;
+    long highest_score_entry_point = 0;
+    char highest_score_func[MAX_SIZE]={0};
+    char highest_score_code[MAX_SIZE]={0};
+    uint8_t file_has_at_least_one_dijkstra_graph = 0;
+    DIR *dir;
+    struct dirent *ent;
+    if((dir = opendir(".")) != NULL) {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL) {
+            // starts with '.' and ends with '.dot'
+            unsigned long len = strlen(ent->d_name);
+            if( len > 4 && ent->d_name[0] == '.' && ent->d_name[len-4] == '.' && ent->d_name[len-3] == 'd' && ent->d_name[len-2] == 'o' && ent->d_name[len-1] == 't') {
+
+                FILE* f;
+                if( (f = fopen(ent->d_name, "r")) != NULL ) {
+                    GRAPH* g = graph_create_from_dot(f);
+                    graph_topological_sort(g);
+                    if( dijkstra_check(g) ) {
+                        file_has_at_least_one_dijkstra_graph = 1;
+                        char* current_dijkstra_code = dijkstra_get_code(g);
+                        // only continues if the watermark can fit in the function
+                        if( (float)strlen(current_dijkstra_code) > SIZE_PERCENTAGE * (float)strlen(dijkstra_code) ) {
+                            NW_RESULT nw_result = watermark_needleman_wunsch(current_dijkstra_code, dijkstra_code, MATCH, MISMATCH, GAP);
+                            long score = nw_result.score;
+                            long entry_point = nw_result.entry_point;
+
+                            fprintf(stderr, "%s:\n\tcode: %s\n\tscore: %ld\n\tentry_point: %ld\n", ent->d_name, current_dijkstra_code, score, entry_point);
+                            if( score > highest_score ) {
+                                highest_score = score;
+                                highest_score_entry_point = entry_point;
+                                memset(highest_score_func, 0x00, MAX_SIZE);
+                                strncpy(highest_score_func, &ent->d_name[1], len-5);
+                                strcpy(highest_score_code, current_dijkstra_code);
+                            }
+                        }
+                        free(current_dijkstra_code);
+                    }
+                    graph_free(g);
+                    fclose(f);
+                }
+                remove(ent->d_name);
+            }
+        }
+        closedir (dir);
+    }
+    if(highest_score_func[0] != '\0') {
+
+        printf("\nwatermark dijkstra code: %s\n", dijkstra_code);
+        printf("best fit function is: '%s'\n", highest_score_func);
+        printf("\tscore: %ld\n", highest_score);
+        printf("\tentry_point: %ld\n", highest_score_entry_point);
+        printf("\tdijkstra code: %s\n", highest_score_code);
+
+        char* code = watermark_generate_code(dijkstra_code);
+        printf("\n\nwatermark example code:\n%s", code);
+        free(code);
+        code = watermark_generate_code(highest_score_code);
+        printf("\n\n'%s' code example:\n%s", highest_score_func, code);
+        free(code);
+    } else {
+        printf("\nNo valid candidate function was found. Reason:\n");
+        if(file_has_at_least_one_dijkstra_graph) {
+            printf("\tthe Dijkstra codes of the functions in the file were too small compared to the watermark dijkstra code\n");
+        } else {
+            printf("\tnone of the functions inside the file has a Dijkstra graph as CFG\n");
+        }
+        return 1;
+    }
+    return 0;
+}
+
+uint8_t get_uint8_t(const char* msg) {
+    uint8_t n;
+    printf("%s", msg);
+    scanf("%hhu", &n);
+    return n;
+}
+
+unsigned long get_ulong(const char* msg) {
+
+    unsigned long n;
+    printf("%s", msg);
+    scanf("%lu", &n);
+    return n;
+}
+
+char* get_string(const char* msg) {
+
+    char* s = calloc(MAX_SIZE + 1, sizeof(char));
+    printf("%s", msg);
+    scanf(" %" MAX_SIZE_STR "s", s);
+    return s;
+}
+
 int main() {
+
     printf("1) encode string\n");
     printf("2) encode number\n");
-    printf("3) run removal test\n");
-    printf("4) run removal test with reed solomon\n");
-    printf("5) show report matrix\n");
+    printf("3) generate graph from dijkstra code\n");
+    printf("4) run removal test for bits\n");
+    printf("5) run removal test with reed solomon for bits\n");
+    printf("6) run removal test for numeric strings\n");
+    printf("7) run removal test with reeed solomon for numeric strings\n");
+    printf("8) show report matrix\n");
     printf("else) exit\n");
-    switch( get_uint8_t() ) {
+    switch(get_uint8_t("input an option: ")) {
+        case 1: {
+            char* s = get_string("Input numberic string to encode: ");
+            unsigned long data_len=strlen(s);
+            void* data = encode_numeric_string(s, &data_len);
 
-        // string
-        case 1:
-            encode_string();
+            GRAPH* g = watermark_encode(data, data_len);
+            char* dijkstra_code = dijkstra_get_code(g);
+            graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
+            graph_print(g, NULL);
+            uint8_t result = ask_for_comparison(dijkstra_code);
+            
+            free(dijkstra_code);
+            graph_free(g);
+            free(s);
+            free(data);
+            return result;
+        }
+        case 2: {
+            unsigned long n = get_ulong("Input number to encode: ");
+            invert_byte_sequence((uint8_t*)&n, sizeof(n));
+            GRAPH* g = watermark_encode(&n, sizeof(n));
+            char* dijkstra_code = dijkstra_get_code(g);
+            graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
+            graph_print(g, NULL);
+            uint8_t result = ask_for_comparison(dijkstra_code);
+            
+            free(dijkstra_code);
+            graph_free(g);
+
+            return result;
+        }
+        case 3: {
+            char* s = get_string("Input dijkstra code: ");
+            GRAPH* g = dijkstra_generate(s);
+            if(!g) {
+                printf("This isn't a valid dijkstra code!\n");
+                free(s);
+                break;
+            }
+            graph_print(g, NULL);
+            graph_write_dot(g, "dot.dot", s);
+            ask_for_comparison(s);
+            graph_free(g);
+            free(s);
             break;
-        // number
-        case 2:
-            encode_number();
+        }
+        case 4: {
+            printf("input maximum number of removals: ");
+            unsigned long n_removals;
+            scanf("%lu", &n_removals);
+            printf("input maximum number of bits: ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            removal_attack_for_bits(n_removals, n_symbols);
             break;
-        case 3:
-            removal_attack();
+        }/*
+        case 5: {
+            printf("input maximum number of removals: ");
+            unsigned long n_removals;
+            scanf("%lu", &n_removals);
+            printf("input maximum number of bits: ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            removal_attack_with_rs_for_bits(n_removals, n_symbols);
             break;
-        case 4:
-            removal_attack_with_rs();
+        }
+        case 6: {
+            printf("input maximum number of removals: ");
+            unsigned long n_removals;
+            scanf("%lu", &n_removals);
+            printf("input maximum number of chars: ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            removal_attack_for_symbols(n_removals, n_symbols);
             break;
-        case 5:
+        }
+        case 7: {
+            printf("input maximum number of removals: ");
+            unsigned long n_removals;
+            scanf("%lu", &n_removals);
+            printf("input maximum number of chars: ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            removal_attack_with_rs_for_symbols(n_removals, n_symbols);
+        }
+        case 8: {
             show_report_matrix();
-            break;
+        }*/
     }
+
+    return 0;
 }

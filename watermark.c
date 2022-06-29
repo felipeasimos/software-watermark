@@ -97,9 +97,10 @@ void show_report_matrix() {
     unsigned long totals[n_rows];
     memset(totals, 0x00, sizeof(totals));
 
+    printf("lost bits\\bits in key\n");
     printf("        ");
     for(unsigned long i = 0; i < n_columns; i++) {
-        printf("%-5lu", i);
+        printf("%-5lu", i+1);
         if( i != n_columns-1) printf(" & ");
     }
 
@@ -138,53 +139,30 @@ void write_to_report_matrix(unsigned long* matrix, unsigned long n_rows, unsigne
     fclose(file);
 }
 
-unsigned long _check(GRAPH* graph, GRAPH* copy) {
+unsigned long _check(void* result, void* identifier, unsigned long result_len, unsigned long identifier_len) {
 
-    NODE* graph_node = graph->nodes[0];
-    NODE* copy_node = copy->nodes[0];
+  unsigned long bit_idx_identifier = get_first_positive_bit_index(identifier, identifier_len);
+  unsigned long bit_idx_result = get_first_positive_bit_index(result, result_len);
 
-    unsigned long errors=0;
-    while(graph_node && copy_node && graph_node->data && copy_node->data) {
+  unsigned long total_num_bits_identifier = identifier_len * 8;
+  unsigned long total_num_bits_result = result_len * 8;
 
-#ifdef DEBUG
-        graph_write_hamiltonian_dot(graph, "dot.dot", NULL);
-        graph_write_hamiltonian_dot(copy, "dot.dot", NULL);
-        fprintf(stderr, "graph idx: %lu, copy idx: %lu\n", graph_node->graph_idx, copy_node->graph_idx);
-#endif
+  unsigned long errors = 0;
 
-        UTILS_NODE* graph_utils = node_get_info(graph_node);
-        UTILS_NODE* copy_utils = node_get_info(copy_node);
+  while(bit_idx_identifier < total_num_bits_identifier && bit_idx_result < total_num_bits_result) {
 
-        // if one of them if mute, skip it
-        if(graph_utils->checker_bit == BIT_MUTE) {
-            graph_node = graph_get(graph, graph_node->graph_idx+1);
-        } else if(copy_utils->checker_bit == BIT_MUTE) {
-            copy_node = graph_get(copy, copy_node->graph_idx+1);
-        // make sure they point to the same bit index
-        } else if( copy_utils->bit_idx < graph_utils->bit_idx ) {
-            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
-        } else if( graph_utils->bit_idx < copy_utils->bit_idx ) {
-            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
-        // at this point on, they are pointing to the same index, so they must always both skip
-        } else {
-            // if one of them is unknown, increment error
-            if(graph_utils->checker_bit == BIT_UNKNOWN || graph_utils->checker_bit == BIT_UNKNOWN) {
-                errors++;
-            // if they are different, increment error
-            } else if( graph_utils->checker_bit != copy_utils->checker_bit ) {
-                errors++;
-            }
-            graph_node = graph_get(graph_node->graph, graph_node->graph_idx+1);
-            copy_node = graph_get(copy_node->graph, copy_node->graph_idx+1);
-            
-        }
+    if( get_bit(identifier, bit_idx_identifier) != get_bit(result, bit_idx_result)) {
+      errors++;
     }
+    bit_idx_result++;
+    bit_idx_identifier++;
+  }
 
-    return errors;
+  return errors;
 }
 
 unsigned long _test_with_removed_connections(
-        STATISTICS* statistics,
+        uint8_t improved,
         void* identifier,
         unsigned long identifier_len,
         GRAPH* graph,
@@ -192,46 +170,80 @@ unsigned long _test_with_removed_connections(
 
     // get copy and remove some of its connections
     GRAPH* copy = graph_copy(graph);
+#ifdef DEBUG
+    uint8_t has_forward_removal = 0;
+#endif
     for(CONN_LIST* l = conns; l; l = l->next) {
-        graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+      graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+#ifdef DEBUG
+#ifdef VERBOSE
+      if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
+        printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
+      } else {
+        has_forward_removal = 1;
+        printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
+      }
+#endif
+#endif
     }
 
     unsigned long num_bytes = identifier_len;
-    unsigned long errors = 0;
-    
-    free(watermark_check_analysis(copy, identifier, &num_bytes));
-    num_bytes = identifier_len;
-    free(watermark_check_analysis(graph, identifier, &num_bytes));
-    //free(watermark2017_decode_analysis(copy, &num_bytes));
-    //decoder_graph_to_utils_nodes(copy);
-    errors = _check(graph, copy);
-    /*if(errors > 0) {
-        printf("errors: %lu\n", errors);
-        graph_print(graph, utils_print_node);
-        graph_print(copy, utils_print_node);
-    }*/
-    graph_free_info(copy);
-    graph_free(copy);
+    void* result = NULL;
+    if(improved) {
+      result = watermark_decode_improved(copy, identifier, &num_bytes);
+    } else {
+      result = watermark_decode(copy, &num_bytes);
+    }
 
-    if( errors > statistics->worst_case ) statistics->worst_case = errors;
+    unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
+#ifdef DEBUG
+    if(errors > 1 || ( has_forward_removal && errors == 1 )) {
+      printf("errors: %lu\n", errors);
+      printf("identifier: ");
+      for(unsigned long i = get_first_positive_bit_index(identifier, identifier_len); i < identifier_len * 8; i++) {
+        printf("%hhu", get_bit(identifier, i));
+      }
+      printf("\n");
+      graph_print(graph, NULL);
+      printf("result: ");
+      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+        printf("%hhu", get_bit(result, i));
+      }
+      printf("\n");
+      graph_print(copy, NULL);
+    } else {
+#ifdef VERBOSE
+      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+        printf("%hhu", get_bit(result, i));
+      }
+      printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
+#endif
+    }
+#endif
+
+    free(result);
+    graph_free(copy);
 
     return errors;
 }
 
 void _multiple_removal_test(
+    uint8_t improved,
     unsigned long n_removals,
     STATISTICS* statistics,
     void* identifier,
     unsigned long identifier_len,
     CONN_LIST* non_hamiltonian_edges,
-    GRAPH* graph,
     NODE* node,
     CONNECTION* conn) {
+
+    GRAPH* graph = node->graph;
 
     if(!n_removals) {
 
         statistics->total++;
-        statistics->errors += _test_with_removed_connections(statistics, identifier, identifier_len, graph, non_hamiltonian_edges);
+        statistics->errors = _test_with_removed_connections(improved, identifier, identifier_len, graph, non_hamiltonian_edges);
+        if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
     } else {
 
         NODE* initial_node = node;
@@ -240,19 +252,22 @@ void _multiple_removal_test(
 
             if(node->out) {
 
+                // if this is a hamiltonian edge, skip it
                 CONNECTION* c = ( node->out->node == graph_get(graph, node->graph_idx+1) ? node->out->next : node->out );
+                // if this is the first node in the loop, start from the connection given by 'conn'
                 if(node == initial_node) c = (conn ? conn : c);
                  
                 for(; c; c = c->next) {
 
-                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, conn);
+                    if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
+                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
                     _multiple_removal_test(
+                        improved,
                         n_removals-1,
                         statistics,
                         identifier,
                         identifier_len,
-                        non_hamiltonian_edges,
-                        graph,
+                        list,
                         node,
                         c->next);
 
@@ -264,20 +279,20 @@ void _multiple_removal_test(
     }
 }
 
-void multiple_removal_test(unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
+void multiple_removal_test(uint8_t improved, unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
 
-    _multiple_removal_test(n_removals, statistics, identifier, identifier_len, NULL, graph, graph->nodes[0], NULL);
+    _multiple_removal_test(improved, n_removals, statistics, identifier, identifier_len, NULL, graph->nodes[0], NULL);
 }
 
-void attack(unsigned long n_removals, unsigned long n_symbols) {
+void attack(uint8_t improved, unsigned long n_removals, unsigned long n_symbols) {
 
-    for(unsigned long n_removal = 0; n_removal < n_removals; n_removal++) {
+    for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
 
         unsigned long matrix[n_symbols][n_symbols];
         memset(matrix, 0x00, sizeof(matrix));
-        for(unsigned long n_bits = 0; n_bits < n_symbols; n_bits++) {
+        for(unsigned long n_bits = 1; n_bits <= n_symbols; n_bits++) {
 
-            printf("number of bits: %lu\n", n_bits);
+            printf("\n\tnumber of bits: %lu\n\n", n_bits);
             unsigned long lower_bound = get_lower_bound(n_bits);
             unsigned long upper_bound = get_upper_bound(n_bits);
 
@@ -292,38 +307,27 @@ void attack(unsigned long n_removals, unsigned long n_symbols) {
 
                 GRAPH* graph = watermark_encode(&identifier, identifier_len);
 
-                multiple_removal_test(n_removal, graph, &statistics, &identifier, identifier_len);
+                multiple_removal_test(improved, n_removal, graph, &statistics, &identifier, identifier_len);
 
                 graph_free(graph);
                 identifiers_evaluated++;
 
-                matrix[statistics.worst_case][n_bits]++;
+                matrix[statistics.worst_case][n_bits-1]++;
             }
         }
-        write_to_report_matrix((unsigned long*)&matrix, n_removals, n_symbols);
+        write_to_report_matrix((unsigned long*)&matrix, n_symbols, n_symbols);
     }
 }
 
-void removal_attack_for_bits(unsigned long n_removals, unsigned long n_symbols) {
+void removal_attack(unsigned long n_removals, unsigned long n_symbols) {
 
-    attack(n_removals, n_symbols);
+    attack(0, n_removals, n_symbols);
     show_report_matrix();
 }
 
-void removal_attack_with_rs_for_bits(unsigned long n_removals, unsigned long n_symbols) {
-    n_removals = n_symbols;
-    show_report_matrix();
-}
+void removal_attack_improved_decoding(unsigned long n_removals, unsigned long n_symbols) {
 
-void removal_attack_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
-
-    n_removals = n_symbols;
-    show_report_matrix();
-}
-
-void removal_attack_with_rs_for_symbols(unsigned long n_removals, unsigned long n_symbols) {
-
-    n_removals = n_symbols;
+    attack(1, n_removals, n_symbols);
     show_report_matrix();
 }
 
@@ -446,11 +450,9 @@ int main() {
     printf("1) encode string\n");
     printf("2) encode number\n");
     printf("3) generate graph from dijkstra code\n");
-    printf("4) run removal test for bits\n");
-    printf("5) run removal test with reed solomon for bits\n");
-    printf("6) run removal test for numeric strings\n");
-    printf("7) run removal test with reeed solomon for numeric strings\n");
-    printf("8) show report matrix\n");
+    printf("4) run removal test\n");
+    printf("5) run removal test with improved decoding\n");
+    printf("6) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -506,9 +508,9 @@ int main() {
             printf("input maximum number of bits: ");
             unsigned long n_symbols;
             scanf("%lu", &n_symbols);
-            removal_attack_for_bits(n_removals, n_symbols);
+            removal_attack(n_removals, n_symbols);
             break;
-        }/*
+        }
         case 5: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
@@ -516,31 +518,12 @@ int main() {
             printf("input maximum number of bits: ");
             unsigned long n_symbols;
             scanf("%lu", &n_symbols);
-            removal_attack_with_rs_for_bits(n_removals, n_symbols);
+            removal_attack_improved_decoding(n_removals, n_symbols);
             break;
         }
         case 6: {
-            printf("input maximum number of removals: ");
-            unsigned long n_removals;
-            scanf("%lu", &n_removals);
-            printf("input maximum number of chars: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack_for_symbols(n_removals, n_symbols);
-            break;
-        }
-        case 7: {
-            printf("input maximum number of removals: ");
-            unsigned long n_removals;
-            scanf("%lu", &n_removals);
-            printf("input maximum number of chars: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack_with_rs_for_symbols(n_removals, n_symbols);
-        }
-        case 8: {
             show_report_matrix();
-        }*/
+        }
     }
 
     return 0;

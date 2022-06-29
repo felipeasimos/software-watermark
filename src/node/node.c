@@ -53,13 +53,13 @@ unsigned long node_get_data_len(NODE* node) {
 
 uint8_t node_oriented_disconnect(NODE* node_from, NODE* node_to){
 
-	//if one of the given pointers is NULL, nothing happens
-	if( !node_from || !node_to ) return 0;
+    //if one of the given pointers is NULL, nothing happens
+    if( !node_from || !node_to ) return 0;
 
-	//delete node_to from node_from's connection's list
+    //delete node_to from node_from's connection's list
     //and update counts if connection existed
     uint8_t deleted=0;
-	if( connection_delete_neighbour( node_from->out, node_to ) ) {
+    if( connection_delete_neighbour( node_from->out, node_to ) ) {
         node_from->num_out_neighbours--;
         deleted=1;
     }
