@@ -6,6 +6,7 @@
 
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes);
 void* watermark_decode(GRAPH*, unsigned long* num_bytes);
+void* watermark_decode_improved(GRAPH*, uint8_t* key, unsigned long* num_bytes);
 
 // 'num_parity_symbols' will hold the size of the binary sequence
 // afterwards

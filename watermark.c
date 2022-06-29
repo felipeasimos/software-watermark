@@ -171,24 +171,45 @@ unsigned long _test_with_removed_connections(
     GRAPH* copy = graph_copy(graph);
     for(CONN_LIST* l = conns; l; l = l->next) {
       graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+#ifdef DEBUG
+      if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
+        printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
+      } else {
+        printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
+      }
+#endif
     }
 
-    invert_byte_sequence(identifier, identifier_len);
-    printf("identifier:%lu\n", *(unsigned long*)identifier);
-    invert_byte_sequence(identifier, identifier_len);
-
     unsigned long num_bytes = identifier_len;
-    void* result = watermark_decode(copy, &num_bytes);
-
-    invert_byte_sequence(result, num_bytes);
-    printf("result: %hhu\n", *(uint8_t*)result);
-    invert_byte_sequence(result, num_bytes);
+    void* result = watermark_decode_improved(copy, identifier, &num_bytes);
 
     unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
+#ifdef DEBUG
+    if(errors > 1) {
+      printf("errors: %lu\n", errors);
+      printf("identifier: ");
+      for(unsigned long i = get_first_positive_bit_index(identifier, identifier_len); i < identifier_len * 8; i++) {
+        printf("%hhu", get_bit(identifier, i));
+      }
+      printf("\n");
+      graph_print(graph, NULL);
+      printf("result: ");
+      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+        printf("%hhu", get_bit(result, i));
+      }
+      printf("\n");
+      graph_print(copy, NULL);
+    } else {
+      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+        printf("%hhu", get_bit(result, i));
+      }
+      printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
+    }
+#endif
+
     free(result);
     graph_free(copy);
 
-    printf("errors: %lu\n", errors);
     return errors;
 }
 
@@ -223,6 +244,7 @@ void _multiple_removal_test(
                  
                 for(; c; c = c->next) {
 
+                    if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
                     CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
                     _multiple_removal_test(
                         n_removals-1,
@@ -254,7 +276,7 @@ void attack(unsigned long n_removals, unsigned long n_symbols) {
         memset(matrix, 0x00, sizeof(matrix));
         for(unsigned long n_bits = 1; n_bits <= n_symbols; n_bits++) {
 
-            printf("number of bits: %lu\n", n_bits);
+            printf("\n\tnumber of bits: %lu\n\n", n_bits);
             unsigned long lower_bound = get_lower_bound(n_bits);
             unsigned long upper_bound = get_upper_bound(n_bits);
 

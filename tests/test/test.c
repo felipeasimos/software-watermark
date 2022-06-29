@@ -202,6 +202,34 @@ int watermark2017_test() {
     return 0;
 }
 
+int watermark2017_improved_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size=1;
+        uint8_t* result = watermark_decode_improved(graph, &k, &size);
+        ctdd_assert(size == 1);
+        uint8_t res = *result == k;
+        if(!res) {
+          PRINT_K(k);
+          printf("%hhu\n", *result);
+        }
+        ctdd_assert(res);
+        free(result);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        unsigned long size=sizeof(unsigned long);
+        uint8_t* result = watermark_decode_improved(graph, (uint8_t*)&k, &size);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        graph_free(graph);
+    }
+    return 0;
+}
+
 int watermark2017_rs_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
@@ -571,6 +599,7 @@ int run_tests() {
     ctdd_verify(watermark2014_test);
     ctdd_verify(watermark2014_rs_test);
     ctdd_verify(watermark2017_test);
+    ctdd_verify(watermark2017_improved_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(watermark2017_decode_analysis_test);
     ctdd_verify(watermark2017_rs_decode_analysis_test);
