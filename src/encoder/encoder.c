@@ -84,8 +84,6 @@ GRAPH* watermark_encode(void* data, unsigned long data_len) {
         // check if there is a forward edge that point to the current node and ignore it if so
         if( idx > 1 && graph_get_connection(graph->nodes[idx-2], graph->nodes[idx]) ) {
             i--;
-            // this is a sink, so it can't have 'in' neighbours from other blocks
-            continue;
         // if there are available backedges in the backedge stack, taking into account that we
         // can't connect a backedge to a node that the last node also does
         } else if( has_possible_backedge(possible_backedges, graph, idx) ) {
