@@ -86,7 +86,7 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
     for(unsigned long graph_idx = 1; graph_idx < max_num_nodes; graph_idx++, i++) {
 
         uint8_t is_odd = !(graph_idx&1);
-        uint8_t bit = get_bit(data, i);
+        uint8_t bit = i < total_number_of_bits ? get_bit(data, i) : 0;
 
         // backedge management
         STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
@@ -110,7 +110,7 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
                 break;
             case BIT_MUTE:
                 i--;
-                continue;
+                break;
             case BIT_0_BACKEDGE:
             case BIT_1_BACKEDGE:
                 if( (checker_flag == BIT_0_BACKEDGE && bit) || (checker_flag == BIT_1_BACKEDGE && !bit)) {
@@ -162,9 +162,8 @@ uint8_t watermark_check(GRAPH* graph, void* data, unsigned long num_bytes) {
             stack_push(even_stack, graph_idx);
             history[graph_idx] = odd_stack->n;
         }
-        // if this was the origin of a forward node, we already processed the inner forward node and the
-        // next node will be ignored
-        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx+=2;
+        // if this was the origin of a forward node, we already processed the inner forward node
+        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx++;
     }
     // bit sequence may be smaller than expected due to mute nodes
     graph_unload_info(graph);
@@ -269,7 +268,7 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
     for(unsigned long graph_idx = 1; graph_idx < max_num_nodes; graph_idx++, i++) {
 
         uint8_t is_odd = !(graph_idx&1);
-        uint8_t bit = get_bit(data, i);
+        uint8_t bit = i < total_number_of_bits ? get_bit(data, i) : 0;
 
         // backedge management
         STACK* possible_backedges = (is_odd && bit) || (!is_odd && !bit) ? even_stack : odd_stack;
@@ -290,7 +289,7 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
                 break;
             case BIT_MUTE:
                 i--;
-                continue;
+                break;
             case BIT_0_BACKEDGE:
             case BIT_1_BACKEDGE:
                 if( (checker_flag == BIT_0_BACKEDGE && bit) || (checker_flag == BIT_1_BACKEDGE && !bit)) {
@@ -338,7 +337,7 @@ void* watermark_check_analysis(GRAPH* graph, void* data, unsigned long* num_byte
             history[graph_idx] = odd_stack->n;
         }
         // if this was the origin of a forward node, we already processed the inner forward node
-        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx+=2;
+        if(checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_0 || checker_flag == BIT_1_FORWARD_EDGE_AND_BIT_1) graph_idx++;
     }
     // bit sequence may be smaller than expected due to mute nodes
     stack_free(odd_stack);

@@ -135,7 +135,7 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
         node_29_was_the_last = 0;
 
         // if this is not a inner forward node
-        if(!graph_get_forward(graph->nodes[graph_idx-1]) && forward_destination != 2) {
+        if(!graph_get_forward(graph->nodes[graph_idx-1])) {
 
             // save stacks
             // odd
