@@ -125,7 +125,7 @@ compilemain: LDFLAGS += $(MAIN_LIBS)
 compilemain: release
 	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
 
-main: CFLAGS += -DDEBUG -g
+# main: CFLAGS += -DDEBUG -g
 main: compilemain
 	#LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(VALGRIND_COMMAND) $(TARGET)
 	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)

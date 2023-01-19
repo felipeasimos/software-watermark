@@ -87,7 +87,7 @@ unsigned long invert_unsigned_long(unsigned long n) {
     return n;
 }
 
-void show_report_matrix() {
+void show_report_matrix(void) {
 
     FILE* file = fopen("tests/report_matrix.plt", "rb");
     unsigned long n_rows, n_columns;
@@ -161,15 +161,28 @@ unsigned long _check(void* result, void* identifier, unsigned long result_len, u
   return errors;
 }
 
+typedef enum METHOD {
+  ORIGINAL,
+  IMPROVED,
+  IMPROVED_WITH_RS
+} METHOD;
+
+typedef struct ATTACK {
+  METHOD method;
+  void* identifier;
+  unsigned long identifier_len;
+  GRAPH* graph;
+  unsigned long n_removals;
+  unsigned long n_bits;
+  unsigned long n_parity_symbols;
+} ATTACK;
+
 unsigned long _test_with_removed_connections(
-        uint8_t improved,
-        void* identifier,
-        unsigned long identifier_len,
-        GRAPH* graph,
+        ATTACK* attack,
         CONN_LIST* conns) {
 
     // get copy and remove some of its connections
-    GRAPH* copy = graph_copy(graph);
+    GRAPH* copy = graph_copy(attack->graph);
 #ifdef DEBUG
     uint8_t has_forward_removal = 0;
 #endif
@@ -187,24 +200,30 @@ unsigned long _test_with_removed_connections(
 #endif
     }
 
-    unsigned long num_bytes = identifier_len;
+    unsigned long num_bytes = attack->identifier_len;
     void* result = NULL;
-    if(improved) {
-      result = watermark_decode_improved(copy, identifier, &num_bytes);
-    } else {
-      result = watermark_decode(copy, &num_bytes);
+    switch(attack->method) {
+      case ORIGINAL:
+        result = watermark_decode(copy, &num_bytes);
+        break;
+      case IMPROVED:
+        result = watermark_decode_improved(copy, attack->identifier, &num_bytes);
+        break;
+      case IMPROVED_WITH_RS:
+        result = watermark_rs_decode_improved(attack->graph, attack->identifier, &num_bytes, attack->n_parity_symbols);
+        break;
     }
 
-    unsigned long errors = _check(result, identifier, num_bytes, identifier_len);
+    unsigned long errors = _check(result, attack->identifier, num_bytes, attack->identifier_len);
 #ifdef DEBUG
     if(errors > 1 || ( has_forward_removal && errors == 1 )) {
       printf("errors: %lu\n", errors);
       printf("identifier: ");
-      for(unsigned long i = get_first_positive_bit_index(identifier, identifier_len); i < identifier_len * 8; i++) {
-        printf("%hhu", get_bit(identifier, i));
+      for(unsigned long i = get_first_positive_bit_index(attack->identifier, attack->identifier_len); i < attack->identifier_len * 8; i++) {
+        printf("%hhu", get_bit(attack->identifier, i));
       }
       printf("\n");
-      graph_print(graph, NULL);
+      graph_print(attack->graph, NULL);
       printf("result: ");
       for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
         printf("%hhu", get_bit(result, i));
@@ -228,32 +247,27 @@ unsigned long _test_with_removed_connections(
 }
 
 void _multiple_removal_test(
-    uint8_t improved,
-    unsigned long n_removals,
+    ATTACK* attack,
     STATISTICS* statistics,
-    void* identifier,
-    unsigned long identifier_len,
     CONN_LIST* non_hamiltonian_edges,
     NODE* node,
     CONNECTION* conn) {
 
-    GRAPH* graph = node->graph;
-
-    if(!n_removals) {
+    if(!attack->n_removals) {
 
         statistics->total++;
-        statistics->errors = _test_with_removed_connections(improved, identifier, identifier_len, graph, non_hamiltonian_edges);
+        statistics->errors = _test_with_removed_connections(attack, non_hamiltonian_edges);
         if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
     } else {
 
         NODE* initial_node = node;
 
-        for(; node; node = graph_get(graph, node->graph_idx+1)) {
+        for(; node; node = graph_get(attack->graph, node->graph_idx+1)) {
 
             if(node->out) {
 
                 // if this is a hamiltonian edge, skip it
-                CONNECTION* c = ( node->out->node == graph_get(graph, node->graph_idx+1) ? node->out->next : node->out );
+                CONNECTION* c = ( node->out->node == graph_get(attack->graph, node->graph_idx+1) ? node->out->next : node->out );
                 // if this is the first node in the loop, start from the connection given by 'conn'
                 if(node == initial_node) c = (conn ? conn : c);
                  
@@ -261,12 +275,12 @@ void _multiple_removal_test(
 
                     if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
                     CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
+                    ATTACK another_attack;
+                    memcpy(&another_attack, attack, sizeof(ATTACK));
+                    another_attack.n_removals -= 1;
                     _multiple_removal_test(
-                        improved,
-                        n_removals-1,
+                        &another_attack,
                         statistics,
-                        identifier,
-                        identifier_len,
                         list,
                         node,
                         c->next);
@@ -279,24 +293,22 @@ void _multiple_removal_test(
     }
 }
 
-void multiple_removal_test(uint8_t improved, unsigned long n_removals, GRAPH* graph, STATISTICS* statistics, void* identifier, unsigned long identifier_len) {
+void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
 
-    _multiple_removal_test(improved, n_removals, statistics, identifier, identifier_len, NULL, graph->nodes[0], NULL);
+    _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
 }
 
-void attack(uint8_t improved, unsigned long n_removals, unsigned long n_symbols) {
+void attack(METHOD method, unsigned long n_removals, unsigned long n_bits, unsigned long n_parity_symbols) {
 
     for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
 
-        unsigned long matrix[n_symbols][n_symbols];
+        unsigned long matrix[n_bits][n_bits];
         memset(matrix, 0x00, sizeof(matrix));
-        for(unsigned long n_bits = 1; n_bits <= n_symbols; n_bits++) {
+        for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
-            printf("\n\tnumber of bits: %lu\n\n", n_bits);
-            unsigned long lower_bound = get_lower_bound(n_bits);
-            unsigned long upper_bound = get_upper_bound(n_bits);
-
-            double identifiers_evaluated = 0;
+            printf("\n\tnumber of bits: %lu\n\n", current_n_bits);
+            unsigned long lower_bound = get_lower_bound(current_n_bits);
+            unsigned long upper_bound = get_upper_bound(current_n_bits);
 
             for(unsigned long i = lower_bound; i < upper_bound; i++) {
 
@@ -305,30 +317,32 @@ void attack(uint8_t improved, unsigned long n_removals, unsigned long n_symbols)
                 unsigned long identifier = invert_unsigned_long(i);
                 unsigned long identifier_len = sizeof(unsigned long);
 
-                GRAPH* graph = watermark_encode(&identifier, identifier_len);
+                GRAPH* graph = NULL;
+                if(method == IMPROVED_WITH_RS) {
+                  graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
+                } else {
+                  graph = watermark_encode(&identifier, identifier_len);
+                }
 
-                multiple_removal_test(improved, n_removal, graph, &statistics, &identifier, identifier_len);
+                ATTACK attack = {
+                  .n_removals = n_removal,
+                  .n_parity_symbols = n_parity_symbols,
+                  .n_bits = current_n_bits,
+                  .graph = graph,
+                  .identifier = &identifier,
+                  .identifier_len = identifier_len,
+                  .method = method,
+                };
+
+                multiple_removal_test(&attack, &statistics);
 
                 graph_free(graph);
-                identifiers_evaluated++;
 
-                matrix[statistics.worst_case][n_bits-1]++;
+                matrix[statistics.worst_case][current_n_bits-1]++;
             }
         }
-        write_to_report_matrix((unsigned long*)&matrix, n_symbols, n_symbols);
+        write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
     }
-}
-
-void removal_attack(unsigned long n_removals, unsigned long n_symbols) {
-
-    attack(0, n_removals, n_symbols);
-    show_report_matrix();
-}
-
-void removal_attack_improved_decoding(unsigned long n_removals, unsigned long n_symbols) {
-
-    attack(1, n_removals, n_symbols);
-    show_report_matrix();
 }
 
 int ask_for_comparison(char* dijkstra_code) {
@@ -445,7 +459,7 @@ char* get_string(const char* msg) {
     return s;
 }
 
-int main() {
+int main(void) {
 
     printf("1) encode string\n");
     printf("2) encode number\n");
@@ -507,9 +521,10 @@ int main() {
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack(n_removals, n_symbols);
+            unsigned long n_bits;
+            scanf("%lu", &n_bits);
+            attack(ORIGINAL, n_removals, n_bits, 0);
+            show_report_matrix();
             break;
         }
         case 5: {
@@ -517,9 +532,10 @@ int main() {
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
-            removal_attack_improved_decoding(n_removals, n_symbols);
+            unsigned long n_bits;
+            scanf("%lu", &n_bits);
+            attack(IMPROVED, n_removals, n_bits, 0);
+            show_report_matrix();
             break;
         }
         case 6: {
@@ -527,11 +543,13 @@ int main() {
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
-            unsigned long n_symbols;
-            scanf("%lu", &n_symbols);
+            unsigned long n_bits;
+            scanf("%lu", &n_bits);
             printf("number of parity symbols: ");
             unsigned long n_parity;
             scanf("%lu", &n_parity);
+            attack(IMPROVED_WITH_RS, n_removals, n_bits, n_parity);
+            show_report_matrix();
             break;           
         }
         case 7: {
