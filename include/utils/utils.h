@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "rs_api/rs.h"
+
 typedef struct STACK {
 
     unsigned long* stack;
@@ -73,6 +75,7 @@ void* decode_numeric_string(void* data, unsigned long* data_len);
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 
-// translate struct used in decoding and checking analysis to a common structure
+// rs
+void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols);
 
 #endif

@@ -254,6 +254,32 @@ int watermark2017_rs_test() {
     return 0;
 }
 
+int watermark2017_rs_decode_improved_test() {
+
+    for(uint8_t k = 1; k < 255; k++) {
+
+        unsigned long num_parity_symbols = 2;
+        unsigned long size = sizeof(k);
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), num_parity_symbols);
+        uint8_t* result = watermark_rs_decode_improved(graph, &k, &size, num_parity_symbols);
+        ctdd_assert(size == 1);
+        ctdd_assert(*result == k);
+        free(result);
+        graph_free(graph);
+    }
+    for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+
+        unsigned long num_parity_symbols = 2;
+        unsigned long size = sizeof(k);
+        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), num_parity_symbols);
+        uint8_t* result = watermark_rs_decode_improved(graph, &k, &size, num_parity_symbols);
+        ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+        free(result);
+        graph_free(graph);
+    }
+    return 0;
+}
+
 int watermark2017_decode_analysis_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
@@ -605,6 +631,7 @@ int run_tests() {
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_improved_test);
     ctdd_verify(watermark2017_rs_test);
+    ctdd_verify(watermark2017_rs_decode_improved_test);
     ctdd_verify(watermark2017_decode_analysis_test);
     ctdd_verify(watermark2017_rs_decode_analysis_test);
     ctdd_verify(dijkstra_recognition_test);

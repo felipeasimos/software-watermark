@@ -452,7 +452,8 @@ int main() {
     printf("3) generate graph from dijkstra code\n");
     printf("4) run removal test\n");
     printf("5) run removal test with improved decoding\n");
-    printf("6) show report matrix\n");
+    printf("6) run removal test with improved decoding and reed solomon\n");
+    printf("7) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -522,6 +523,18 @@ int main() {
             break;
         }
         case 6: {
+            printf("input maximum number of removals: ");
+            unsigned long n_removals;
+            scanf("%lu", &n_removals);
+            printf("input maximum number of bits: ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            printf("number of parity symbols: ");
+            unsigned long n_parity;
+            scanf("%lu", &n_parity);
+            break;           
+        }
+        case 7: {
             show_report_matrix();
         }
     }

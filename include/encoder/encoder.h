@@ -2,7 +2,7 @@
 #define ENCODER_H
 
 #include "graph/graph.h"
-#include "rs_api/rs.h"
+#include "utils/utils.h"
 
 GRAPH* watermark2014_encode(void* data, unsigned long data_len);
 GRAPH* watermark_encode(void* data, unsigned long data_len);
