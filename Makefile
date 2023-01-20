@@ -1,167 +1,206 @@
-# v Settings to be changed per-project v
-# v v v v v v v v v vvvv v v v v v v v v
 
-# compiler settings
-CC := clang
-CFLAGS = -pedantic-errors -Wall -Wextra -std=c99 -fPIC -Werror
-
-# extensions and location
-ROOT_DIR :=.
-TEST_FILE_EXTENSION := c
-SRC_FILE_EXTENSION := c
-
-# final binaries
-## project name, will also be the name of the main binary and library
-TARGET := watermark
-## name of the test binary
-TEST_TARGET := test
-
-# libraries (without -l)
-LIBS :=
-MAIN_LIBS :=
-TEST_LIBS :=
-
-# gcov-like coverage command (expect gcov output, not gcov files)
-# Examples: llvm-cov-7 gcov -n (clang), gcov -rnm (gcc)
-# files with 100% coverage are not showed in the final output
-COVERAGE_COMMAND := llvm-cov-7 gcov -n
-
-# libraries locations
-LIBS_LOCATION :=
-MAIN_LIBS_LOCATION :=
-TEST_LIBS_LOCATION :=
-
-# ^ Settings to be changed per-project ^
-# ^ ^ ^ ^ ^ ^ ^ ^ ^ ^^^^ ^ ^ ^ ^ ^ ^ ^ ^ 
-
-SRC_DIR := $(ROOT_DIR)/src
-INCLUDE_DIR := $(ROOT_DIR)/include
-BUILD_DIR := $(ROOT_DIR)/build
-OBJ_DIR := $(BUILD_DIR)/objects
-APP_DIR := $(BUILD_DIR)/app
-TEST_OBJ_DIR := $(BUILD_DIR)/tests
-TEST_SRC_DIR := $(ROOT_DIR)/tests
-
-# targets and pre-requisites
-SRC := $(wildcard $(SRC_DIR)/*/*.$(SRC_FILE_EXTENSION))
-OBJECTS := $(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o)
-
-TESTS_SRC := $(wildcard $(TEST_SRC_DIR)/*/*.$(TEST_FILE_EXTENSION))
-TESTS_OBJ := $(TESTS_SRC:$(TEST_SRC_DIR)/%.$(TEST_FILE_EXTENSION)=$(TEST_OBJ_DIR)/%.o)
-
-TARGET_LIB := lib$(TARGET).so
-
-MAIN := $(ROOT_DIR)/$(TARGET).$(SRC_FILE_EXTENSION)
-
-# libraries (without -l)
-MAIN_LIBS := $(TARGET) $(MAIN_LIBS)
-
-# target with address
-TARGET := $(ROOT_DIR)/$(TARGET)
-
-# libraries location
-LIBS_LOCATION :=
-MAIN_LIBS_LOCATION :=$(APP_DIR) $(MAIN_LIB_LOCATION) 
-
-# libraries directories
-LIBS_DIR_LOCATION := $(LIBS_LOCATION)
-MAIN_LIBS_DIR_LOCATION := $(MAIN_LIBS_LOCATION)
-
-# libraries settings
-LIBS_LOCATION := $(addprefix -L,$(LIBS_LOCATION))
-MAIN_LIBS_LOCATION := $(addprefix -L,$(MAIN_LIBS_LOCATION))
-TEST_LIBS_LOCATION := $(addprefix -L,$(TEST_LIBS_LOCATION))
-
-# compiler settings
-LDFLAGS =
-INCLUDE := -I$(INCLUDE_DIR)
-
-LIBS := $(LIBS_LOCATION) $(addprefix -l,$(LIBS))
-MAIN_LIBS := $(MAIN_LIBS_LOCATION) $(addprefix -l,$(MAIN_LIBS))
-TEST_LIBS := $(TEST_LIBS_LOCATION) $(addprefix -l,$(TEST_LIBS))
-
-# final preparations (don't change this)
-TARGET_LIB_FINAL := $(APP_DIR)/$(TARGET_LIB)
-TEST_TARGET_FINAL := $(ROOT_DIR)/$(TEST_TARGET)
-
-# tests, static analysis and code coverage
-VALGRIND_COMMAND:=valgrind -q --exit-on-first-error=yes --error-exitcode=1 --tool=memcheck\
-		--show-reachable=yes --leak-check=yes --track-origins=yes
-GCOV_COMMAND:=$(COVERAGE_COMMAND) $(TESTS_OBJ) $(OBJECTS) 2>/dev/null | grep -Eo "('.*'|[[:digit:]]{1,3}.[[:digit:]]{2}%)" | paste -d " " - - | sort -k2 -nr
-UNTESTED_DETECTOR_COMMAND:=$(GCOV_COMMAND) | grep -v "100.00%" | grep -v "^'tests/" | awk '{ print "\x1b[38;2;255;25;25;1m" $$1 " \x1b[0m\x1b[38;2;255;100;100;1m" $$2 "\x1b[0m" }'
-COVERAGE_COMMAND:=@$(UNTESTED_DETECTOR_COMMAND); $(GCOV_COMMAND) | awk '{ sum += $$2; count[NR] = $$2 } END { if(NR%2) { median=count[(NR+1)/2]; } else { median=count[NR/2]; } if( NR==0 ) { NR=1; } print "\x1b[32mCode Coverage\x1b[0m:\n\t\x1b[33mAverage\x1b[0m: " sum/NR "%\n\x1b[35m\tMedian\x1b[0m: " median  }'
-RUN_TESTS_COMMAND:=@$(VALGRIND_COMMAND) $(TEST_TARGET_FINAL) #--gtest_color=1 | grep -Pv "^\x1b\[0;32m" | grep -v "^$$"
-STATIC_ANALYSIS_COMMAND:=@cppcheck --addon=cert --addon=threadsafety --addon=naming \
-	$(INCLUDE) --suppress=missingIncludeSystem --suppress=unusedFunction --suppress=knownConditionTrueFalse --quiet --enable=all $(SRC) $(TESTS_SRC)
-
-SHELL := /bin/bash
-.PHONY: help clean debug release main
-
+.PHONY: test lib debug build run coverage avg loc compile_flags docs init clean clean-objs help
 help:
-	# release - produce optimized lib
-	# compilemain - produce main
-	# main - produce main and run it
-	# debug - produce lib with debug info and run tests
-	# clean - clean produced binaries
-	# clangd - generate compile_flags.txt file for clangd
-plot:
-	gnuplot -e "plot '$(TEST_SRC_DIR)/report_rm_1.plt' using 1:2 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_1.plt' using 1:3 with lines,\
-		'$(TEST_SRC_DIR)/report_rm_1.plt' using 1:4 with lines;\
-		pause -1 \"Hit any key to continue\""
+	# This Makefile can produce a dynamic library, test binary and main executable for C/C++ projects.
 
-clangd:
+	# The only prerequisite is that you must have this project structure:
+	# myproject/
+	# ├── Makefile
+	# ├── main.c (optional)
+	# ├── include/
+	# ├── src/ (can contain one level of subfolders)
+	# └── tests/ (can contain one level of subfolders)
+
+	# the available commands in this Makefile are:
+	# test - build and run tests with debug flags and debugger
+	# lib - build dynamic lib for release
+	# debug - build and run main executable (if you have one) with debug flags and debugger
+	# build - build main executable for release (if you have one)
+	# run - build and run main executable for release (if you have one)
+	# coverage - run code coverage command
+	# avg - shows average code coverage from percentages displayed by coverage command to stdout
+	# loc - show sum of lines in the src/ and include/ directories
+	# compile_flags - generate compile_flags.txt file for clangd lsp
+	# docs - generate documentation
+	# init - create minimal project structure in current folder (src/, tests/, include/)
+	# clean - remove build/ (folder where targets are stored)
+	# clean-objs - remove build/ subfolder with objects generate from src/
+	# help - show this help
+
+# compilation variables to be set per project
+# v v v v v v v v v v v v v v v v v v v v v v
+
+# compiler being used
+COMPILER :=clang
+
+# flags that will be used in every compilation command
+FLAGS :=-std=c99
+
+# command used to generate documentation (you can leave it empty)
+DOCUMENTATION_COMMAND :=
+
+# target name. Will be used to name the library, executable
+# and test binaries:
+# build/lib/libtarget.so, build/main/target, build/tests/target_test
+TARGET :=watermark
+
+# debugger command to run when debugging (you can leave it empty)
+DEBUGGER_COMMAND :=valgrind --leak-check=full --exit-on-first-error=yes --error-exitcode=1 --quiet
+
+# code coverage command to use (you can leave it empty)
+CODE_COVERAGE_COMMAND :=llvm-cov-11 gcov -n
+
+# these can be either c or cpp
+TESTS_FILE_EXTENSION :=c
+SRC_FILE_EXTENSION :=c
+
+# libraries to link against (without -l)
+GENERAL_LIBS :=
+MAIN_LIBS :=
+TESTS_LIBS :=
+
+# libs location (if they are system libs, just leave it empty)
+GENERAL_LIBS_LOCATION :=
+MAIN_LIBS_LOCATION :=
+TESTS_LIBS_LOCATION :=
+
+# additional headers location
+GENERAL_HEADERS_LOCATION :=
+MAIN_HEADERS_LOCATION :=
+TESTS_HEADERS_LOCATION :=./tests
+
+# general flags
+FLAGS := -pedantic-errors -Wall -Wextra -fPIC -Werror
+DEBUG_FLAGS :=-DDEBUG -O0 -g
+RELEASE_FLAGS :=-O3 -DNDEBUG
+TESTS_FLAGS :=--coverage
+
+# ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+# compilation variables to be set per project
+
+# define directories
+ROOT_DIR :=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SRC_DIR :=$(ROOT_DIR)/src
+INCLUDE_DIR :=$(ROOT_DIR)/include
+BUILD_DIR :=$(ROOT_DIR)/build
+OBJ_DIR :=$(BUILD_DIR)/objs
+MAIN_DIR :=$(BUILD_DIR)/main
+LIB_DIR :=$(BUILD_DIR)/lib
+TESTS_MAIN_DIR :=$(BUILD_DIR)/tests
+TESTS_SRC_DIR :=$(ROOT_DIR)/tests
+TESTS_OBJ_DIR :=$(TESTS_MAIN_DIR)/objs
+
+# define sources
+SRC :=$(wildcard $(SRC_DIR)/*.$(SRC_FILE_EXTENSION)) $(wildcard $(SRC_DIR)/*/*.$(SRC_FILE_EXTENSION))
+SRC :=$(wildcard $(SRC_DIR)/*.$(SRC_FILE_EXTENSION)) $(wildcard $(SRC_DIR)/*/*.$(SRC_FILE_EXTENSION))
+TESTS_SRC :=$(wildcard $(TESTS_SRC_DIR)/*.$(TESTS_FILE_EXTENSION)) $(wildcard $(TESTS_SRC_DIR)/*/*.$(TESTS_FILE_EXTENSION))
+MAIN_SRC :=$(ROOT_DIR)/$(TARGET).$(SRC_FILE_EXTENSION)
+
+# define targets
+TARGET_LIB :=$(LIB_DIR)/lib$(TARGET).so
+TARGET_MAIN :=$(MAIN_DIR)/$(TARGET)
+TARGET_TESTS :=$(TESTS_MAIN_DIR)/$(TARGET)_tests
+
+# define intermediary objects
+SRC_OBJS :=$(SRC:$(SRC_DIR)/%.$(SRC_FILE_EXTENSION)=$(OBJ_DIR)/%.o)
+TESTS_OBJS := $(TESTS_SRC:$(TESTS_SRC_DIR)/%.$(TESTS_FILE_EXTENSION)=$(TESTS_OBJ_DIR)/%.o)
+
+# add -l to library names
+GENERAL_LIBS :=$(addprefix -l,$(GENERAL_LIBS))
+MAIN_LIBS :=$(addprefix -l,$(MAIN_LIBS)) $(GENERAL_LIBS)
+TESTS_LIBS :=$(addprefix -l,$(TESTS_LIBS)) $(GENERAL_LIBS)
+
+# add -L to library directories
+GENERAL_LIBS_LOCATION :=$(addprefix -L,$(GENERAL_LIBS_LOCATION))
+MAIN_LIBS_LOCATION :=$(addprefix -L,$(MAIN_LIBS_LOCATION)) $(GENERAL_LIBS_LOCATION)
+TESTS_LIBS_LOCATION :=$(addprefix -L,$(TESTS_LIBS)) $(GENERAL_LIBS_LOCATION)
+
+# add -I to header directories
+GENERAL_HEADERS_LOCATION_WITH_FLAG :=$(addprefix -I,$(GENERAL_HEADERS_LOCATION)) $(addprefix -I,$(INCLUDE_DIR))
+MAIN_HEADERS_LOCATION_WITH_FLAG :=$(addprefix -I,$(MAIN_HEADERS_LOCATION)) $(GENERAL_HEADERS_LOCATION_WITH_FLAG)
+TESTS_HEADERS_LOCATION_WITH_FLAG :=$(addprefix -I,$(TESTS_HEADERS_LOCATION)) $(GENERAL_HEADERS_LOCATION_WITH_FLAG)
+
+# build objects
+$(SRC_OBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(FLAGS) $(GENERAL_HEADERS_LOCATION_WITH_FLAG) $< -c -o $@ $(GENERAL_LIBS_LOCATION) $(GENERAL_LIBS)
+
+# build tests objects
+$(TESTS_OBJS): $(SRC_OBJS)
+$(TESTS_OBJS): $(TESTS_OBJ_DIR)/%.o: $(TESTS_SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(FLAGS) $(TESTS_HEADERS_LOCATION_WITH_FLAG) $< -c -o $@ $(TESTS_LIBS_LOCATION) $(TESTS_LIBS)
+
+# build lib
+$(TARGET_LIB): $(SRC_OBJS)
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(FLAGS) $(GENERAL_HEADERS_LOCATION_WITH_FLAG) $^ -shared -o $@
+	$(MAKE) -C $(ROOT_DIR) clean-objs
+
+# build tests executable
+$(TARGET_TESTS): $(TESTS_OBJS)
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(FLAGS) $(TESTS_HEADERS_LOCATION_WITH_FLAG) $(SRC_OBJS) $^ -o $@
+
+# build main
+$(TARGET_MAIN): $(SRC_OBJS) $(MAIN_SRC)
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(FLAGS) $(MAIN_HEADERS_LOCATION_WITH_FLAG) $^ -o $@ $(MAIN_LIBS_LOCATION) $(MAIN_LIBS)
+	$(MAKE) -C $(ROOT_DIR) clean-objs
+
+# main commands
+lib: clean
+lib: FLAGS+=$(RELEASE_FLAGS)
+lib: $(TARGET_LIB)
+
+test: FLAGS+=$(DEBUG_FLAGS) $(TESTS_FLAGS)
+test: $(TARGET_TESTS)
+	$(DEBUGGER_COMMAND) $(TARGET_TESTS)
+
+debug: FLAGS+=$(DEBUG_FLAGS)
+debug: $(SRC_OBJS) $(TARGET_MAIN)
+	$(DEBUGGER_COMMAND) $(TARGET_MAIN)
+
+build: clean
+build: FLAGS+=$(RELEASE_FLAGS)
+build: $(SRC_OBJS) $(TARGET_MAIN)
+
+run: build
+	$(TARGET_MAIN)
+
+coverage:
+	@$(CODE_COVERAGE_COMMAND) $(SRC_OBJS)
+
+avg:
+	@$(MAKE) coverage | grep -Eo "[[:digit:]]{0,3}\.[[:digit:]]{0,2}%" | \
+		sed 's/%//' | \
+		awk -v CONVFMT=%.4g '{ s+=$$1 } END { print s/NR "%" }'
+loc:
+	@find $(SRC_DIR) $(INCLUDE_DIR) -exec cat {} + 2>/dev/null | grep -Ev "(^$$)|(^//)|(^/\*)" | wc -l
+
+compile_flags:
 	@echo "-I" > $(ROOT_DIR)/compile_flags.txt
 	@echo "$(INCLUDE_DIR)" >> $(ROOT_DIR)/compile_flags.txt
+	@for folder in $(TESTS_HEADERS_LOCATION) $(MAIN_HEADERS_LOCATION); do\
+		echo "-I" >> $(ROOT_DIR)/compile_flags.txt;\
+		echo $$folder >> $(ROOT_DIR)/compile_flags.txt;\
+	done
 	@echo "-DDEBUG" >> $(ROOT_DIR)/compile_flags.txt
-	@for opt in $(CFLAGS); do\
+	@for opt in $(FLAGS); do\
 		echo $$opt >> $(ROOT_DIR)/compile_flags.txt;\
 	done
 
-release: CFLAGS += -O2
-release: | clean lib 
+docs: 
+	$(DOCUMENTATION_COMMAND)
 
-compilemain: LDFLAGS += $(MAIN_LIBS)
-compilemain: release
-	@$(CC) $(CFLAGS) $(INCLUDE) $(MAIN) -o $(TARGET) $(LDFLAGS)
-
-# main: CFLAGS += -DDEBUG -g
-main: compilemain
-	#LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(VALGRIND_COMMAND) $(TARGET)
-	LD_LIBRARY_PATH=$(MAIN_LIBS_DIR_LOCATION) $(TARGET)
-
-lib: folders $(TARGET_LIB_FINAL)
-
-debug: CFLAGS += -DDEBUG -g -O0 -fprofile-arcs -ftest-coverage
-debug: LDFLAGS = $(LIBS) $(TEST_LIBS) --coverage
-debug: $(TESTS_OBJ) test lib
-
-test: $(TESTS_OBJ) $(OBJECTS) 
-	@$(CC) $(CFLAGS) $(INCLUDE) -o $(TEST_TARGET_FINAL) $^ $(LDFLAGS)
-	@#$(STATIC_ANALYSIS_COMMAND)
-	$(RUN_TESTS_COMMAND)
-	$(COVERAGE_COMMAND)
-
-folders:
-	@mkdir -p $(APP_DIR)
-	@mkdir -p $(OBJ_DIR)
-	@mkdir -p $(TEST_OBJ_DIR)
-
+init:
+	@mkdir -p $(INCLUDE_DIR)
+	@mkdir -p $(SRC_DIR)
+	@mkdir -p $(TESTS_SRC_DIR)
 clean:
-	# removed build/ directory, $(TEST_TARGET_FINAL) and $(TARGET)
-	-@rm -rf $(BUILD_DIR)
-	-@rm -f $(TEST_TARGET_FINAL)
-	-@rm -f $(TARGET)
+	@-rm -rf $(BUILD_DIR)
 
-$(TARGET_LIB_FINAL): $(OBJECTS)
-	@mkdir -p $(@D)
-	@$(CC) $(CFLAGS) -shared -o $(TARGET_LIB_FINAL) $^ $(LDFLAGS)
+# clean build/objs/ to avoid debugging objects with release flags later or build for release with debug flags
+clean-objs:
+	@-rm -rf $(OBJ_DIR)
 
-$(OBJECTS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.$(SRC_FILE_EXTENSION)
-	@mkdir -p $(@D)
-	@$(CC) $(CFLAGS) $(INCLUDE) $(COVERAGE) -c $< -o $@
-
-$(TESTS_OBJ): $(OBJECTS)
-$(TESTS_OBJ): $(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.$(TEST_FILE_EXTENSION)
-	@mkdir -p $(@D)
-	@$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@

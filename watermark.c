@@ -189,14 +189,12 @@ unsigned long _test_with_removed_connections(
     for(CONN_LIST* l = conns; l; l = l->next) {
       graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
 #ifdef DEBUG
-#ifdef VERBOSE
       if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
         printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
       } else {
         has_forward_removal = 1;
         printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
       }
-#endif
 #endif
     }
 
@@ -231,12 +229,11 @@ unsigned long _test_with_removed_connections(
       printf("\n");
       graph_print(copy, NULL);
     } else {
-#ifdef VERBOSE
       for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
         printf("%hhu", get_bit(result, i));
       }
       printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
-#endif
+      if(errors) graph_print(copy, NULL);
     }
 #endif
 
@@ -306,7 +303,7 @@ void attack(METHOD method, unsigned long n_removals, unsigned long n_bits, unsig
         memset(matrix, 0x00, sizeof(matrix));
         for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
-            printf("\n\tnumber of bits: %lu\n\n", current_n_bits);
+            printf("\tnumber of bits: %lu\n", current_n_bits);
             unsigned long lower_bound = get_lower_bound(current_n_bits);
             unsigned long upper_bound = get_upper_bound(current_n_bits);
 

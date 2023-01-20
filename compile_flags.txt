@@ -1,9 +1,10 @@
 -I
-./include
+/home/asimos/Documents/uff/ic/waterwark/software-watermark//include
+-I
+./tests
 -DDEBUG
 -pedantic-errors
 -Wall
 -Wextra
--std=c99
 -fPIC
 -Werror
