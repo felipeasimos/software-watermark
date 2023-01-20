@@ -19,11 +19,11 @@ else
     DIR=$1
 fi
 
-make compilemain
+make build
 
 for filename in $( ls $1 | grep -o ".*\.c" );
 do
-    LD_LIBRARY_PATH=./build/app ./watermark <<< "$OPT
+    ./build/main/watermark <<< "$OPT
     $WATERMARK
     y
     $1/$filename" > $OUTPUT_FILE

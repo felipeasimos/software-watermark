@@ -1,4 +1,6 @@
-# Watermark
+# Software Watermark
+
+This repository explores algorithms for encoding/decoding/embedding/extracting arbitrary binary sequences from and to a function source code's CFG.
 
 Reed-Solomon code from: https://github.com/tierney/reed-solomon.
 
@@ -9,11 +11,12 @@ Reed-Solomon code from: https://github.com/tierney/reed-solomon.
 ```
 1) encode string
 2) encode number
-3) generate graph from dijkstra code
-4) run removal test
-5) run removal test with improved decoding
-6) run removal test with improved decoding and reed solomon
-7) show report matrix
+3) encode number with reed solomon
+4) generate graph from dijkstra code
+5) run removal test
+6) run removal test with improved decoding
+7) run removal test with improved decoding and reed solomon
+8) show report matrix
 ```
 
 ## Library

@@ -460,11 +460,12 @@ int main(void) {
 
     printf("1) encode string\n");
     printf("2) encode number\n");
-    printf("3) generate graph from dijkstra code\n");
-    printf("4) run removal test\n");
-    printf("5) run removal test with improved decoding\n");
-    printf("6) run removal test with improved decoding and reed solomon\n");
-    printf("7) show report matrix\n");
+    printf("3) encode number with reed solomon\n");
+    printf("4) generate graph from dijkstra code\n");
+    printf("5) run removal test\n");
+    printf("6) run removal test with improved decoding\n");
+    printf("7) run removal test with improved decoding and reed solomon\n");
+    printf("8) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -499,6 +500,21 @@ int main(void) {
             return result;
         }
         case 3: {
+            unsigned long n = get_ulong("Input number to encode: ");
+            unsigned long n_parity = get_ulong("number of parity symbols (16bits each): ");
+            invert_byte_sequence((uint8_t*)&n, sizeof(n));
+            GRAPH* g = watermark_rs_encode(&n, sizeof(n), n_parity);
+            char* dijkstra_code = dijkstra_get_code(g);
+            graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
+            graph_print(g, NULL);
+            uint8_t result = ask_for_comparison(dijkstra_code);
+            
+            free(dijkstra_code);
+            graph_free(g);
+
+            return result;
+        }
+        case 4: {
             char* s = get_string("Input dijkstra code: ");
             GRAPH* g = dijkstra_generate(s);
             if(!g) {
@@ -513,7 +529,7 @@ int main(void) {
             free(s);
             break;
         }
-        case 4: {
+        case 5: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
@@ -524,7 +540,7 @@ int main(void) {
             show_report_matrix();
             break;
         }
-        case 5: {
+        case 6: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
@@ -535,7 +551,7 @@ int main(void) {
             show_report_matrix();
             break;
         }
-        case 6: {
+        case 7: {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
@@ -549,7 +565,7 @@ int main(void) {
             show_report_matrix();
             break;           
         }
-        case 7: {
+        case 8: {
             show_report_matrix();
         }
     }
