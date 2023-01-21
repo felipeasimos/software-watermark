@@ -21,7 +21,7 @@ fi
 
 make build
 
-for filename in $( ls $1 | grep -o ".*\.c" );
+for filename in $( find . -name "*.c" );
 do
     ./build/main/watermark <<< "$OPT
     $WATERMARK
