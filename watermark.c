@@ -512,8 +512,8 @@ int main(void) {
             return result;
         }
         case 3: {
-            unsigned long n = get_ulong("Input number to encode: ");
-            unsigned long n_parity = get_ulong("number of parity symbols (16bits each): ");
+            unsigned long n = get_ulong("input number to encode: ");
+            unsigned long n_parity = get_ulong("number of parity symbols: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
             GRAPH* g = watermark_rs_encode(&n, sizeof(n), n_parity);
             char* dijkstra_code = dijkstra_get_code(g);
@@ -567,19 +567,22 @@ int main(void) {
             printf("input maximum number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
-            printf("input maximum number of bits: ");
-            unsigned long n_bits;
-            scanf("%lu", &n_bits);
-            printf("number of parity symbols: ");
+            printf("input maximum number of message symbols (8 bit each): ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            printf("input number of parity symbols (8 bit each): ");
             unsigned long n_parity;
             scanf("%lu", &n_parity);
-            attack(IMPROVED_WITH_RS, n_removals, n_bits, n_parity);
+            attack(IMPROVED_WITH_RS, n_removals, n_symbols * 8, n_parity);
             show_report_matrix();
             break;           
         }
         case 8: {
           unsigned long n_bits, num_bytes;
           uint8_t* data = get_binary_sequence("input message as binary sequence:", &n_bits, &num_bytes);
+          unsigned long n_parity_symbols;
+          printf("input number of parity symbols: ");
+          scanf("%lu", &n_parity_symbols);
           free(data);
           break;
         }

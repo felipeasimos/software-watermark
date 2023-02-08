@@ -198,21 +198,21 @@ void* watermark2014_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
 
     unsigned long data_len;
     uint8_t* data = watermark2014_decode(graph, &data_len);
-    return remove_rs_code(data, data_len, num_parity_symbols);
+    return remove_rs_code8(data, data_len, num_parity_symbols);
 }
 
 void* watermark_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
 
     unsigned long data_len;
     uint8_t* data = watermark_decode(graph, &data_len);
-    return remove_rs_code(data, data_len, num_parity_symbols);
+    return remove_rs_code8(data, data_len, num_parity_symbols);
 }
 
 void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_bytes, unsigned long num_parity_symbols) {
 
   void* key_with_parity = append_rs_code(key, num_bytes, num_parity_symbols);
   uint8_t* data = watermark_decode_improved(graph, key_with_parity, num_bytes);
-  void* result = remove_rs_code(data, *num_bytes, &num_parity_symbols);
+  void* result = remove_rs_code8(data, *num_bytes, &num_parity_symbols);
   *num_bytes = num_parity_symbols;
   free(key_with_parity);
   return result;

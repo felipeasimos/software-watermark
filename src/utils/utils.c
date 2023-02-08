@@ -250,7 +250,7 @@ void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_pari
 
     uint8_t parity[num_parity_symbols];
     memset(parity, 0x00, sizeof(parity));
-    rs_encode(data, *data_len, parity, num_parity_symbols);
+    rs_encode8(data, *data_len, parity, num_parity_symbols);
 
     unsigned long new_len = (*data_len) + num_parity_symbols;
     uint8_t* data_with_parity = malloc(new_len);

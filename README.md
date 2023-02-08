@@ -3,7 +3,6 @@
 This repository explores algorithms for encoding/decoding/embedding/extracting arbitrary binary sequences from and to a function source code's CFG.
 
 Reed-Solomon (rs-api) code from: https://github.com/tierney/reed-solomon.
-Reed-Solomon (rscode) code from: https://github.com/hqm/rscode.
 
 ## How to Run
 
