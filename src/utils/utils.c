@@ -248,14 +248,14 @@ unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsign
 
 void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
 
-    uint16_t parity[num_parity_symbols];
+    uint8_t parity[num_parity_symbols];
     memset(parity, 0x00, sizeof(parity));
     rs_encode(data, *data_len, parity, num_parity_symbols);
 
-    unsigned long new_len = (*data_len) + num_parity_symbols * sizeof(uint16_t);
+    unsigned long new_len = (*data_len) + num_parity_symbols;
     uint8_t* data_with_parity = malloc(new_len);
     memcpy(data_with_parity, data, *data_len);
-    memcpy(data_with_parity+(*data_len), parity, num_parity_symbols * sizeof(uint16_t));
+    memcpy(data_with_parity+(*data_len), parity, num_parity_symbols);
     *data_len = new_len;
     return data_with_parity;
 }

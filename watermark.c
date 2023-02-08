@@ -12,9 +12,6 @@
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
-#define MAX_N_BITS 12
-#define MAX_N_SYMBOLS 5
-#define MAX_RS_REMOVALS 4
 #define SIZE_PERCENTAGE 0.8
 
 #define MATCH 1
@@ -456,6 +453,19 @@ char* get_string(const char* msg) {
     return s;
 }
 
+uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned long* num_bytes) {
+    printf("%s", msg);
+    char bin_char[MAX_SIZE+1]={0};
+    int res = scanf("%" MAX_SIZE_STR "[01]", bin_char);
+    if(res != 1) return NULL;
+    *n_bits = strlen(bin_char);
+    uint8_t bin_u8[*n_bits];
+    for(unsigned int i = 0; i < *n_bits; i++) {
+      bin_u8[i] = bin_char[i] - '0';
+    }
+    return get_sequence_from_bit_arr(bin_u8, *n_bits, num_bytes);
+}
+
 int main(void) {
 
     printf("1) encode string\n");
@@ -465,7 +475,9 @@ int main(void) {
     printf("5) run removal test\n");
     printf("6) run removal test with improved decoding\n");
     printf("7) run removal test with improved decoding and reed solomon\n");
-    printf("8) show report matrix\n");
+    printf("8) reed solomon encode\n");
+    printf("9) reed solomon decode\n");
+    printf("10) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -566,6 +578,16 @@ int main(void) {
             break;           
         }
         case 8: {
+          unsigned long n_bits, num_bytes;
+          uint8_t* data = get_binary_sequence("input message as binary sequence:", &n_bits, &num_bytes);
+          free(data);
+          break;
+        }
+        case 9: {
+
+          break;
+        }
+        case 10: {
             show_report_matrix();
         }
     }
