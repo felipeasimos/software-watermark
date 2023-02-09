@@ -70,12 +70,16 @@ uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsig
 uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_bytes1, unsigned long num_bytes2);
 void* encode_numeric_string(char* string, unsigned long* data_len);
 void* decode_numeric_string(void* data, unsigned long* data_len);
+unsigned long get_number_of_left_zeros(uint8_t* data, unsigned long data_len);
+unsigned long get_number_of_right_zeros(uint8_t* data, unsigned long data_len);
+void remove_left_zeros(uint8_t* data, unsigned long* data_len);
 
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 
 // rs
-void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols);
+void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_parity_symbols);
+void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols, unsigned long symsize);
 
 #endif

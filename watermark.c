@@ -292,51 +292,48 @@ void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
     _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
 }
 
-void attack(METHOD method, unsigned long n_removals, unsigned long n_bits, unsigned long n_parity_symbols) {
+void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols) {
 
-    for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
+    unsigned long matrix[n_bits][n_bits];
+    memset(matrix, 0x00, sizeof(matrix));
+    for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
-        unsigned long matrix[n_bits][n_bits];
-        memset(matrix, 0x00, sizeof(matrix));
-        for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
+        printf("\tnumber of bits: %lu\n", current_n_bits);
+        unsigned long lower_bound = get_lower_bound(current_n_bits);
+        unsigned long upper_bound = get_upper_bound(current_n_bits);
 
-            printf("\tnumber of bits: %lu\n", current_n_bits);
-            unsigned long lower_bound = get_lower_bound(current_n_bits);
-            unsigned long upper_bound = get_upper_bound(current_n_bits);
+        for(unsigned long i = lower_bound; i < upper_bound; i++) {
 
-            for(unsigned long i = lower_bound; i < upper_bound; i++) {
+            STATISTICS statistics = {0};
 
-                STATISTICS statistics = {0};
+            unsigned long identifier = invert_unsigned_long(i);
+            unsigned long identifier_len = sizeof(unsigned long);
 
-                unsigned long identifier = invert_unsigned_long(i);
-                unsigned long identifier_len = sizeof(unsigned long);
-
-                GRAPH* graph = NULL;
-                if(method == IMPROVED_WITH_RS) {
-                  graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
-                } else {
-                  graph = watermark_encode(&identifier, identifier_len);
-                }
-
-                ATTACK attack = {
-                  .n_removals = n_removal,
-                  .n_parity_symbols = n_parity_symbols,
-                  .n_bits = current_n_bits,
-                  .graph = graph,
-                  .identifier = &identifier,
-                  .identifier_len = identifier_len,
-                  .method = method,
-                };
-
-                multiple_removal_test(&attack, &statistics);
-
-                graph_free(graph);
-
-                matrix[statistics.worst_case][current_n_bits-1]++;
+            GRAPH* graph = NULL;
+            if(method == IMPROVED_WITH_RS) {
+              graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
+            } else {
+              graph = watermark_encode(&identifier, identifier_len);
             }
+
+            ATTACK attack = {
+              .n_removals = n_removal,
+              .n_parity_symbols = n_parity_symbols,
+              .n_bits = current_n_bits,
+              .graph = graph,
+              .identifier = &identifier,
+              .identifier_len = identifier_len,
+              .method = method,
+            };
+
+            multiple_removal_test(&attack, &statistics);
+
+            graph_free(graph);
+
+            matrix[statistics.worst_case][current_n_bits-1]++;
         }
-        write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
     }
+    write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
 }
 
 int ask_for_comparison(char* dijkstra_code) {
@@ -542,7 +539,7 @@ int main(void) {
             break;
         }
         case 5: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
@@ -553,7 +550,7 @@ int main(void) {
             break;
         }
         case 6: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
@@ -564,7 +561,7 @@ int main(void) {
             break;
         }
         case 7: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of message symbols (8 bit each): ");
@@ -583,11 +580,12 @@ int main(void) {
           unsigned long n_parity_symbols;
           printf("input number of parity symbols: ");
           scanf("%lu", &n_parity_symbols);
+          
           free(data);
           break;
         }
         case 9: {
-
+          
           break;
         }
         case 10: {

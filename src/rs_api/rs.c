@@ -23,11 +23,35 @@ void rs_encode8(uint8_t* data, int data_len, uint8_t* parity, int number_of_pari
 	free_rs(rs);
 }
 
+void rs_encode(uint8_t* data, int data_len, uint8_t* parity, int number_of_parity_symbols, int symsize) {
+  struct rs_control* rs = get_rs_struct(symsize, number_of_parity_symbols);
+
+  uint16_t parity16[number_of_parity_symbols];
+  memset(parity16, 0x00, sizeof(uint16_t) * number_of_parity_symbols);
+	encode_rs8(rs, data, data_len, parity16, 0);
+  for(int i = 0; i < number_of_parity_symbols; i++) parity[i] = parity16[i];
+
+  free_rs(rs);
+}
+
 // give data, data_len, parity and parity_len, data array is changed to correct errors
 // if errors can't be corrected, -1 is returned, otherwise number of errors is returned (can be 0)
 int rs_decode8(uint8_t* data, int data_len, uint8_t* parity, int number_of_parity_symbols) {
 
 	struct rs_control* rs = get_rs_struct(8, number_of_parity_symbols);
+
+  uint16_t parity16[number_of_parity_symbols];
+  for(int i = 0; i < number_of_parity_symbols; i++) parity16[i] = parity[i];
+	int numerr = decode_rs8(rs, data, parity16, data_len, NULL, 0, NULL, 0, NULL);
+
+	free_rs(rs);
+
+	return numerr == -74 ? -1 : numerr;
+}
+
+int rs_decode(uint8_t* data, int data_len, uint8_t* parity, int number_of_parity_symbols, int symsize) {
+
+	struct rs_control* rs = get_rs_struct(symsize, number_of_parity_symbols);
 
   uint16_t parity16[number_of_parity_symbols];
   for(int i = 0; i < number_of_parity_symbols; i++) parity16[i] = parity[i];

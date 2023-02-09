@@ -176,6 +176,44 @@ void* encode_numeric_string(char* string, unsigned long* data_len) {
     return data;
 }
 
+unsigned long get_number_of_left_zeros(uint8_t* data, unsigned long data_len) {
+  unsigned long byte_idx = 0;
+  while(!data[byte_idx] && byte_idx < data_len) byte_idx++;
+  // check if its all zeros
+  if(byte_idx == data_len - 1 && !data[byte_idx]) return data_len * 8;
+  uint8_t bit_idx = 0;
+  while(!get_bit(&data[byte_idx], bit_idx) && bit_idx < 8) bit_idx++;
+  return byte_idx * 8 + bit_idx;
+}
+
+unsigned long get_number_of_right_zeros(uint8_t* data, unsigned long data_len) {
+  unsigned long byte_idx = 0;
+  while(!data[data_len - byte_idx - 1] && byte_idx < data_len) byte_idx++;
+  byte_idx = data_len - byte_idx - 1;
+  // check if its all zeros
+  if(byte_idx == 0 && !data[byte_idx]) return data_len * 8;
+  uint8_t bit_idx = 0;
+  while(!get_bit(&data[byte_idx], 7 - bit_idx) && bit_idx < 8) bit_idx++;
+  byte_idx = data_len - byte_idx - 1;
+  return byte_idx * 8 + bit_idx;
+}
+
+void remove_left_zeros(uint8_t* data, unsigned long* data_len) {
+  unsigned long n_left_zeros = get_number_of_left_zeros(data, *data_len);
+
+  unsigned long n_bits = (*data_len) * 8;
+
+  // iterate over non-left-zero part of the sequence, throwing its values
+  // back to the beginning
+  unsigned long cursor = 0;
+  for(unsigned long i = n_left_zeros; i < n_bits; i++) {
+    set_bit(data, cursor, get_bit(data, i));
+    cursor++;
+  }
+  // calculate new data_len
+  *data_len = (n_bits - n_left_zeros) / 8 + !!n_left_zeros;
+}
+
 void* decode_numeric_string(void* data, unsigned long* data_len) {
 
     unsigned long num_bits = *data_len * 8;
@@ -246,7 +284,7 @@ unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsign
     return backedge_idx;
 }
 
-void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
+void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
 
     uint8_t parity[num_parity_symbols];
     memset(parity, 0x00, sizeof(parity));
@@ -258,4 +296,18 @@ void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_pari
     memcpy(data_with_parity+(*data_len), parity, num_parity_symbols);
     *data_len = new_len;
     return data_with_parity;
+}
+
+void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols, unsigned long symsize) {
+ 
+    uint8_t parity[num_parity_symbols];
+    memset(parity, 0x00, sizeof(parity));
+    rs_encode(data, *data_len, parity, num_parity_symbols, symsize);
+
+    unsigned long new_len = (*data_len) + num_parity_symbols;
+    uint8_t* data_with_parity = malloc(new_len);
+    memcpy(data_with_parity, data, *data_len);
+    memcpy(data_with_parity+(*data_len), parity, num_parity_symbols);
+    *data_len = new_len;
+    return data_with_parity; 
 }
