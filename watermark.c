@@ -1,20 +1,20 @@
 #include "decoder/decoder.h"
 #include "encoder/encoder.h"
-#include "checker/checker.h"
-#include "set/set.h"
 #include "code_generation/code_generation.h"
 #include "sequence_alignment/sequence_alignment.h"
 #include "dijkstra/dijkstra.h"
 #include <dirent.h>
+#if defined(_OPENMP)
+  #include <omp.h>
+#else
+  #include <time.h>
+#endif
 
 #define MAX_SIZE 4095
 #define STRINGIFY_(x) #x
 #define STRINGIFY(x) STRINGIFY_(x)
 #define MAX_SIZE_STR STRINGIFY(MAX_SIZE)
 
-#define MAX_N_BITS 12
-#define MAX_N_SYMBOLS 5
-#define MAX_RS_REMOVALS 4
 #define SIZE_PERCENTAGE 0.8
 
 #define MATCH 1
@@ -295,51 +295,73 @@ void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
     _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
 }
 
-void attack(METHOD method, unsigned long n_removals, unsigned long n_bits, unsigned long n_parity_symbols) {
+void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols) {
 
-    for(unsigned long n_removal = 1; n_removal <= n_removals; n_removal++) {
+    unsigned long matrix[n_bits][n_bits];
+    memset(matrix, 0x00, sizeof(matrix));
+  #if defined(_OPENMP)
+    omp_set_num_threads(4);
+    printf("openmp is being used.\n");
+  #else
+    printf("openmp is not being used.\n");
+  #endif
 
-        unsigned long matrix[n_bits][n_bits];
-        memset(matrix, 0x00, sizeof(matrix));
-        for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
+    for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
-            printf("\tnumber of bits: %lu\n", current_n_bits);
-            unsigned long lower_bound = get_lower_bound(current_n_bits);
-            unsigned long upper_bound = get_upper_bound(current_n_bits);
+        printf("\tnumber of bits: %lu", current_n_bits);
+        #if defined(_OPENMP)
+          double start = omp_get_wtime();
+        #else
+          clock_t start = clock();
+        #endif
+        unsigned long lower_bound = get_lower_bound(current_n_bits);
+        unsigned long upper_bound = get_upper_bound(current_n_bits);
 
-            for(unsigned long i = lower_bound; i < upper_bound; i++) {
+        #if defined(_OPENMP)
+          #pragma omp parallel for schedule(dynamic)
+        #endif
+        for(unsigned long i = lower_bound; i < upper_bound; i++) {
 
-                STATISTICS statistics = {0};
+            STATISTICS statistics = {0};
 
-                unsigned long identifier = invert_unsigned_long(i);
-                unsigned long identifier_len = sizeof(unsigned long);
+            unsigned long identifier = invert_unsigned_long(i);
+            unsigned long identifier_len = sizeof(unsigned long);
 
-                GRAPH* graph = NULL;
-                if(method == IMPROVED_WITH_RS) {
-                  graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
-                } else {
-                  graph = watermark_encode(&identifier, identifier_len);
-                }
+            GRAPH* graph = NULL;
+            if(method == IMPROVED_WITH_RS) {
+                graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
+            } else {
+              graph = watermark_encode(&identifier, identifier_len);
+            }
 
-                ATTACK attack = {
-                  .n_removals = n_removal,
-                  .n_parity_symbols = n_parity_symbols,
-                  .n_bits = current_n_bits,
-                  .graph = graph,
-                  .identifier = &identifier,
-                  .identifier_len = identifier_len,
-                  .method = method,
-                };
+            ATTACK attack = {
+              .n_removals = n_removal,
+              .n_parity_symbols = n_parity_symbols,
+              .n_bits = current_n_bits,
+              .graph = graph,
+              .identifier = &identifier,
+              .identifier_len = identifier_len,
+              .method = method,
+            };
 
-                multiple_removal_test(&attack, &statistics);
+            multiple_removal_test(&attack, &statistics);
 
-                graph_free(graph);
+            graph_free(graph);
 
-                matrix[statistics.worst_case][current_n_bits-1]++;
+            #pragma omp critical
+            { 
+              matrix[statistics.worst_case][current_n_bits-1]++;
             }
         }
-        write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
+        #if defined(_OPENMP)
+          double duration = omp_get_wtime() - start;
+          printf(" - %F secs\n", current_n_bits, duration);
+        #else
+          clock_t duration = clock() - start;
+          printf(" - %F secs\n", duration / (double) CLOCKS_PER_SEC);
+        #endif
     }
+    write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
 }
 
 int ask_for_comparison(char* dijkstra_code) {
@@ -456,6 +478,19 @@ char* get_string(const char* msg) {
     return s;
 }
 
+uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned long* num_bytes) {
+    printf("%s", msg);
+    char bin_char[MAX_SIZE+1]={0};
+    int res = scanf(" %" MAX_SIZE_STR "[01]", bin_char);
+    if(res != 1) return NULL;
+    *n_bits = strlen(bin_char);
+    uint8_t bin_u8[*n_bits];
+    for(unsigned int i = 0; i < *n_bits; i++) {
+      bin_u8[i] = bin_char[i] - '0';
+    }
+    return get_sequence_from_bit_arr(bin_u8, *n_bits, num_bytes);
+}
+
 int main(void) {
 
     printf("1) encode string\n");
@@ -465,7 +500,9 @@ int main(void) {
     printf("5) run removal test\n");
     printf("6) run removal test with improved decoding\n");
     printf("7) run removal test with improved decoding and reed solomon\n");
-    printf("8) show report matrix\n");
+    printf("8) reed solomon encode\n");
+    printf("9) reed solomon decode\n");
+    printf("10) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -500,8 +537,8 @@ int main(void) {
             return result;
         }
         case 3: {
-            unsigned long n = get_ulong("Input number to encode: ");
-            unsigned long n_parity = get_ulong("number of parity symbols (16bits each): ");
+            unsigned long n = get_ulong("input number to encode: ");
+            unsigned long n_parity = get_ulong("number of parity symbols: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
             GRAPH* g = watermark_rs_encode(&n, sizeof(n), n_parity);
             char* dijkstra_code = dijkstra_get_code(g);
@@ -530,7 +567,7 @@ int main(void) {
             break;
         }
         case 5: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
@@ -541,7 +578,7 @@ int main(void) {
             break;
         }
         case 6: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
             printf("input maximum number of bits: ");
@@ -552,20 +589,42 @@ int main(void) {
             break;
         }
         case 7: {
-            printf("input maximum number of removals: ");
+            printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
-            printf("input maximum number of bits: ");
-            unsigned long n_bits;
-            scanf("%lu", &n_bits);
-            printf("number of parity symbols: ");
+            printf("input maximum number of message symbols (8 bit each): ");
+            unsigned long n_symbols;
+            scanf("%lu", &n_symbols);
+            printf("input number of parity symbols (8 bit each): ");
             unsigned long n_parity;
             scanf("%lu", &n_parity);
-            attack(IMPROVED_WITH_RS, n_removals, n_bits, n_parity);
+            attack(IMPROVED_WITH_RS, n_removals, n_symbols * 8, n_parity);
             show_report_matrix();
             break;           
         }
         case 8: {
+          unsigned long n_bits, num_bytes;
+          uint8_t* data = get_binary_sequence("input message as binary sequence: ", &n_bits, &num_bytes);
+          unsigned long n_parity_symbols;
+          printf("input number of parity symbols: ");
+          scanf("%lu", &n_parity_symbols);
+          int symbol_size;
+          printf("input symbol size (1-16): ");
+          scanf("%d", &symbol_size);
+          void* res = append_rs_code(data, &num_bytes, n_parity_symbols, symbol_size);
+          for(unsigned long i = 0; i < num_bytes; i++) {
+            printf("%hhu", get_bit(res, i)); 
+          }
+          printf("\n");
+          
+          free(data);
+          break;
+        }
+        case 9: {
+          
+          break;
+        }
+        case 10: {
             show_report_matrix();
         }
     }

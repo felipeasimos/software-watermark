@@ -177,20 +177,20 @@ uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, un
     unsigned long starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
 
     // get correct parity numbers
-    uint16_t parity[num_parity_symbols];
-    memset(parity, 0x00, num_parity_symbols*2);
-    rs_encode(data, num_bytes, parity, num_parity_symbols);
+    uint8_t parity[num_parity_symbols];
+    memset(parity, 0x00, num_parity_symbols);
+    rs_encode8(data, num_bytes, parity, num_parity_symbols);
 
-    unsigned long data_with_parity_n_bits = num_parity_symbols*2+payload_n_bytes;
-    uint8_t data_with_parity[num_parity_symbols*2+payload_n_bytes];
+    unsigned long data_with_parity_n_bits = num_parity_symbols+payload_n_bytes;
+    uint8_t data_with_parity[num_parity_symbols+payload_n_bytes];
     memcpy(data_with_parity, data, payload_n_bytes);
-    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols*2);
+    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols);
 
     // decode using checker
     unsigned long total_n_bits = data_with_parity_n_bits;
     uint8_t* bits = watermark_check_analysis(graph, data_with_parity, &total_n_bits);
     graph_free_info(graph);
-    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*16;
+    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*8;
 
     // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
     for(unsigned long i = 0; i < payload_n_bits; i++) {
@@ -216,7 +216,7 @@ uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, un
     uint8_t* final_data = get_sequence_from_bit_arr(bits, total_n_bits, &final_data_n_bytes);
     free(bits);
     // get correct rs code
-    final_data = remove_rs_code(final_data, final_data_n_bytes, &num_parity_symbols);
+    final_data = remove_rs_code8(final_data, final_data_n_bytes, &num_parity_symbols);
     uint8_t result = binary_sequence_equal(data, final_data, payload_n_bytes, num_parity_symbols);
     free(final_data);
     return result;
@@ -351,19 +351,19 @@ void* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     unsigned long data_starting_idx = get_first_positive_bit_index(data, payload_n_bytes);
 
     // get correct parity numbers
-    uint16_t parity[num_parity_symbols];
-    memset(parity, 0x00, num_parity_symbols*2);
-    rs_encode(data, *num_bytes, parity, num_parity_symbols);
+    uint8_t parity[num_parity_symbols];
+    memset(parity, 0x00, num_parity_symbols);
+    rs_encode8(data, *num_bytes, parity, num_parity_symbols);
 
-    unsigned long data_with_parity_n_bits = num_parity_symbols*2+payload_n_bytes;
-    uint8_t data_with_parity[num_parity_symbols*2+payload_n_bytes];
+    unsigned long data_with_parity_n_bits = num_parity_symbols+payload_n_bytes;
+    uint8_t data_with_parity[num_parity_symbols+payload_n_bytes];
     memcpy(data_with_parity, data, payload_n_bytes);
-    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols*2);
+    memcpy(data_with_parity+payload_n_bytes, parity, num_parity_symbols);
 
     // decode using checker
     unsigned long total_n_bits = data_with_parity_n_bits;
     uint8_t* bits = watermark_check_analysis(graph, data_with_parity, &total_n_bits);
-    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*16;
+    unsigned long payload_n_bits = total_n_bits - num_parity_symbols*8;
 
     // in the payload, turn 'x' into wrong bit, and ascii numbers into numbers
     for(unsigned long i = 0; i < payload_n_bits; i++) {
@@ -388,7 +388,7 @@ void* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     unsigned long final_data_n_bytes = payload_n_bytes;
     uint8_t* final_data = get_sequence_from_bit_arr(bits, total_n_bits, &final_data_n_bytes);
     // get correct rs code
-    final_data = remove_rs_code(final_data, final_data_n_bytes, &num_parity_symbols);
+    final_data = remove_rs_code8(final_data, final_data_n_bytes, &num_parity_symbols);
 
     unsigned long final_data_len = num_parity_symbols;
 

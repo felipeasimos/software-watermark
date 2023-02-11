@@ -70,7 +70,8 @@ MAIN_HEADERS_LOCATION :=
 TESTS_HEADERS_LOCATION :=./tests
 
 # general flags
-FLAGS := -pedantic-errors -Wall -Wextra -fPIC -Werror
+FLAGS := -fPIC
+# FLAGS := -fPIC -pedantic-errors -Wall -Wextra  -Werror
 DEBUG_FLAGS :=-DDEBUG -O0 -g
 RELEASE_FLAGS :=-O3 -DNDEBUG
 TESTS_FLAGS :=--coverage

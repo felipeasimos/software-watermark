@@ -463,8 +463,8 @@ GRAPH* graph_create_from_dot(FILE* file) {
     HASHMAP* hashmap = hashmap_create(1, 1, NULL);
 
     // get number of nodes
-    char node1[MAX_NODE_NAME_SIZE];
-    char node2[MAX_NODE_NAME_SIZE];
+    char node1[MAX_NODE_NAME_SIZE+1];
+    char node2[MAX_NODE_NAME_SIZE+1];
     int res = 0;
 
     GRAPH* graph = graph_create(HASHMAP_SIZE);
