@@ -1,11 +1,14 @@
 #include "decoder/decoder.h"
 #include "encoder/encoder.h"
-#include "checker/checker.h"
-#include "set/set.h"
 #include "code_generation/code_generation.h"
 #include "sequence_alignment/sequence_alignment.h"
 #include "dijkstra/dijkstra.h"
 #include <dirent.h>
+#if defined(_OPENMP)
+  #include <omp.h>
+#else
+  #include <time.h>
+#endif
 
 #define MAX_SIZE 4095
 #define STRINGIFY_(x) #x
@@ -296,12 +299,27 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
     unsigned long matrix[n_bits][n_bits];
     memset(matrix, 0x00, sizeof(matrix));
+  #if defined(_OPENMP)
+    omp_set_num_threads(4);
+    printf("openmp is being used.\n");
+  #else
+    printf("openmp is not being used.\n");
+  #endif
+
     for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
-        printf("\tnumber of bits: %lu\n", current_n_bits);
+        printf("\tnumber of bits: %lu", current_n_bits);
+        #if defined(_OPENMP)
+          double start = omp_get_wtime();
+        #else
+          clock_t start = clock();
+        #endif
         unsigned long lower_bound = get_lower_bound(current_n_bits);
         unsigned long upper_bound = get_upper_bound(current_n_bits);
 
+        #if defined(_OPENMP)
+          #pragma omp parallel for schedule(dynamic)
+        #endif
         for(unsigned long i = lower_bound; i < upper_bound; i++) {
 
             STATISTICS statistics = {0};
@@ -311,7 +329,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
-              graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
+                graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
             } else {
               graph = watermark_encode(&identifier, identifier_len);
             }
@@ -330,8 +348,18 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
             graph_free(graph);
 
-            matrix[statistics.worst_case][current_n_bits-1]++;
+            #pragma omp critical
+            { 
+              matrix[statistics.worst_case][current_n_bits-1]++;
+            }
         }
+        #if defined(_OPENMP)
+          double duration = omp_get_wtime() - start;
+          printf(" - %F secs\n", current_n_bits, duration);
+        #else
+          clock_t duration = clock() - start;
+          printf(" - %F secs\n", duration / (double) CLOCKS_PER_SEC);
+        #endif
     }
     write_to_report_matrix((unsigned long*)&matrix, n_bits, n_bits);
 }
@@ -453,7 +481,7 @@ char* get_string(const char* msg) {
 uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned long* num_bytes) {
     printf("%s", msg);
     char bin_char[MAX_SIZE+1]={0};
-    int res = scanf("%" MAX_SIZE_STR "[01]", bin_char);
+    int res = scanf(" %" MAX_SIZE_STR "[01]", bin_char);
     if(res != 1) return NULL;
     *n_bits = strlen(bin_char);
     uint8_t bin_u8[*n_bits];
@@ -576,10 +604,18 @@ int main(void) {
         }
         case 8: {
           unsigned long n_bits, num_bytes;
-          uint8_t* data = get_binary_sequence("input message as binary sequence:", &n_bits, &num_bytes);
+          uint8_t* data = get_binary_sequence("input message as binary sequence: ", &n_bits, &num_bytes);
           unsigned long n_parity_symbols;
           printf("input number of parity symbols: ");
           scanf("%lu", &n_parity_symbols);
+          int symbol_size;
+          printf("input symbol size (1-16): ");
+          scanf("%d", &symbol_size);
+          void* res = append_rs_code(data, &num_bytes, n_parity_symbols, symbol_size);
+          for(unsigned long i = 0; i < num_bytes; i++) {
+            printf("%hhu", get_bit(res, i)); 
+          }
+          printf("\n");
           
           free(data);
           break;

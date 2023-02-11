@@ -73,6 +73,8 @@ void* decode_numeric_string(void* data, unsigned long* data_len);
 unsigned long get_number_of_left_zeros(uint8_t* data, unsigned long data_len);
 unsigned long get_number_of_right_zeros(uint8_t* data, unsigned long data_len);
 void remove_left_zeros(uint8_t* data, unsigned long* data_len);
+void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, unsigned long symbol_size);
+void unmerge_arr(void* data, unsigned long num_symbols, unsigned long element_size, unsigned long symbol_size, void* res);
 
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
