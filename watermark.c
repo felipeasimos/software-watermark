@@ -355,7 +355,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
         }
         #if defined(_OPENMP)
           double duration = omp_get_wtime() - start;
-          printf(" - %F secs\n", current_n_bits, duration);
+          printf(" - %F secs\n", duration);
         #else
           clock_t duration = clock() - start;
           printf(" - %F secs\n", duration / (double) CLOCKS_PER_SEC);

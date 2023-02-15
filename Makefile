@@ -31,7 +31,7 @@ help:
 # v v v v v v v v v v v v v v v v v v v v v v
 
 # compiler being used
-COMPILER :=clang
+COMPILER :=clang -fopenmp
 
 # flags that will be used in every compilation command
 FLAGS :=-std=c99
@@ -70,8 +70,8 @@ MAIN_HEADERS_LOCATION :=
 TESTS_HEADERS_LOCATION :=./tests
 
 # general flags
-FLAGS := -fPIC
-# FLAGS := -fPIC -pedantic-errors -Wall -Wextra  -Werror
+# FLAGS := -fPIC
+FLAGS := -fPIC -pedantic-errors -Wall -Wextra  -Werror
 DEBUG_FLAGS :=-DDEBUG -O0 -g
 RELEASE_FLAGS :=-O3 -DNDEBUG
 TESTS_FLAGS :=--coverage
