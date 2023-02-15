@@ -410,7 +410,7 @@ int ask_for_comparison(char* dijkstra_code) {
                             long score = nw_result.score;
                             long entry_point = nw_result.entry_point;
 
-                            fprintf(stderr, "%s:\n\tcode: %s\n\tscore: %ld\n\tentry_point: %ld\n", ent->d_name, current_dijkstra_code, score, entry_point);
+                            printf("%s:\n\tcode: %s\n\tscore: %ld\n\tentry_point: %ld\n", ent->d_name, current_dijkstra_code, score, entry_point);
                             if( score > highest_score ) {
                                 highest_score = score;
                                 highest_score_entry_point = entry_point;
