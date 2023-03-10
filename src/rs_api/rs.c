@@ -4,15 +4,35 @@
 
 struct rs_control* get_rs_struct(int symbol_size, int parity_len) {
 
-	int gfpoly = 0x187;
-	int fcr = 0;
-	int prim = 1;
+  int gfpoly, fcr, prim;
+  switch(symbol_size) {
+    case 3:
+      gfpoly = 0x3;
+      fcr = 1;
+      prim = 1;
+      break;
+    default:
+    case 8:
+      gfpoly = 0x187;
+      fcr = 0;
+      prim = 1;
+  }
 
 	// parity_len == nroots
   #if defined(_OPENMP)
     #pragma omp critical
+    {
   #endif
-  return init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
+  struct rs_control* rs = init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
+
+  if(!rs) {
+    fprintf(stderr, "'init_rs' returned %p\n", (void*)rs);
+    exit(EXIT_FAILURE);
+  }
+  return rs;
+  # if defined(_OPENMP)
+    }
+  #endif
 }
 
 // give data, data_len and parity_len, get parity back
@@ -112,7 +132,8 @@ uint8_t* remove_rs_code(uint8_t* data, unsigned long data_len, unsigned long* nu
 
     // put every parity symbol in their separate uint16_t element
     uint16_t parity[*num_parity_symbols];
-    unmerge_arr(data + original_size, *num_parity_symbols, sizeof(uint16_t), symsize, parity);
+    unsigned long num_bytes = *num_parity_symbols;
+    unmerge_arr(data + original_size, &num_bytes, sizeof(uint16_t), symsize, (void**)&parity);
 
     if( rs_decode(data, original_size, parity, *num_parity_symbols, symsize) != -1 ) {
         *num_parity_symbols = original_size;

@@ -103,6 +103,30 @@ int get_bit_test() {
     return 0;
 }
 
+int rs_test(void) {
+  uint8_t data[] = { 6, 1, 3 };// 0b110_001_011 -> 100_101 (4, 5);
+
+  unsigned long num_parity_symbols = 2;
+  uint16_t parity[num_parity_symbols];
+  memset(parity, 0x00, num_parity_symbols * sizeof(uint16_t));
+
+  rs_encode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
+
+  ctdd_assert( parity[0] == 4 );
+  ctdd_assert( parity[1] == 5 );
+
+  // noise
+  data[1] = 5;
+
+  rs_decode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
+
+  ctdd_assert( data[0] == 6 );
+  ctdd_assert( data[1] == 1 );
+  ctdd_assert( data[2] == 3 );
+
+  return 0;
+}
+
 int numeric_encoding_string_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
@@ -626,6 +650,7 @@ int run_tests() {
     ctdd_verify(graph_test);
     ctdd_verify(numeric_encoding_string_test);
     ctdd_verify(get_bit_test);
+    ctdd_verify(rs_test);
     ctdd_verify(watermark2014_test);
     ctdd_verify(watermark2014_rs_test);
     ctdd_verify(watermark2017_test);

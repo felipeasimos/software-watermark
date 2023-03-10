@@ -233,18 +233,26 @@ void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, 
   *data_len = next_bit / 8 + !!(next_bit % 8);
 }
 
-void unmerge_arr(void* data, unsigned long num_symbols, unsigned long element_size, unsigned long symbol_size, void* res) {
+void unmerge_arr(void* data, unsigned long* num_symbols, unsigned long element_size, unsigned long symbol_size, void** res) {
 
   // iterate over 'new_data' elements
   unsigned long next_bit = 0;
-  for(unsigned long i = 0; i < num_symbols; i++) {
-    void* element = ((uint8_t*)res)+(element_size * i);
+  unsigned long symbol_bytes = (symbol_size / 8) + !!(symbol_size % 8);
+  unsigned long res_size = (*num_symbols) * symbol_bytes;
+  if(!*res) {
+    *res = malloc(res_size);
+  }
+  memset(*res, 0x00, res_size);
+  for(unsigned long i = 0; i < *num_symbols; i ++) {
+    void* element = ((uint8_t*)*res)+(element_size * i);
     // iterate over symbol bits and populate element with symbol bits
     for(unsigned long j = 0; j < symbol_size; j++) {
       set_bit(element, j, get_bit(data, next_bit));
       next_bit++;
     }
+    *(uint8_t*)element >>= (element_size * 8) - symbol_size;
   }
+  *num_symbols = res_size;
 }
 
 void* decode_numeric_string(void* data, unsigned long* data_len) {

@@ -484,11 +484,13 @@ uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned lo
     int res = scanf(" %" MAX_SIZE_STR "[01]", bin_char);
     if(res != 1) return NULL;
     *n_bits = strlen(bin_char);
-    uint8_t bin_u8[*n_bits];
+    *num_bytes = (*n_bits / 8) + !!(*n_bits % 8);
+    uint8_t* bin_u8 = malloc(*num_bytes);
+    memset(bin_u8, 0x00, *num_bytes);
     for(unsigned int i = 0; i < *n_bits; i++) {
-      bin_u8[i] = bin_char[i] - '0';
+      set_bit(bin_u8, i, bin_char[i] - '0');
     }
-    return get_sequence_from_bit_arr(bin_u8, *n_bits, num_bytes);
+    return bin_u8;
 }
 
 int main(void) {
@@ -605,18 +607,39 @@ int main(void) {
         case 8: {
           unsigned long n_bits, num_bytes;
           uint8_t* data = get_binary_sequence("input message as binary sequence: ", &n_bits, &num_bytes);
+
           unsigned long n_parity_symbols;
           printf("input number of parity symbols: ");
           scanf("%lu", &n_parity_symbols);
+
           int symbol_size;
           printf("input symbol size (1-16): ");
           scanf("%d", &symbol_size);
-          void* res = append_rs_code(data, &num_bytes, n_parity_symbols, symbol_size);
-          for(unsigned long i = 0; i < num_bytes; i++) {
-            printf("%hhu", get_bit(res, i)); 
+
+          unsigned long symbol_bytes = (symbol_size / 8) + !!(symbol_size % 8);
+          unsigned long num_data_symbols = (n_bits/symbol_size) + !!(n_bits % symbol_size);
+          uint8_t* unmerged_data = NULL;
+          printf("num_data_symbols: %lu, symbol_bytes: %lu, symbol_size: %d\n", num_data_symbols, symbol_bytes, symbol_size);
+          unmerge_arr(data, &num_data_symbols, symbol_bytes, symbol_size, (void**)&unmerged_data);
+          uint16_t parity[n_parity_symbols];
+          memset(parity, 0x00, sizeof(uint16_t) * n_parity_symbols);
+          rs_encode(unmerged_data, num_data_symbols, parity, n_parity_symbols, symbol_size);
+          for(unsigned long i = 0; i < num_data_symbols; i++) {
+            for(unsigned long j = symbol_bytes*8 - symbol_size; j < symbol_bytes*8; j++) {
+              printf("%hhu", get_bit(&unmerged_data[i], j));
+            }
+            printf(" ");
+          }
+          printf("| ");
+          for(unsigned long i = 0; i < n_parity_symbols; i++) {
+            for(unsigned long j = symbol_bytes*8 - symbol_size; j < symbol_bytes*8; j++) {
+              printf("%hhu", get_bit((uint8_t*)&parity[i], j));
+            }
           }
           printf("\n");
-          
+
+          printf("\n");
+          free(unmerged_data);
           free(data);
           break;
         }
