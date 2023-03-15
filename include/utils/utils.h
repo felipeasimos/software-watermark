@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "rs_api/rs.h"
-
 typedef struct STACK {
 
     unsigned long* stack;
@@ -74,14 +72,14 @@ unsigned long get_number_of_left_zeros(uint8_t* data, unsigned long data_len);
 unsigned long get_number_of_right_zeros(uint8_t* data, unsigned long data_len);
 void remove_left_zeros(uint8_t* data, unsigned long* data_len);
 void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, unsigned long symbol_size);
-void unmerge_arr(void* data, unsigned long* num_symbols, unsigned long element_size, unsigned long symbol_size, void** res);
+void unmerge_arr(void* data, unsigned long num_symbols, unsigned long element_size, unsigned long symbol_size, void** res);
 
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 
-// rs
-void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_parity_symbols);
-void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols, unsigned long symsize);
+// bitshift
+void rshift(uint8_t* mem, unsigned long size, uint8_t shift);
+void lshift(uint8_t* mem, unsigned long size, uint8_t shift);
 
 #endif

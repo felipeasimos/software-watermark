@@ -5,7 +5,7 @@
 #include "dijkstra/dijkstra.h"
 #include "checker/checker.h"
 #include "sequence_alignment/sequence_alignment.h"
-#include "code_generation/code_generation.h"
+#include <limits.h>
 
 #define PRINT_K(k)\
         char str[100];\
@@ -127,6 +127,118 @@ int rs_test(void) {
   return 0;
 }
 
+int merge_unmerge_test() {
+
+  uint8_t data[] = { 181, 1 };
+
+  uint8_t* res = NULL;
+  unsigned long num_symbols = 3;
+  unmerge_arr(&data, num_symbols, 1, 3, (void**)&res);
+  
+  ctdd_assert( num_symbols == 3 );
+  ctdd_assert( res[0] == 5 );
+  ctdd_assert( res[1] == 5 );
+  ctdd_assert( res[2] = 3 );
+  free(res);
+
+  for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+    unsigned long symsize = 3; //(rand() % 6) + 1;
+    num_symbols = (rand() % (((sizeof(k) * 8) / symsize)-1) + 1);
+    unsigned long num_bits = num_symbols * symsize;
+    unsigned long num_bytes = num_bits / 8 + !!(num_bits % 8);
+    res = NULL;
+    unmerge_arr(&k, num_symbols, 1, symsize, (void**)&res);
+
+    ctdd_assert( res );
+
+    merge_arr(res, &num_symbols, 1, symsize);
+    ctdd_assert( num_symbols == num_bytes );
+
+    for(unsigned long i = 0; i < num_bits; i++) {
+      ctdd_assert( get_bit((void*)&k, i) == get_bit((void*)res, i) );
+    }
+    free(res);
+  }
+
+  return 0;
+}
+
+int append_remove_rs_code_test() {  
+
+  uint8_t data[] = { 183, 128 };
+
+  uint8_t symsize = 3;
+  unsigned long num_data_symbols = 3;
+  unsigned long num_parity_symbols = 2;
+  unsigned long n_bits = num_data_symbols;
+  uint8_t* data_with_rs = append_rs_code(data, &n_bits, num_parity_symbols, symsize);
+ 
+  ctdd_assert( n_bits == 15 );
+  ctdd_assert( data_with_rs[0] == 183 );
+  ctdd_assert( data_with_rs[1] == 246 );
+
+  uint8_t* data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+  free(data_with_rs);
+
+  ctdd_assert( data_without_rs );
+  ctdd_assert( data[0] == data_without_rs[0] );
+  ctdd_assert( data[1] == data_without_rs[1] );
+  free(data_without_rs);
+
+  num_parity_symbols = 1;
+  unsigned long k_top = 1 << (num_data_symbols * symsize);
+  for(unsigned short k = 1; k < k_top; k++) {
+    invert_binary_sequence((uint8_t*)&k+1, 1);
+    n_bits = num_data_symbols;
+
+    data_with_rs = append_rs_code(&k, &n_bits, num_parity_symbols, symsize);
+
+    ctdd_assert( data_with_rs );
+    ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
+
+    data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+    free(data_with_rs);
+
+    n_bits = num_data_symbols * symsize;
+    for(unsigned long i = 0; i < n_bits; i++) {
+      ctdd_assert( get_bit((void*)&k, i) == get_bit((void*)data_without_rs, i) );
+    }
+
+    free(data_without_rs);
+    invert_binary_sequence((uint8_t*)&k+1, 1);
+  }
+
+  unsigned long num_data_symbols_top = sizeof(unsigned short) * 8 / symsize;
+  for(unsigned long num_data_symbols = 1; num_data_symbols < num_data_symbols_top; num_data_symbols++) {
+    unsigned long num_parity_symbols_max = num_data_symbols / 2 + 1;
+    for(unsigned long num_parity_symbols = 1; num_parity_symbols < num_parity_symbols_max; num_parity_symbols++) {
+      unsigned long k_top = 1 << (num_data_symbols * symsize);
+      for(unsigned short k = 1; k < k_top; k++) {
+        invert_binary_sequence((uint8_t*)&k+1, 1);
+        n_bits = num_data_symbols;
+
+        data_with_rs = append_rs_code(&k, &n_bits, num_parity_symbols, symsize);
+
+        ctdd_assert( data_with_rs );
+        ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
+
+        data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+        free(data_with_rs);
+
+        n_bits = num_data_symbols * symsize;
+        for(unsigned long i = 0; i < n_bits; i++) {
+          ctdd_assert( get_bit((void*)&k, i) == get_bit((void*)data_without_rs, i) );
+        }
+
+        free(data_without_rs);
+        invert_binary_sequence((uint8_t*)&k+1, 1);
+      }
+    }
+  }
+
+  return 0;
+}
+
 int numeric_encoding_string_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
@@ -206,7 +318,7 @@ int watermark2017_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode(graph, &size);
         ctdd_assert(size == 1);
@@ -216,7 +328,7 @@ int watermark2017_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode(graph, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
@@ -229,9 +341,9 @@ int watermark2017_test() {
 int watermark2017_improved_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size=1;
-        uint8_t* result = watermark_decode_improved(graph, &k, &size);
+        uint8_t* result = watermark_decode_improved8(graph, &k, &size);
         ctdd_assert(size == 1);
         uint8_t res = *result == k;
         if(!res) {
@@ -244,9 +356,9 @@ int watermark2017_improved_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size=sizeof(unsigned long);
-        uint8_t* result = watermark_decode_improved(graph, (uint8_t*)&k, &size);
+        uint8_t* result = watermark_decode_improved8(graph, (uint8_t*)&k, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
         free(result);
         graph_free(graph);
@@ -258,7 +370,7 @@ int watermark2017_rs_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 2);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 2);
         unsigned long size=2;
         uint8_t* result = watermark_rs_decode(graph, &size);
         ctdd_assert(size == 1);
@@ -268,7 +380,7 @@ int watermark2017_rs_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 2);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 2);
         unsigned long size=2;
         uint8_t* result = watermark_rs_decode(graph, &size);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
@@ -284,8 +396,8 @@ int watermark2017_rs_decode_improved_test() {
 
         unsigned long num_parity_symbols = 2;
         unsigned long size = sizeof(k);
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), num_parity_symbols);
-        uint8_t* result = watermark_rs_decode_improved(graph, &k, &size, num_parity_symbols);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), num_parity_symbols);
+        uint8_t* result = watermark_rs_decode_improved8(graph, &k, &size, num_parity_symbols);
         ctdd_assert(size == 1);
         ctdd_assert(*result == k);
         free(result);
@@ -295,8 +407,8 @@ int watermark2017_rs_decode_improved_test() {
 
         unsigned long num_parity_symbols = 2;
         unsigned long size = sizeof(k);
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), num_parity_symbols);
-        uint8_t* result = watermark_rs_decode_improved(graph, &k, &size, num_parity_symbols);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), num_parity_symbols);
+        uint8_t* result = watermark_rs_decode_improved8(graph, &k, &size, num_parity_symbols);
         ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
         free(result);
         graph_free(graph);
@@ -304,11 +416,53 @@ int watermark2017_rs_decode_improved_test() {
     return 0;
 }
 
+int watermark2017_rs_3_bit_test() {
+
+    uint8_t data[] = { 183, 128 }; // 0b101_101_11|1_0000000 
+
+    unsigned long num_parity_symbols = 2;
+    unsigned long num_data_symbols = 3;
+    GRAPH* graph = watermark_rs_encode(&data, num_data_symbols, num_parity_symbols, 3);
+    ctdd_assert( graph );
+    uint8_t* result = watermark_rs_decode_improved(graph, &data, &num_data_symbols, num_parity_symbols, 3);
+    ctdd_assert( result );
+    unsigned long size = num_data_symbols;
+    ctdd_assert( size == 2 );
+    ctdd_assert( result[0] == 183 );
+    ctdd_assert( result[1] == 128 );
+    free(result);
+    graph_free(graph);
+
+    for(uint8_t k = 1; k < 255; k++) {
+        unsigned long symsize = 3;
+        unsigned long num_parity_symbols = 2;
+        unsigned long num_data_symbols = 2;
+        GRAPH* graph = watermark_rs_encode(&k, num_data_symbols, num_parity_symbols, symsize);
+        uint8_t* result = watermark_rs_decode_improved(graph, &k, &num_data_symbols, num_parity_symbols, symsize);
+        ctdd_assert(num_data_symbols == sizeof(k));
+        ctdd_assert(*result == k);
+        free(result);
+        graph_free(graph);
+    }
+    // for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
+    //
+    //     unsigned long num_parity_symbols = 2;
+    //     unsigned long size = sizeof(k);
+    //     GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), num_parity_symbols);
+    //     uint8_t* result = watermark_rs_decode_improved8(graph, &k, &size, num_parity_symbols);
+    //     ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
+    //     free(result);
+    //     graph_free(graph);
+    // }
+
+    return 0;
+}
+
 int watermark2017_decode_analysis_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode_analysis(graph, &size);
         graph_free_info(graph);
@@ -321,7 +475,7 @@ int watermark2017_decode_analysis_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size;
         uint8_t* result = watermark_decode_analysis(graph, &size);
         graph_free_info(graph);
@@ -338,7 +492,7 @@ int watermark2017_rs_decode_analysis_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 3);
         unsigned long size=3;
         uint8_t* result = watermark_rs_decode_analysis(graph, &size);
         graph_free_info(graph);
@@ -351,7 +505,7 @@ int watermark2017_rs_decode_analysis_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 24);
         unsigned long size=24;
         uint8_t* result = watermark_rs_decode_analysis(graph, &size);
         graph_free_info(graph);
@@ -368,7 +522,7 @@ int dijkstra_recognition_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         uint8_t result = dijkstra_check(graph);
         if(!result) {
             PRINT_K(k);
@@ -378,7 +532,7 @@ int dijkstra_recognition_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         ctdd_assert(dijkstra_check(graph));
         graph_free(graph);
     }
@@ -481,7 +635,7 @@ int dijkstra_watermark_code_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* original = watermark_encode(&k, sizeof(k));
+        GRAPH* original = watermark_encode8(&k, sizeof(k));
         char* code = dijkstra_get_code(original);
         GRAPH* new = dijkstra_generate(code);
         // check that the resulting dijkstra code is the same
@@ -507,7 +661,7 @@ int dijkstra_watermark_code_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* original = watermark_encode(&k, sizeof(k));
+        GRAPH* original = watermark_encode8(&k, sizeof(k));
         char* code = dijkstra_get_code(original);
         GRAPH* new = dijkstra_generate(code);
         // check that the resulting dijkstra code is the same
@@ -529,7 +683,7 @@ int watermark_check_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         uint8_t result = watermark_check(graph, &k, sizeof(k));
         if(!result) {
             PRINT_K(k);
@@ -539,7 +693,7 @@ int watermark_check_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         uint8_t result = watermark_check(graph, &k, sizeof(k));
         graph_free(graph);
         ctdd_assert(result);
@@ -558,7 +712,7 @@ int watermark_check_analysis_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
         graph_free_info(graph);
@@ -572,7 +726,7 @@ int watermark_check_analysis_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_encode(&k, sizeof(k));
+        GRAPH* graph = watermark_encode8(&k, sizeof(k));
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_check_analysis(graph, &k, &size);
         graph_free_info(graph);
@@ -588,7 +742,7 @@ int watermark_check_rs_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 3);
         unsigned long size=sizeof(k);
         uint8_t result = watermark_rs_check(graph, &k, size, 3);
         if(!result) {
@@ -599,7 +753,7 @@ int watermark_check_rs_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 24);
         unsigned long size=sizeof(k);
         uint8_t result = watermark_rs_check(graph, &k, size, 24);
         graph_free(graph);
@@ -612,7 +766,7 @@ int watermark_check_rs_analysis_test() {
 
     for(uint8_t k = 1; k < 255; k++) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 3);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 3);
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 3);
         graph_free_info(graph);
@@ -626,7 +780,7 @@ int watermark_check_rs_analysis_test() {
     }
     for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
 
-        GRAPH* graph = watermark_rs_encode(&k, sizeof(k), 24);
+        GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), 24);
         unsigned long size = sizeof(k);
         uint8_t* bit_arr = watermark_rs_check_analysis(graph, &k, &size, 24);
         graph_free_info(graph);
@@ -651,12 +805,15 @@ int run_tests() {
     ctdd_verify(numeric_encoding_string_test);
     ctdd_verify(get_bit_test);
     ctdd_verify(rs_test);
+    ctdd_verify(merge_unmerge_test);
+    ctdd_verify(append_remove_rs_code_test);
     ctdd_verify(watermark2014_test);
     ctdd_verify(watermark2014_rs_test);
     ctdd_verify(watermark2017_test);
     ctdd_verify(watermark2017_improved_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(watermark2017_rs_decode_improved_test);
+    ctdd_verify(watermark2017_rs_3_bit_test);
     ctdd_verify(watermark2017_decode_analysis_test);
     ctdd_verify(watermark2017_rs_decode_analysis_test);
     ctdd_verify(dijkstra_recognition_test);
@@ -673,7 +830,7 @@ int run_tests() {
 
 int main() {
 
-    srand(time(0));
+    srand(0);
 	ctdd_setup_signal_handler();
 
 	return ctdd_test(run_tests);

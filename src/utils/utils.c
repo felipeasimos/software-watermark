@@ -217,42 +217,46 @@ void remove_left_zeros(uint8_t* data, unsigned long* data_len) {
 void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, unsigned long symbol_size) {
 
   unsigned long num_elements = (*data_len)/element_size;
-  // iterate over every element (skipping the first)
-  unsigned long next_bit = symbol_size;
-  for(unsigned long i = 1; i < num_elements; i++) {
+  unsigned long next_bit = 0;
+  unsigned long offset = element_size * 8 - symbol_size;
+  for(unsigned long i = 0; i < num_elements; i++) {
     void* element = ((uint8_t*)data)+(element_size * i);
     // iterate over element bits
     for(unsigned long j = 0; j < symbol_size; j++) {
-
       // shift element's bit to where next_bit is pointing to
-      set_bit(data, next_bit, get_bit(element, j));
+      set_bit(data, next_bit, get_bit(element, offset + j));
       next_bit++;
     } 
   }
   // update 'data_len' with size of the new sequence
   *data_len = next_bit / 8 + !!(next_bit % 8);
+  // set any bits left to zero
+  unsigned long n_bits = *data_len * 8;
+  for(; next_bit < n_bits; next_bit++) {
+    set_bit(data, next_bit, 0);
+  }
+
 }
 
-void unmerge_arr(void* data, unsigned long* num_symbols, unsigned long element_size, unsigned long symbol_size, void** res) {
+void unmerge_arr(void* data, unsigned long num_symbols, unsigned long element_size, unsigned long symbol_size, void** res) {
 
   // iterate over 'new_data' elements
-  unsigned long next_bit = 0;
   unsigned long symbol_bytes = (symbol_size / 8) + !!(symbol_size % 8);
-  unsigned long res_size = (*num_symbols) * symbol_bytes;
+  unsigned long res_size = (num_symbols) * symbol_bytes;
+  unsigned long next_bit = 0;
   if(!*res) {
     *res = malloc(res_size);
   }
   memset(*res, 0x00, res_size);
-  for(unsigned long i = 0; i < *num_symbols; i ++) {
+  unsigned long offset = element_size * 8 - symbol_size;
+  for(unsigned long i = 0; i < num_symbols; i ++) {
     void* element = ((uint8_t*)*res)+(element_size * i);
     // iterate over symbol bits and populate element with symbol bits
     for(unsigned long j = 0; j < symbol_size; j++) {
-      set_bit(element, j, get_bit(data, next_bit));
+      set_bit(element, offset + j, get_bit(data, next_bit));
       next_bit++;
     }
-    *(uint8_t*)element >>= (element_size * 8) - symbol_size;
   }
-  *num_symbols = res_size;
 }
 
 void* decode_numeric_string(void* data, unsigned long* data_len) {
@@ -325,33 +329,25 @@ unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsign
     return backedge_idx;
 }
 
-void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
-
-    uint8_t parity[num_parity_symbols];
-    rs_encode8(data, *data_len, parity, num_parity_symbols);
-
-    unsigned long new_len = (*data_len) + num_parity_symbols;
-    uint8_t* data_with_parity = malloc(new_len);
-    memcpy(data_with_parity, data, *data_len);
-    memcpy(data_with_parity+(*data_len), parity, num_parity_symbols);
-    *data_len = new_len;
-    return data_with_parity;
+void rshift(uint8_t* mem, unsigned long size, uint8_t shift) {
+  uint8_t tmp = 0x00;
+  for(unsigned long i = 0; i < size; i++) {
+    // save bits that would be lost in the in-byte shift
+    uint8_t next_tmp = mem[i] << (8 - shift);
+    mem[i] >>= shift;
+    mem[i] |= tmp;
+    tmp = next_tmp;
+  }
 }
 
-void* append_rs_code(void* data, unsigned long* data_len, unsigned long num_parity_symbols, unsigned long symsize) {
- 
-    uint16_t parity[num_parity_symbols];
-    rs_encode(data, *data_len, parity, num_parity_symbols, symsize);
-
-    // merge parity symbols
-    unsigned long num_parity_bytes = sizeof(uint16_t) * num_parity_symbols;
-    merge_arr(parity, &num_parity_bytes, sizeof(uint16_t), symsize);
-
-    // calculate and alloc memory for data + parity sequence
-    unsigned long new_len = (*data_len) + num_parity_bytes;
-    uint8_t* data_with_parity = malloc(new_len);
-    memcpy(data_with_parity, data, *data_len);
-    memcpy(data_with_parity+(*data_len), parity, num_parity_bytes);
-    *data_len = new_len;
-    return data_with_parity; 
+void lshift(uint8_t* mem, unsigned long size, uint8_t shift) {
+  uint8_t tmp = 0x00;
+  for(unsigned long i = 0; i < size; i++) {
+    unsigned long idx = size - i - 1;
+    // save bits that would be lost in the in-byte shift
+    uint8_t next_tmp = mem[idx] >> (8 - shift);
+    mem[idx] <<= shift;
+    mem[idx] |= tmp;
+    tmp = next_tmp;
+  }
 }

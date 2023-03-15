@@ -36,10 +36,21 @@ int watermark_decode_improved_sequence_of_three(GRAPH* graph, unsigned long grap
   graph->nodes[graph_idx+2]->num_out_neighbours == 1 && graph_get_connection(graph->nodes[graph_idx+2], graph->nodes[graph_idx+3]);
 }
 
-void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_bytes) {
+void* watermark_decode_improved8(GRAPH* graph, uint8_t* data, unsigned long* num_bytes) {
 
-    unsigned long data_num_bits = *num_bytes * 8;
-    unsigned long data_begin = get_first_positive_bit_index(data, *num_bytes);
+  // convert to bits
+  *num_bytes *= 8;
+  void* res = watermark_decode_improved(graph, data, num_bytes);
+  // convert to bytes
+  *num_bytes = *num_bytes / 8 + !!(*num_bytes % 8);
+  return res;
+}
+
+void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_bits) {
+
+    unsigned long data_num_bits = *num_bits;
+    unsigned long num_bytes = *num_bits * 8;
+    unsigned long data_begin = get_first_positive_bit_index(data, num_bytes);
 
     unsigned long n_bits = graph->num_nodes-2;
     uint8_t bits[n_bits];
@@ -158,7 +169,8 @@ void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_
     uint8_t is_prev_last_forward_destination = !!( n_bits > 2 && graph_get_connection(graph->nodes[n_bits-2], graph->nodes[n_bits]) && data_begin + i < data_num_bits );
     n_bits = i-is_prev_last_forward_destination;
     // bit sequence may be smaller than expected due to mute nodes
-    void* res = get_sequence_from_bit_arr(bits, n_bits, num_bytes);
+    void* res = get_sequence_from_bit_arr(bits, n_bits, &num_bytes);
+    *num_bits = n_bits;
     return res;
 }
 
@@ -208,12 +220,28 @@ void* watermark_rs_decode(GRAPH* graph, unsigned long* num_parity_symbols) {
     return remove_rs_code8(data, data_len, num_parity_symbols);
 }
 
-void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_bytes, unsigned long num_parity_symbols) {
+void* watermark_rs_decode_improved8(GRAPH* graph, void* key, unsigned long* num_bytes, unsigned long num_parity_symbols) {
 
   void* key_with_parity = append_rs_code8(key, num_bytes, num_parity_symbols);
-  uint8_t* data = watermark_decode_improved(graph, key_with_parity, num_bytes);
+  uint8_t* data = watermark_decode_improved8(graph, key_with_parity, num_bytes);
   void* result = remove_rs_code8(data, *num_bytes, &num_parity_symbols);
   *num_bytes = num_parity_symbols;
+  free(key_with_parity);
+  return result;
+}
+
+void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_data_symbols, unsigned long num_parity_symbols, unsigned long symsize) {
+
+  unsigned long n_bits = *num_data_symbols;
+  void* key_with_parity = append_rs_code(key, &n_bits, num_parity_symbols, symsize);
+  unsigned long n_bytes = n_bits / 8 + !!(n_bits % 8);
+  uint8_t* data = watermark_decode_improved(graph, key_with_parity, &n_bits);
+  n_bytes = n_bits / 8 + !!(n_bits % 8);
+  // zeros get added to the left, however, we want them on the right
+  lshift(data, n_bytes, get_number_of_left_zeros(data, n_bytes));
+  void* result = remove_rs_code(data, *num_data_symbols, num_parity_symbols, n_bits, symsize);
+  unsigned long data_bits = *num_data_symbols * symsize;
+  *num_data_symbols = data_bits / 8 + !!( data_bits % 8 );
   free(key_with_parity);
   return result;
 }

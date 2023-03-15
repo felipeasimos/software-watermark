@@ -175,6 +175,7 @@ typedef struct ATTACK {
   unsigned long n_removals;
   unsigned long n_bits;
   unsigned long n_parity_symbols;
+  unsigned long symsize;
 } ATTACK;
 
 unsigned long _test_with_removed_connections(
@@ -205,10 +206,10 @@ unsigned long _test_with_removed_connections(
         result = watermark_decode(copy, &num_bytes);
         break;
       case IMPROVED:
-        result = watermark_decode_improved(copy, attack->identifier, &num_bytes);
+        result = watermark_decode_improved8(copy, attack->identifier, &num_bytes);
         break;
       case IMPROVED_WITH_RS:
-        result = watermark_rs_decode_improved(attack->graph, attack->identifier, &num_bytes, attack->n_parity_symbols);
+        result = watermark_rs_decode_improved(attack->graph, attack->identifier, &num_bytes, attack->n_parity_symbols, attack->symsize);
         break;
     }
 
@@ -295,7 +296,7 @@ void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
     _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
 }
 
-void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols) {
+void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols, unsigned long symsize) {
 
     unsigned long matrix[n_bits][n_bits];
     memset(matrix, 0x00, sizeof(matrix));
@@ -329,9 +330,9 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
-                graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols); 
+              graph = watermark_rs_encode(&identifier, identifier_len, n_parity_symbols, symsize); 
             } else {
-              graph = watermark_encode(&identifier, identifier_len);
+              graph = watermark_encode8(&identifier, identifier_len);
             }
 
             ATTACK attack = {
@@ -342,16 +343,16 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
               .identifier = &identifier,
               .identifier_len = identifier_len,
               .method = method,
+              .symsize = symsize
             };
 
             multiple_removal_test(&attack, &statistics);
 
             graph_free(graph);
 
-            #pragma omp critical
-            { 
+            #if defined(_OPENMP)
               matrix[statistics.worst_case][current_n_bits-1]++;
-            }
+            #endif
         }
         #if defined(_OPENMP)
           double duration = omp_get_wtime() - start;
@@ -495,15 +496,15 @@ uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned lo
 
 int main(void) {
 
-    printf("1) encode string\n");
-    printf("2) encode number\n");
-    printf("3) encode number with reed solomon\n");
+    printf("1) encode string to watermark\n");
+    printf("2) encode number to watermark\n");
+    printf("3) encode number to watermark with reed solomon\n");
     printf("4) generate graph from dijkstra code\n");
     printf("5) run removal test\n");
     printf("6) run removal test with improved decoding\n");
     printf("7) run removal test with improved decoding and reed solomon\n");
-    printf("8) reed solomon encode\n");
-    printf("9) reed solomon decode\n");
+    printf("8) reed solomon encode binary sequence\n");
+    printf("9) reed solomon decode binary sequence\n");
     printf("10) show report matrix\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
@@ -512,7 +513,7 @@ int main(void) {
             unsigned long data_len=strlen(s);
             void* data = encode_numeric_string(s, &data_len);
 
-            GRAPH* g = watermark_encode(data, data_len);
+            GRAPH* g = watermark_encode8(data, data_len);
             char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
@@ -527,7 +528,7 @@ int main(void) {
         case 2: {
             unsigned long n = get_ulong("Input number to encode: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
-            GRAPH* g = watermark_encode(&n, sizeof(n));
+            GRAPH* g = watermark_encode8(&n, sizeof(n));
             char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
@@ -542,7 +543,7 @@ int main(void) {
             unsigned long n = get_ulong("input number to encode: ");
             unsigned long n_parity = get_ulong("number of parity symbols: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
-            GRAPH* g = watermark_rs_encode(&n, sizeof(n), n_parity);
+            GRAPH* g = watermark_rs_encode8(&n, sizeof(n), n_parity);
             char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
@@ -575,7 +576,7 @@ int main(void) {
             printf("input maximum number of bits: ");
             unsigned long n_bits;
             scanf("%lu", &n_bits);
-            attack(ORIGINAL, n_removals, n_bits, 0);
+            attack(ORIGINAL, n_removals, n_bits, 0, 0);
             show_report_matrix();
             break;
         }
@@ -586,7 +587,7 @@ int main(void) {
             printf("input maximum number of bits: ");
             unsigned long n_bits;
             scanf("%lu", &n_bits);
-            attack(IMPROVED, n_removals, n_bits, 0);
+            attack(IMPROVED, n_removals, n_bits, 0, 0);
             show_report_matrix();
             break;
         }
@@ -594,13 +595,16 @@ int main(void) {
             printf("input number of removals: ");
             unsigned long n_removals;
             scanf("%lu", &n_removals);
-            printf("input maximum number of message symbols (8 bit each): ");
+            printf("input maximum number of message symbols: ");
             unsigned long n_symbols;
             scanf("%lu", &n_symbols);
-            printf("input number of parity symbols (8 bit each): ");
+            printf("input number of parity symbols: ");
             unsigned long n_parity;
             scanf("%lu", &n_parity);
-            attack(IMPROVED_WITH_RS, n_removals, n_symbols * 8, n_parity);
+            printf("input symbol size (1-16): ");
+            unsigned long symsize;
+            scanf("%lu", &symsize);
+            attack(IMPROVED_WITH_RS, n_removals, n_symbols * symsize, n_parity, symsize);
             show_report_matrix();
             break;           
         }
@@ -636,7 +640,6 @@ int main(void) {
               printf("%hhu", get_bit((uint8_t*)&parity[i], j));
             }
           }
-          printf("\n");
 
           printf("\n");
           free(unmerged_data);

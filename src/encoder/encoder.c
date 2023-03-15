@@ -1,4 +1,5 @@
 #include "encoder/encoder.h"
+#include "rs_api/rs.h"
 
 GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
 
@@ -54,10 +55,15 @@ GRAPH* watermark2014_encode(void* data, unsigned long data_len) {
     return graph;
 }
 
-GRAPH* watermark_encode(void* data, unsigned long data_len) {
+GRAPH* watermark_encode8(void* data, unsigned long data_len) {
+  return watermark_encode(data, data_len * 8);
+}
+
+GRAPH* watermark_encode(void* data, unsigned long n_bits) {
 
     // get index of first positive bit
-    unsigned long total_number_of_bits = data_len*8;
+    unsigned long data_len = n_bits/8 + !!(n_bits%8);
+    unsigned long total_number_of_bits = n_bits;
     unsigned long starting_idx = get_first_positive_bit_index(data, data_len);
     unsigned long n = total_number_of_bits - starting_idx;
 
@@ -158,10 +164,18 @@ GRAPH* watermark2014_rs_encode(void* data, unsigned long data_len, unsigned long
     return graph;
 }
 
-GRAPH* watermark_rs_encode(void* data, unsigned long data_len, unsigned long num_parity_symbols) {
+GRAPH* watermark_rs_encode8(void* data, unsigned long data_len, unsigned long num_parity_symbols) {
 
     uint8_t* data_with_parity = append_rs_code8(data, &data_len, num_parity_symbols);
-    GRAPH* graph = watermark_encode(data_with_parity, data_len);
+    GRAPH* graph = watermark_encode8(data_with_parity, data_len);
+    free(data_with_parity);
+    return graph;
+}
+
+GRAPH* watermark_rs_encode(void* data, unsigned long num_data_symbols, unsigned long num_parity_symbols, unsigned long symsize) {
+
+    uint8_t* data_with_parity = append_rs_code(data, &num_data_symbols, num_parity_symbols, symsize);
+    GRAPH* graph = watermark_encode(data_with_parity, num_data_symbols); // num_data_symbols == n_bits
     free(data_with_parity);
     return graph;
 }

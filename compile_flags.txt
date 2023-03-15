@@ -3,8 +3,8 @@
 -I
 ./tests
 -DDEBUG
+-fPIC
 -pedantic-errors
 -Wall
 -Wextra
--fPIC
 -Werror
