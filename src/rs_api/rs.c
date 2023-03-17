@@ -122,7 +122,7 @@ void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_par
     return data_with_parity;
 }
 
-void copy_unmerge_arr_to_merged_arr(void* from, void* to, unsigned long num_symbols, unsigned long symbol_size, unsigned long num_from_element_bytes, unsigned long* next_bit) {
+void copy_unmerged_arr_to_merged_arr(void* from, void* to, unsigned long num_symbols, unsigned long symbol_size, unsigned long num_from_element_bytes, unsigned long* next_bit) {
   unsigned long offset = num_from_element_bytes * 8 - symbol_size;
   for(unsigned long i = 0; i < num_symbols; i++) {
     void* from_element = ((uint8_t*)from) + ( num_from_element_bytes * i );
@@ -131,6 +131,18 @@ void copy_unmerge_arr_to_merged_arr(void* from, void* to, unsigned long num_symb
       (*next_bit)++;
     }
   }
+}
+
+void copy_merged_arr_to_unmerged_arr(void* from, void* to, unsigned long num_symbols, unsigned long symbol_size, unsigned long num_to_element_bytes, unsigned long* next_bit) {
+
+    unsigned long offset = num_to_element_bytes * 8 - symbol_size;
+    for(unsigned long i = 0; i < num_symbols; i++) {
+      void* to_element = ((uint8_t*)to) + ( num_to_element_bytes * i );
+      for(unsigned long j = 0; j < symbol_size; j++) {
+        set_bit(to_element, offset + j, get_bit(from, *next_bit));
+        (*next_bit)++;
+      }
+    }
 }
 
 void* append_rs_code(void* data, unsigned long* num_data_symbols, unsigned long num_parity_symbols, unsigned long symsize) {
@@ -162,9 +174,9 @@ void* append_rs_code(void* data, unsigned long* num_data_symbols, unsigned long 
   memset(data_with_parity, 0x00, total_bytes);
   // 4. copy data bits
   unsigned long next_bit = 0;
-  copy_unmerge_arr_to_merged_arr(res, data_with_parity, *num_data_symbols, symsize, symbol_bytes, &next_bit);
+  copy_unmerged_arr_to_merged_arr(res, data_with_parity, *num_data_symbols, symsize, symbol_bytes, &next_bit);
   // 5. copy parity bits
-  copy_unmerge_arr_to_merged_arr(parity, data_with_parity, num_parity_symbols, symsize, sizeof(uint16_t), &next_bit);
+  copy_unmerged_arr_to_merged_arr(parity, data_with_parity, num_parity_symbols, symsize, sizeof(uint16_t), &next_bit);
   // 6. set 'num_data_symbols' to total number of bits of the final sequence
   *num_data_symbols = total_bits;
   free(res);
@@ -186,32 +198,26 @@ uint8_t* remove_rs_code8(uint8_t* data, unsigned long data_len, unsigned long* n
     }
 }
 
-uint8_t* remove_rs_code(uint8_t* data, unsigned long num_data_symbols, unsigned long num_parity_symbols, unsigned long n_bits, int symsize) {
+uint8_t* remove_rs_code(uint8_t* data, unsigned long num_data_symbols, unsigned long num_parity_symbols, int symsize) {
 
-    // correct for any skipped left zero in the encoding process
-    unsigned long current_total_bits = (num_data_symbols + num_parity_symbols) * symsize;
+    // 0. initialize variables
     unsigned long num_data_bits = num_data_symbols * symsize;
     unsigned long num_data_bytes = num_data_bits / 8 + !!(num_data_bits % 8);
-    rshift(data, num_data_bytes, n_bits - current_total_bits);
- 
-    // unmerge data
-    uint8_t* res = NULL;
+    // unsigned long num_parity_bits = num_parity_symbols * symsize;
+    // unsigned long num_parity_bytes = num_parity_bits / 8 + !!(num_parity_bits % 8);
     unsigned long symbol_bytes = symsize / 8 + !!(symsize % 8);
+ 
+    // 1. unmerge data
+    uint8_t* res = NULL;
     unmerge_arr(data, num_data_symbols, symbol_bytes, symsize, (void**)&res);
 
-    // unmerge parity, separating it from data
+    // 2. unmerge parity, separating it from data
     uint16_t parity[num_parity_symbols];
     memset(parity, 0x00, sizeof(uint16_t) * (num_parity_symbols));
-
     unsigned long next_bit = num_data_bits;
-    unsigned long offset = sizeof(uint16_t) * 8 - symsize;
-    for(unsigned long i = 0; i < num_parity_symbols; i++) {
-      void* parity_element = &parity[i];
-      for(int j = 0; j < symsize; j++) {
-        set_bit(parity_element, offset + j, get_bit(data, next_bit));
-        next_bit++;
-      }
-    }
+    copy_merged_arr_to_unmerged_arr(data, parity, num_parity_symbols, symsize, sizeof(uint16_t), &next_bit);
+
+    // 3. convert parity from big endian to little endian, if necessary
     if( is_little_endian_machine() ) {
       for(unsigned long i = 0; i < num_parity_symbols; i++) {
         uint8_t* parity_element = (uint8_t*)&parity[i];
@@ -222,11 +228,10 @@ uint8_t* remove_rs_code(uint8_t* data, unsigned long num_data_symbols, unsigned 
     }
 
     if( rs_decode(res, num_data_symbols, parity, num_parity_symbols, symsize) != -1 ) {
-      data = NULL;
-      merge_arr(res, &num_data_symbols, sizeof(uint8_t), symsize);
-      
+      merge_arr(res, &num_data_symbols, sizeof(uint8_t), symsize); 
       return realloc(res, num_data_bytes);
     } else {
+      free(res);
       return NULL;
     }
 }

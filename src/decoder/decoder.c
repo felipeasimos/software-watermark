@@ -1,5 +1,11 @@
 #include "decoder/decoder.h"
 
+#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
+  for(unsigned long i = 0; i < len; i++) {\
+    fprintf(stderr, "%hhu", get_bit(bits, i));\
+  }\
+  fprintf(stderr, "\n");
+
 void* watermark2014_decode(GRAPH* graph, unsigned long* num_bytes) {
 
     unsigned long n_bits = graph->num_nodes-1;
@@ -49,7 +55,7 @@ void* watermark_decode_improved8(GRAPH* graph, uint8_t* data, unsigned long* num
 void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_bits) {
 
     unsigned long data_num_bits = *num_bits;
-    unsigned long num_bytes = *num_bits * 8;
+    unsigned long num_bytes = *num_bits / 8 + !!(*num_bits % 8);
     unsigned long data_begin = get_first_positive_bit_index(data, num_bytes);
 
     unsigned long n_bits = graph->num_nodes-2;
@@ -232,18 +238,42 @@ void* watermark_rs_decode_improved8(GRAPH* graph, void* key, unsigned long* num_
 
 void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_data_symbols, unsigned long num_parity_symbols, unsigned long symsize) {
 
-  unsigned long n_bits = *num_data_symbols;
-  void* key_with_parity = append_rs_code(key, &n_bits, num_parity_symbols, symsize);
-  unsigned long n_bytes = n_bits / 8 + !!(n_bits % 8);
-  uint8_t* data = watermark_decode_improved(graph, key_with_parity, &n_bits);
-  n_bytes = n_bits / 8 + !!(n_bits % 8);
-  // zeros get added to the left, however, we want them on the right
-  lshift(data, n_bytes, get_number_of_left_zeros(data, n_bytes));
-  void* result = remove_rs_code(data, *num_data_symbols, num_parity_symbols, n_bits, symsize);
-  unsigned long data_bits = *num_data_symbols * symsize;
-  *num_data_symbols = data_bits / 8 + !!( data_bits % 8 );
+  // 0. initialize variables
+  unsigned long num_key_bits_with_parity = *num_data_symbols;
+
+  // 1. get key with RS code
+  void* key_with_parity = append_rs_code(key, &num_key_bits_with_parity, num_parity_symbols, symsize);
+  unsigned long num_key_bytes_with_parity = num_key_bits_with_parity / 8 + !!(num_key_bits_with_parity % 8);
+  unsigned long num_result_bits_with_parity = num_key_bits_with_parity;
+  // 2. decode graph
+  uint8_t* result_with_parity = watermark_decode_improved(graph, key_with_parity, &num_result_bits_with_parity);
+  // 3. remove all left zeros from result
+  unsigned long num_result_bytes_with_parity = num_result_bits_with_parity / 8 + !!(num_result_bits_with_parity % 8);
+  remove_left_zeros(result_with_parity, &num_result_bytes_with_parity);
+  // 4. if there are more bytes in the result than it should, return NULL
+  if(num_result_bytes_with_parity > num_key_bytes_with_parity) {
+    free(result_with_parity);
+    free(key_with_parity);
+    fprintf(stderr, "watermark_rs_decode_improved:ERROR ['result_num_bytes' > 'n_bytes']\n");
+    return NULL;
+  }
+  // 5. realloc result to the right number of bytes
+  if(num_key_bytes_with_parity != num_result_bytes_with_parity) {
+    result_with_parity = realloc(result_with_parity, num_key_bytes_with_parity);
+    memset(result_with_parity + num_result_bytes_with_parity, 0x00, num_key_bytes_with_parity - num_result_bytes_with_parity);
+    num_result_bytes_with_parity = num_key_bytes_with_parity;
+  }
+  // 6. insert the right number of zeros in the left (decoding throws the result the right, filling the left with zeros)
+  unsigned long correct_num_zeros = get_number_of_left_zeros(key_with_parity, num_key_bytes_with_parity);
+  num_result_bits_with_parity += correct_num_zeros;
+  add_left_zeros(&result_with_parity, &num_result_bytes_with_parity, correct_num_zeros);
   free(key_with_parity);
-  return result;
+  // 7. remove rs code
+  uint8_t* result_without_rs = remove_rs_code(result_with_parity, *num_data_symbols, num_parity_symbols, symsize);
+  free(result_with_parity);
+  unsigned long data_bits = (*num_data_symbols) * symsize;
+  *num_data_symbols = data_bits / 8 + !!(data_bits % 8);
+  return result_without_rs;
 }
 
 void* _watermark_decode_analysis(GRAPH* graph, unsigned long* num_bytes) {

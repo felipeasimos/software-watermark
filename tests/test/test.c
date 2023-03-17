@@ -7,6 +7,12 @@
 #include "sequence_alignment/sequence_alignment.h"
 #include <limits.h>
 
+#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
+  for(unsigned long i = 0; i < len; i++) {\
+    fprintf(stderr, "%hhu", get_bit(bits, i));\
+  }\
+  fprintf(stderr, "\n");
+
 #define PRINT_K(k)\
         char str[100];\
         sprintf(str, "%hhu", k);\
@@ -163,6 +169,14 @@ int merge_unmerge_test() {
   return 0;
 }
 
+void last_n_to_zero(uint8_t* arr, unsigned long size, unsigned long num_zeros) {
+  unsigned long n_bits = size * 8;
+  for(unsigned long i = 0; i < num_zeros; i++) {
+    unsigned long idx = n_bits - i - 1;
+    set_bit(arr, idx, 0);
+  }
+}
+
 int append_remove_rs_code_test() {  
 
   uint8_t data[] = { 183, 128 };
@@ -177,7 +191,7 @@ int append_remove_rs_code_test() {
   ctdd_assert( data_with_rs[0] == 183 );
   ctdd_assert( data_with_rs[1] == 246 );
 
-  uint8_t* data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+  uint8_t* data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, symsize);
   free(data_with_rs);
 
   ctdd_assert( data_without_rs );
@@ -196,7 +210,7 @@ int append_remove_rs_code_test() {
     ctdd_assert( data_with_rs );
     ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
 
-    data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+    data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, symsize);
     free(data_with_rs);
 
     n_bits = num_data_symbols * symsize;
@@ -211,7 +225,7 @@ int append_remove_rs_code_test() {
   unsigned long num_data_symbols_top = sizeof(unsigned short) * 8 / symsize;
   for(unsigned long num_data_symbols = 1; num_data_symbols < num_data_symbols_top; num_data_symbols++) {
     unsigned long num_parity_symbols_max = num_data_symbols / 2 + 1;
-    for(unsigned long num_parity_symbols = 1; num_parity_symbols < num_parity_symbols_max; num_parity_symbols++) {
+    for(unsigned long num_parity_symbols = 1; num_parity_symbols <= num_parity_symbols_max; num_parity_symbols++) {
       unsigned long k_top = 1 << (num_data_symbols * symsize);
       for(unsigned short k = 1; k < k_top; k++) {
         invert_binary_sequence((uint8_t*)&k+1, 1);
@@ -222,7 +236,7 @@ int append_remove_rs_code_test() {
         ctdd_assert( data_with_rs );
         ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
 
-        data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, n_bits, symsize);
+        data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, symsize);
         free(data_with_rs);
 
         n_bits = num_data_symbols * symsize;
@@ -413,48 +427,6 @@ int watermark2017_rs_decode_improved_test() {
         free(result);
         graph_free(graph);
     }
-    return 0;
-}
-
-int watermark2017_rs_3_bit_test() {
-
-    uint8_t data[] = { 183, 128 }; // 0b101_101_11|1_0000000 
-
-    unsigned long num_parity_symbols = 2;
-    unsigned long num_data_symbols = 3;
-    GRAPH* graph = watermark_rs_encode(&data, num_data_symbols, num_parity_symbols, 3);
-    ctdd_assert( graph );
-    uint8_t* result = watermark_rs_decode_improved(graph, &data, &num_data_symbols, num_parity_symbols, 3);
-    ctdd_assert( result );
-    unsigned long size = num_data_symbols;
-    ctdd_assert( size == 2 );
-    ctdd_assert( result[0] == 183 );
-    ctdd_assert( result[1] == 128 );
-    free(result);
-    graph_free(graph);
-
-    for(uint8_t k = 1; k < 255; k++) {
-        unsigned long symsize = 3;
-        unsigned long num_parity_symbols = 2;
-        unsigned long num_data_symbols = 2;
-        GRAPH* graph = watermark_rs_encode(&k, num_data_symbols, num_parity_symbols, symsize);
-        uint8_t* result = watermark_rs_decode_improved(graph, &k, &num_data_symbols, num_parity_symbols, symsize);
-        ctdd_assert(num_data_symbols == sizeof(k));
-        ctdd_assert(*result == k);
-        free(result);
-        graph_free(graph);
-    }
-    // for(unsigned long k = 1; k < 10e13; k=(k<<1)-(k>>1)) {
-    //
-    //     unsigned long num_parity_symbols = 2;
-    //     unsigned long size = sizeof(k);
-    //     GRAPH* graph = watermark_rs_encode8(&k, sizeof(k), num_parity_symbols);
-    //     uint8_t* result = watermark_rs_decode_improved8(graph, &k, &size, num_parity_symbols);
-    //     ctdd_assert(binary_sequence_equal((uint8_t*)&k, result, sizeof(k), size));
-    //     free(result);
-    //     graph_free(graph);
-    // }
-
     return 0;
 }
 
@@ -799,6 +771,74 @@ int sequence_alignment_score_test() {
     return 0;
 }
 
+unsigned short get_key_from_k(unsigned short k, unsigned long symsize, unsigned long num_data_symbols) {
+  unsigned long key = 0;
+  for(unsigned long i = 0; i < sizeof(k); i++) {
+    invert_binary_sequence(&((uint8_t*)&k)[i], 1);
+  }
+  unsigned long n_bits = symsize * num_data_symbols;
+  for(unsigned long i = 0; i < n_bits; i++) {
+    set_bit((void*)&key, i, get_bit((void*)&k, i));
+  }
+  return key;
+}
+
+int watermark2017_rs_3_bit_test() {
+
+    uint8_t symsize = 3;
+    {
+      uint8_t data[] = { 183, 128 }; // 0b101_101_11|1_0000000 
+
+      unsigned long num_parity_symbols = 2;
+      unsigned long num_data_symbols = 3;
+      GRAPH* graph = watermark_rs_encode(&data, num_data_symbols, num_parity_symbols, symsize);
+      ctdd_assert( graph );
+      uint8_t* result = watermark_rs_decode_improved(graph, &data, &num_data_symbols, num_parity_symbols, symsize);
+      ctdd_assert( result );
+      unsigned long size = num_data_symbols;
+      ctdd_assert( size == 2 );
+      ctdd_assert( result[0] == data[0] );
+      ctdd_assert( result[1] == data[1] );
+      free(result);
+      graph_free(graph);
+    }
+
+    unsigned long num_data_symbols_top = sizeof(unsigned short) * 8 / symsize;
+    for(unsigned long num_data_symbols = 1; num_data_symbols < num_data_symbols_top; num_data_symbols++) {
+
+      unsigned long n_bits = num_data_symbols * symsize;
+      unsigned long n_bytes = n_bits / 8 + !!(n_bits % 8);
+      unsigned long num_parity_symbols_top = num_data_symbols / 2 + 1;
+
+      for(unsigned long num_parity_symbols = 1; num_parity_symbols <= num_parity_symbols_top; num_parity_symbols++) {
+        unsigned long k_top = 1 << (num_data_symbols * symsize);
+        for(unsigned short k = 1; k < k_top; k++) {
+          unsigned short key = get_key_from_k(k, symsize, num_data_symbols);
+
+          GRAPH* graph = watermark_rs_encode(&key, num_data_symbols, num_parity_symbols, symsize);
+
+          ctdd_assert( graph );
+
+          unsigned long num_result_bytes = num_data_symbols;
+          uint8_t* result = watermark_rs_decode_improved(graph, &key, &num_result_bytes, num_parity_symbols, symsize);
+
+          ctdd_assert( result );
+          graph_free(graph);
+
+          ctdd_assert( num_result_bytes == n_bytes );
+
+          for(unsigned long i = 0; i < n_bits; i++) {
+            ctdd_assert( get_bit((void*)&key, i) == get_bit((void*)result, i) );
+          }
+          free(result);
+        }
+      }
+    }
+
+    return 0;
+}
+
+
 int run_tests() {
 
     ctdd_verify(graph_test);
@@ -813,7 +853,6 @@ int run_tests() {
     ctdd_verify(watermark2017_improved_test);
     ctdd_verify(watermark2017_rs_test);
     ctdd_verify(watermark2017_rs_decode_improved_test);
-    ctdd_verify(watermark2017_rs_3_bit_test);
     ctdd_verify(watermark2017_decode_analysis_test);
     ctdd_verify(watermark2017_rs_decode_analysis_test);
     ctdd_verify(dijkstra_recognition_test);
@@ -824,6 +863,7 @@ int run_tests() {
     ctdd_verify(watermark_check_rs_test);
     ctdd_verify(watermark_check_rs_analysis_test);
     ctdd_verify(sequence_alignment_score_test);
+    ctdd_verify(watermark2017_rs_3_bit_test);
 
     return 0;
 }

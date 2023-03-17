@@ -71,15 +71,12 @@ void* decode_numeric_string(void* data, unsigned long* data_len);
 unsigned long get_number_of_left_zeros(uint8_t* data, unsigned long data_len);
 unsigned long get_number_of_right_zeros(uint8_t* data, unsigned long data_len);
 void remove_left_zeros(uint8_t* data, unsigned long* data_len);
+void add_left_zeros(uint8_t** data, unsigned long* data_len, unsigned long num_zeros);
 void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, unsigned long symbol_size);
 void unmerge_arr(void* data, unsigned long num_symbols, unsigned long element_size, unsigned long symbol_size, void** res);
 
 // 2017 codec-specific
 uint8_t has_possible_backedge(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
 unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsigned long current_idx);
-
-// bitshift
-void rshift(uint8_t* mem, unsigned long size, uint8_t shift);
-void lshift(uint8_t* mem, unsigned long size, uint8_t shift);
 
 #endif

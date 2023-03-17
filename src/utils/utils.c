@@ -214,6 +214,23 @@ void remove_left_zeros(uint8_t* data, unsigned long* data_len) {
   *data_len = (n_bits - n_left_zeros) / 8 + !!n_left_zeros;
 }
 
+void add_left_zeros(uint8_t** data, unsigned long* data_len, unsigned long num_zeros) {
+  unsigned long old_n_bits = (*data_len) * 8;
+  unsigned long new_n_bits = num_zeros + old_n_bits;
+  unsigned long new_n_bytes = new_n_bits / 8 + !!(new_n_bits % 8);
+  new_n_bits = new_n_bytes * 8;
+
+  uint8_t* new_data = malloc(new_n_bytes);
+  memset(new_data, 0x00, new_n_bytes);
+
+  for(unsigned long i = 0; i < old_n_bits; i++) {
+    set_bit(new_data, num_zeros + i, get_bit(*data, i));
+  }
+  free(*data);
+  *data = new_data;
+  *data_len = new_n_bytes;
+}
+
 void merge_arr(void* data, unsigned long* data_len, unsigned long element_size, unsigned long symbol_size) {
 
   unsigned long num_elements = (*data_len)/element_size;
@@ -327,27 +344,4 @@ unsigned long get_backedge_index(STACK* possible_backedges, GRAPH* graph, unsign
         }
     }
     return backedge_idx;
-}
-
-void rshift(uint8_t* mem, unsigned long size, uint8_t shift) {
-  uint8_t tmp = 0x00;
-  for(unsigned long i = 0; i < size; i++) {
-    // save bits that would be lost in the in-byte shift
-    uint8_t next_tmp = mem[i] << (8 - shift);
-    mem[i] >>= shift;
-    mem[i] |= tmp;
-    tmp = next_tmp;
-  }
-}
-
-void lshift(uint8_t* mem, unsigned long size, uint8_t shift) {
-  uint8_t tmp = 0x00;
-  for(unsigned long i = 0; i < size; i++) {
-    unsigned long idx = size - i - 1;
-    // save bits that would be lost in the in-byte shift
-    uint8_t next_tmp = mem[idx] >> (8 - shift);
-    mem[idx] <<= shift;
-    mem[idx] |= tmp;
-    tmp = next_tmp;
-  }
 }

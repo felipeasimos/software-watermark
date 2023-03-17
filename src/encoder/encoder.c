@@ -174,8 +174,9 @@ GRAPH* watermark_rs_encode8(void* data, unsigned long data_len, unsigned long nu
 
 GRAPH* watermark_rs_encode(void* data, unsigned long num_data_symbols, unsigned long num_parity_symbols, unsigned long symsize) {
 
-    uint8_t* data_with_parity = append_rs_code(data, &num_data_symbols, num_parity_symbols, symsize);
-    GRAPH* graph = watermark_encode(data_with_parity, num_data_symbols); // num_data_symbols == n_bits
+    unsigned long n_bits = num_data_symbols;
+    uint8_t* data_with_parity = append_rs_code(data, &n_bits, num_parity_symbols, symsize);
+    GRAPH* graph = watermark_encode(data_with_parity, n_bits); // num_data_symbols == n_bits
     free(data_with_parity);
     return graph;
 }
