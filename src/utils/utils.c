@@ -131,7 +131,7 @@ unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_
 uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes) {
 
     uint8_t n_zeros_on_the_left = n_bits%8 ? 8 - (n_bits % 8) : 0;
-    *num_bytes = n_bits/8 + !!n_zeros_on_the_left;
+    *num_bytes = n_bits/8 + !!(n_bits%8);
     uint8_t* data = malloc(*num_bytes);
     data[0] = 0;
 
