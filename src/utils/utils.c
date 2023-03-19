@@ -92,7 +92,7 @@ void set_bit(uint8_t* data, unsigned long idx, uint8_t value) {
     }
 }
 
-uint8_t* invert_binary_sequence(uint8_t* data, unsigned long size) {
+void invert_binary_sequence(uint8_t* data, unsigned long size) {
 
     unsigned long total_n_bits = size * 8;
     unsigned long half_n_bits = total_n_bits/2;
@@ -103,10 +103,9 @@ uint8_t* invert_binary_sequence(uint8_t* data, unsigned long size) {
         set_bit(data, i, bit2);
         set_bit(data, total_n_bits-i-1, bit1);
     }
-    return data;
 }
 
-uint8_t* invert_byte_sequence(uint8_t* data, unsigned long size) {
+void invert_byte_sequence(uint8_t* data, unsigned long size) {
 
     unsigned long half_size = size/2;
     for(unsigned long i = 0; i < half_size; i++) {
@@ -116,7 +115,6 @@ uint8_t* invert_byte_sequence(uint8_t* data, unsigned long size) {
         data[size - i - 1] = byte1;
         data[i] = byte2;
     }
-    return data;
 }
 
 unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes) {

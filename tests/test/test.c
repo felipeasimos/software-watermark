@@ -93,7 +93,7 @@ int get_bit_test() {
     ctdd_assert( get_bit((uint8_t*)&arr, 0) == 1 );
     ctdd_assert( get_bit((uint8_t*)&arr, 1) == 0 );
     ctdd_assert( get_bit((uint8_t*)&arr, 2) == 1 );
-    ctdd_assert( get_bit((uint8_t*)&arr, 3) == 1 );
+ctdd_assert( get_bit((uint8_t*)&arr, 3) == 1 );
     ctdd_assert( get_bit((uint8_t*)&arr, 4) == 0 );
     ctdd_assert( get_bit((uint8_t*)&arr, 5) == 0 );
     ctdd_assert( get_bit((uint8_t*)&arr, 6) == 1 );

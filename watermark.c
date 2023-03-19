@@ -168,6 +168,28 @@ unsigned long _check(void* result, void* identifier, unsigned long result_len, u
   return errors;
 }
 
+unsigned long _check_rs(void* result, void* identifier, unsigned long n_bits) {
+
+  // unsigned long bit_idx_identifier = get_first_positive_bit_index(identifier, identifier_bits);
+  // unsigned long bit_idx_result = get_first_positive_bit_index(result, result_bits);
+  long bit_idx_identifier = 0;
+  long bit_idx_result = 0;
+
+  unsigned long errors = 0;
+
+  while(bit_idx_identifier < (long)n_bits && bit_idx_result < (long)n_bits) {
+
+    if( get_bit(identifier, bit_idx_identifier) != get_bit(result, bit_idx_result)) {
+      errors++;
+    }
+    bit_idx_result++;
+    bit_idx_identifier++;
+  }
+  show_bits((void*)identifier, n_bits);
+  show_bits((void*)result, n_bits);
+  return errors + abs((int)n_bits - (int)n_bits);
+}
+
 typedef enum METHOD {
   ORIGINAL,
   IMPROVED,
@@ -196,13 +218,15 @@ unsigned long _test_with_removed_connections(
         ATTACK* attack,
         CONN_LIST* conns) {
 
-    // get copy and remove some of its connections
-    GRAPH* copy = graph_copy(attack->graph);
 #ifdef DEBUG
     uint8_t has_forward_removal = 0;
 #endif
+
+    // get copy and remove some of its connections
+    GRAPH* copy = graph_copy(attack->graph);
     for(CONN_LIST* l = conns; l; l = l->next) {
       graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+
 #ifdef DEBUG
       if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
         printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
@@ -230,13 +254,13 @@ unsigned long _test_with_removed_connections(
         if(!result) {
           free(result);
           graph_free(copy);
-          return (attack->info.rs.n_data_symbols * attack->info.rs.symsize);
+          return attack->info.rs.n_data_symbols * attack->info.rs.symsize;
         }
-        num_bytes = num_bytes / 8 + !!(num_bytes % 8);
         break;
     }
 
-    unsigned long errors = _check(result, attack->identifier, num_bytes, attack->identifier_len);
+    unsigned long errors = attack->method == IMPROVED_WITH_RS ? _check_rs(result, attack->identifier, attack->info.rs.symsize * attack->info.rs.n_data_symbols)
+    : _check(result, attack->identifier, num_bytes, attack->identifier_len) ;
 #ifdef DEBUG
     if(errors > 1 || ( has_forward_removal && errors == 1 )) {
       printf("errors: %lu\n", errors);
@@ -289,10 +313,9 @@ void _multiple_removal_test(
                 // if this is a hamiltonian edge, skip it
                 CONNECTION* c = ( node->out->node == graph_get(attack->graph, node->graph_idx+1) ? node->out->next : node->out );
                 // if this is the first node in the loop, start from the connection given by 'conn'
-                if(node == initial_node) c = (conn ? conn : c);
-                 
+                if(node == initial_node) c = (conn ? conn : c); 
                 for(; c; c = c->next) {
-
+                    // ignore hamiltonian edges
                     if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
                     CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
                     ATTACK another_attack;
@@ -318,6 +341,32 @@ void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
     _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
 }
 
+uint8_t key_is_non_zero(unsigned long key, unsigned long n_data_symbols, unsigned long symsize) {
+  unsigned long n_bits = n_data_symbols * symsize;
+  for(unsigned long i = 0; i < n_bits; i++) {
+    if(get_bit((void*)&key, i)) return 1;
+  }
+  return 0;
+}
+
+void get_key_from_k(unsigned long** k, unsigned long symsize, unsigned long num_data_symbols) {
+  // for(unsigned long i = 0; i < sizeof(*k); i++) {
+  //   invert_binary_sequence(&((uint8_t*)k)[i], 1);
+  // }
+  **k = invert_unsigned_long(**k);
+  // show_bits((void*)*k, sizeof(**k) * 8 );
+  unsigned long total_n_bits = sizeof(**k) * 8;
+  unsigned long data_bits = num_data_symbols * symsize;
+  unsigned long left_zeros = get_number_of_left_zeros((void*)*k, sizeof(**k));
+  long zeros_in_symbol = ( data_bits + left_zeros ) - total_n_bits;
+  unsigned long num_bytes = sizeof(*k);
+  // fprintf(stderr, "zeros_in_symbol: %ld, left_zeros: %lu, total_n_bits: %lu, data_bits: %lu, k: %lu\n", zeros_in_symbol, left_zeros, total_n_bits, data_bits, **k);
+  remove_left_zeros((void*)*k, &num_bytes);
+  // show_bits((void*)*k, data_bits );
+  add_left_zeros((uint8_t**)k, &num_bytes, zeros_in_symbol);
+  // show_bits((void*)*k, data_bits );
+}
+
 void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols, unsigned long symsize) {
 
     unsigned long matrix_size = method == IMPROVED_WITH_RS ? n_bits * symsize + 1 : n_bits + 1;
@@ -330,6 +379,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
     printf("openmp is not being used.\n");
   #endif
 
+    unsigned long identifier_len = sizeof(unsigned long);
     for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
 
         printf("\tnumber of bits: %lu", current_n_bits);
@@ -343,9 +393,8 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
         unsigned long upper_bound = get_upper_bound(current_n_bits);
 
         if(method == IMPROVED_WITH_RS) {
-          lower_bound = 1 << (current_n_bits * symsize);
-          if(current_n_bits == 1) lower_bound = 1;
-          upper_bound = 1 << ((current_n_bits + 1) * symsize);    
+          lower_bound = 1 << ((current_n_bits-1) * symsize);
+          upper_bound = 1 << (current_n_bits * symsize);    
         }
         fprintf(stderr,"lower bound: %lu, upper bound: %lu\n", lower_bound, upper_bound);
 
@@ -356,20 +405,33 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
             STATISTICS statistics = {0};
 
-            unsigned long identifier = invert_unsigned_long(i);
-            unsigned long identifier_len = sizeof(unsigned long);
+            unsigned long* identifier = malloc(sizeof(unsigned long));
+            memset(identifier, 0x00, sizeof(unsigned long));
+            if(method == IMPROVED_WITH_RS) {
+              *identifier = i;
+              get_key_from_k(&identifier, symsize, current_n_bits);
+            } else {
+              *identifier = invert_unsigned_long(i);
+            }
+            if(!key_is_non_zero(*identifier, current_n_bits, symsize)) {
+              fprintf(stderr, "i: %lu\n", i);
+              show_bits((void*)&i, current_n_bits * symsize);
+              fprintf(stderr, "identifier: %lu\n", *identifier);
+              show_bits((void*)identifier, current_n_bits * symsize);
+              exit(EXIT_FAILURE);
+            }
 
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
-               graph = watermark_rs_encode(&identifier, current_n_bits, n_parity_symbols, symsize); 
+              graph = watermark_rs_encode(identifier, current_n_bits, n_parity_symbols, symsize); 
             } else {
-              graph = watermark_encode8(&identifier, identifier_len);
+              graph = watermark_encode8(identifier, identifier_len);
             }
 
             ATTACK attack = {0};
             attack.n_removals = n_removal;
             attack.graph = graph;
-            attack.identifier = &identifier;
+            attack.identifier = identifier;
             attack.identifier_len = identifier_len;
             attack.method = method;
             if(method == IMPROVED_WITH_RS) {
@@ -387,6 +449,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
               #pragma omp critical
             #endif
             matrix[statistics.worst_case][current_n_bits-1]++;
+            free(identifier);
         }
         #if defined(_OPENMP)
           double duration = omp_get_wtime() - start;

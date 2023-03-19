@@ -203,8 +203,6 @@ uint8_t* remove_rs_code(uint8_t* data, unsigned long num_data_symbols, unsigned 
     // 0. initialize variables
     unsigned long num_data_bits = num_data_symbols * symsize;
     unsigned long num_data_bytes = num_data_bits / 8 + !!(num_data_bits % 8);
-    // unsigned long num_parity_bits = num_parity_symbols * symsize;
-    // unsigned long num_parity_bytes = num_parity_bits / 8 + !!(num_parity_bits % 8);
     unsigned long symbol_bytes = symsize / 8 + !!(symsize % 8);
  
     // 1. unmerge data

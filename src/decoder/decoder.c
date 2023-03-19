@@ -240,35 +240,36 @@ void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_d
 
   // 0. initialize variables
   unsigned long num_key_bits_with_parity = *num_data_symbols;
-  show_bits(key, (*num_data_symbols) * symsize);
+  // show_bits(key, (*num_data_symbols) * symsize);
   // 1. get key with RS code
   void* key_with_parity = append_rs_code(key, &num_key_bits_with_parity, num_parity_symbols, symsize);
   // show_bits(key_with_parity, num_key_bits_with_parity);
-  unsigned long num_key_bytes_with_parity = num_key_bits_with_parity / 8 + !!(num_key_bits_with_parity % 8);
   unsigned long num_result_bits_with_parity = num_key_bits_with_parity;
   // 2. decode graph
   uint8_t* result_with_parity = watermark_decode_improved(graph, key_with_parity, &num_result_bits_with_parity);
+  // show_bits(key_with_parity, num_key_bits_with_parity);
   free(key_with_parity);
-  // 3. remove all left zeros from result
+  // 3. remove all left zeros from result (actual data start at first positive index)
   unsigned long num_result_bytes_with_parity = num_result_bits_with_parity / 8 + !!(num_result_bits_with_parity % 8);
   remove_left_zeros(result_with_parity, &num_result_bytes_with_parity);
-  show_bits(result_with_parity, num_result_bits_with_parity);
+  // show_bits(result_with_parity, num_result_bits_with_parity);
+  // show_bits(result_with_parity, num_result_bits_with_parity);
   // 4. if there are more bytes in the result than it should, return NULL
-  if(num_result_bytes_with_parity > num_key_bytes_with_parity) {
-    free(result_with_parity);
-    #ifdef DEBUG
-      fprintf(stderr, "watermark_rs_decode_improved:ERROR ['result_num_bytes' > 'n_bytes']\n");
-    #endif
-    return NULL;
-  }
+  // if(num_result_bytes_with_parity > num_key_bytes_with_parity) {
+  //   free(result_with_parity);
+  //   #ifdef DEBUG
+  //     fprintf(stderr, "watermark_rs_decode_improved:ERROR ['result_num_bytes' > 'n_bytes']\n");
+  //   #endif
+  //   return NULL;
+  // }
   // 5. realloc result to the right number of bytes
-  if(num_key_bytes_with_parity != num_result_bytes_with_parity) {
-    result_with_parity = realloc(result_with_parity, num_key_bytes_with_parity);
-    memset(result_with_parity + num_result_bytes_with_parity, 0x00, num_key_bytes_with_parity - num_result_bytes_with_parity);
-    num_result_bytes_with_parity = num_key_bytes_with_parity;
-  }
+  // if(num_key_bytes_with_parity != num_result_bytes_with_parity) {
+  //   result_with_parity = realloc(result_with_parity, num_key_bytes_with_parity);
+  //   memset(result_with_parity + num_result_bytes_with_parity, 0x00, num_key_bytes_with_parity - num_result_bytes_with_parity);
+  //   num_result_bytes_with_parity = num_key_bytes_with_parity;
+  // }
   // 6. insert the right number of zeros in the left (decoding throws the result the right, filling the left with zeros)
-  long diff = ((*num_data_symbols) + num_parity_symbols) * symsize - num_result_bits_with_parity;
+  long diff = ((int)(*num_data_symbols) + num_parity_symbols) * symsize - (int)num_result_bits_with_parity;
   if(diff < 0) {
     free(result_with_parity);
     #ifdef DEBUG

@@ -61,8 +61,8 @@ void queue_free(QUEUE*);
 // binary sequence
 uint8_t get_bit(uint8_t* data, unsigned long idx);
 void set_bit(uint8_t* data, unsigned long idx, uint8_t value);
-uint8_t* invert_binary_sequence(uint8_t* data, unsigned long size);
-uint8_t* invert_byte_sequence(uint8_t* data, unsigned long size);
+void invert_binary_sequence(uint8_t* data, unsigned long size);
+void invert_byte_sequence(uint8_t* data, unsigned long size);
 unsigned long get_first_positive_bit_index(uint8_t* data, unsigned long size_in_bytes);
 uint8_t* get_sequence_from_bit_arr(uint8_t* bit_arr, unsigned long n_bits, unsigned long* num_bytes);
 uint8_t binary_sequence_equal(uint8_t* data1, uint8_t* data2, unsigned long num_bytes1, unsigned long num_bytes2);
