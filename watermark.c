@@ -25,6 +25,7 @@
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
 #define MIN(a, b) a < b ? a : b
+#define write_graphs do { graph_write_hamiltonian_dot(attack->graph, "original.dot", NULL); graph_write_hamiltonian_dot(copy, "copy.dot", NULL); } while(0)
 
 #define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
   for(unsigned long i = 0; i < len; i++) {\
@@ -220,7 +221,8 @@ typedef struct ATTACK {
 
 unsigned long _test_with_removed_connections(
         ATTACK* attack,
-        CONNECTION** conns) {
+        CONNECTION** conns,
+        unsigned long num_removals) { // num_removals may be lower than requested, if there aren't enough edges
     if(!conns) return 0;
 
 #ifdef DEBUG
@@ -229,7 +231,7 @@ unsigned long _test_with_removed_connections(
 
     // get copy and remove some of its connections
     GRAPH* copy = graph_copy(attack->graph);
-    for(unsigned long i = 0; i < attack->n_removals; i++) {
+    for(unsigned long i = 0; i < num_removals; i++) {
       if(!graph_oriented_disconnect(copy->nodes[conns[i]->parent->graph_idx], copy->nodes[conns[i]->node->graph_idx])) {
         fprintf(stderr, "TEST ERROR: invalid edge removal requested\n");
         exit(EXIT_FAILURE);
@@ -243,8 +245,7 @@ unsigned long _test_with_removed_connections(
         printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
       } else {
         fprintf(stderr, "TEST ERROR: hamiltonian edge removed\n");
-        graph_write_hamiltonian_dot(attack->graph, "original.dot", NULL);
-        graph_write_hamiltonian_dot(copy, "copy.dot", NULL);
+        write_graphs;
         exit(EXIT_FAILURE);
       }
 #endif
@@ -379,8 +380,8 @@ void** get_list_of_combinations(void* arr, unsigned long* len, unsigned long ele
     if(!sub_combinations || !n_comb) continue;
     // append current element to the sub_combinations (each row is in reverse order)
     for(unsigned long j = 0; j < n_comb; j++) {
-      sub_combinations[i] = realloc(sub_combinations[i], element_size * k);
-      memcpy(((uint8_t*)sub_combinations[i]) + (element_size * k), ((uint8_t*)arr) + ( element_size * i), element_size);
+      sub_combinations[j] = realloc(sub_combinations[j], element_size * k);
+      memcpy(((uint8_t*)sub_combinations[j]) + (element_size * (k-1)), ((uint8_t*)arr) + ( element_size * i), element_size);
     }
     // stack combinations
     combinations = stack_combinations(combinations, combinations_len, sub_combinations, n_comb);
@@ -401,12 +402,13 @@ void _multiple_removal_test(
     ATTACK* attack,
     STATISTICS* statistics,
     CONNECTION*** combinations,
-    unsigned long len) {
+    unsigned long num_combinations,
+    unsigned long num_removals) {
 
-  statistics->total+=len;
   // iterate through combinations and attack from them
-  for(unsigned long i = 0; i < len; i++) {
-    statistics->errors = _test_with_removed_connections(attack, combinations[i]);
+  for(unsigned long i = 0; i < num_combinations; i++) {
+    statistics->errors = _test_with_removed_connections(attack, combinations[i], num_removals);
+  statistics->total++;
     if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
   }
 }
@@ -418,13 +420,12 @@ unsigned long fac(unsigned long n) {
 
 void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
     CONN_ARR* arr = get_list_of_non_hamiltonian_edges(attack->graph);
-    if(!arr) {
-      _multiple_removal_test(attack, statistics, NULL, 0);
-      return;
-    }
+    // no edges no errors
+    if(!arr) return;
     unsigned long combinations_len = arr->len;
-    CONNECTION*** combinations = (CONNECTION***)get_list_of_combinations(arr->arr, &combinations_len, sizeof(CONNECTION*), MIN(arr->len, attack->n_removals));
-    _multiple_removal_test(attack, statistics, combinations, combinations_len);
+    unsigned long num_removals = MIN(arr->len, attack->n_removals);
+    CONNECTION*** combinations = (CONNECTION***)get_list_of_combinations(arr->arr, &combinations_len, sizeof(CONNECTION*), num_removals);
+    _multiple_removal_test(attack, statistics, combinations, combinations_len, num_removals);
     conn_arr_free(arr);
     remove_combinations((void**)combinations, combinations_len);
 }
