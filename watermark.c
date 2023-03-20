@@ -4,6 +4,8 @@
 #include "sequence_alignment/sequence_alignment.h"
 #include "dijkstra/dijkstra.h"
 #include <dirent.h>
+#include <math.h>
+
 #if defined(_OPENMP)
   #include <omp.h>
 #else
@@ -22,6 +24,7 @@
 #define GAP -1
 
 #define debug fprintf(stderr, "%s: %d\n", __FILE__, __LINE__)
+#define MIN(a, b) a < b ? a : b
 
 #define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
   for(unsigned long i = 0; i < len; i++) {\
@@ -29,35 +32,10 @@
   }\
   fprintf(stderr, "\n");
 
-typedef struct CONN_LIST {
-
-struct CONN_LIST* next;
-    CONNECTION* conn;
-} CONN_LIST;
-
-CONN_LIST* conn_list_copy(CONN_LIST* l) {
-
-    if(!l) return NULL;
-    CONN_LIST* list = malloc(sizeof(CONN_LIST));
-    list->conn = l->conn;
-    list->next = conn_list_copy(l->next);
-    return list;
-}
-
-CONN_LIST* conn_list_create(CONN_LIST* l, CONNECTION* new_conn) {
-
-    CONN_LIST* list = malloc(sizeof(CONN_LIST));
-    list->conn = new_conn;
-    list->next = conn_list_copy(l);
-    return list;
-}
-
-void conn_list_free(CONN_LIST* list) {
-
-    if(!list) return;
-    conn_list_free(list->next);
-    free(list);
-}
+typedef struct CONN_ARR {
+  unsigned long len;
+  CONNECTION** arr;
+} CONN_ARR;
 
 typedef struct STATISTICS {
     unsigned long total;
@@ -190,6 +168,32 @@ unsigned long _check_rs(void* result, void* identifier, unsigned long n_bits) {
   return errors + abs((int)n_bits - (int)n_bits);
 }
 
+CONN_ARR* conn_arr_create(CONN_ARR* arr, CONNECTION* conn) {
+
+  if(!arr) { 
+    arr = malloc(sizeof(CONN_ARR));
+    memset(arr, 0x00, sizeof(CONN_ARR));
+  }
+  arr->len += 1;
+  arr->arr = realloc(arr->arr, arr->len * sizeof(CONNECTION*));
+  arr->arr[arr->len - 1] = conn;
+  return arr;
+}
+
+CONN_ARR* conn_arr_copy(CONN_ARR* arr) {
+  CONN_ARR* new = malloc(sizeof(CONN_ARR));
+  new->len = arr->len;
+  new->arr = malloc(arr->len * sizeof(CONNECTION*));
+  memcpy(new->arr, arr->arr, sizeof(CONNECTION*) * new->len);
+  return new;
+}
+
+void conn_arr_free(CONN_ARR* arr) {
+  free(arr->arr);
+  arr->len = 0;
+  free(arr);
+}
+
 typedef enum METHOD {
   ORIGINAL,
   IMPROVED,
@@ -216,7 +220,8 @@ typedef struct ATTACK {
 
 unsigned long _test_with_removed_connections(
         ATTACK* attack,
-        CONN_LIST* conns) {
+        CONNECTION** conns) {
+    if(!conns) return 0;
 
 #ifdef DEBUG
     uint8_t has_forward_removal = 0;
@@ -224,15 +229,23 @@ unsigned long _test_with_removed_connections(
 
     // get copy and remove some of its connections
     GRAPH* copy = graph_copy(attack->graph);
-    for(CONN_LIST* l = conns; l; l = l->next) {
-      graph_oriented_disconnect(copy->nodes[l->conn->parent->graph_idx], copy->nodes[l->conn->node->graph_idx]);
+    for(unsigned long i = 0; i < attack->n_removals; i++) {
+      if(!graph_oriented_disconnect(copy->nodes[conns[i]->parent->graph_idx], copy->nodes[conns[i]->node->graph_idx])) {
+        fprintf(stderr, "TEST ERROR: invalid edge removal requested\n");
+        exit(EXIT_FAILURE);
+      }
 
 #ifdef DEBUG
-      if(l->conn->parent->graph_idx > l->conn->node->graph_idx) {
-        printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
-      } else {
+      if(conns[i]->parent->graph_idx > conns[i]->node->graph_idx) {
+        printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
+      } else if(conns[i]->parent->graph_idx + 2 == conns[i]->node->graph_idx ) {
         has_forward_removal = 1;
-        printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", l->conn->parent->graph_idx, l->conn->node->graph_idx);
+        printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
+      } else {
+        fprintf(stderr, "TEST ERROR: hamiltonian edge removed\n");
+        graph_write_hamiltonian_dot(attack->graph, "original.dot", NULL);
+        graph_write_hamiltonian_dot(copy, "copy.dot", NULL);
+        exit(EXIT_FAILURE);
       }
 #endif
     }
@@ -262,7 +275,7 @@ unsigned long _test_with_removed_connections(
     unsigned long errors = attack->method == IMPROVED_WITH_RS ? _check_rs(result, attack->identifier, attack->info.rs.symsize * attack->info.rs.n_data_symbols)
     : _check(result, attack->identifier, num_bytes, attack->identifier_len) ;
 #ifdef DEBUG
-    if(errors > 1 || ( has_forward_removal && errors == 1 )) {
+    if(errors > 1 || (( has_forward_removal && errors == 1 )&&0)) {
       printf("errors: %lu\n", errors);
       printf("identifier: ");
       for(unsigned long i = get_first_positive_bit_index(attack->identifier, attack->identifier_len); i < attack->identifier_len * 8; i++) {
@@ -291,54 +304,129 @@ unsigned long _test_with_removed_connections(
     return errors;
 }
 
+uint8_t is_hamiltonian(CONNECTION* conn) {
+  return conn->parent->graph_idx + 1 == conn->node->graph_idx;
+}
+
+CONNECTION* conn_next(CONNECTION* conn) {
+  if(conn->next) return conn->next;
+  // iterate over nodes
+  for(NODE* next_node = graph_get(conn->parent->graph, conn->parent->graph_idx + 1); next_node; next_node = graph_get(next_node->graph, next_node->graph_idx + 1)) {
+    if(next_node->out) return next_node->out;
+  }
+  return NULL;
+}
+
+CONNECTION* conn_next_non_hamiltonian_edge(CONNECTION* conn) {
+  do {
+    conn = conn_next(conn);
+  } while(conn && is_hamiltonian(conn));
+  return conn;
+}
+
+CONN_ARR* get_list_of_non_hamiltonian_edges(GRAPH* graph) {
+ 
+  CONN_ARR* arr = NULL;
+  CONNECTION* conn = conn_next_non_hamiltonian_edge(graph->nodes[0]->out);
+  for(; conn; conn = conn_next_non_hamiltonian_edge(conn)) {
+    arr = conn_arr_create(arr, conn);
+  }
+  if(!arr) return NULL;
+#ifdef DEBUG
+  for(unsigned long i = 0 ; i < arr->len; i++) {
+    CONNECTION* conn = arr->arr[i];
+    if( conn->parent->graph_idx + 1 == conn->node->graph_idx) {
+      fprintf(stderr, "TEST ERROR: hamiltonian edge added to removal combination array\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+#endif
+  return arr;
+}
+
+void** stack_combinations(void** comb1, unsigned long comb1len, void** comb2, unsigned long comb2len) {
+
+  unsigned long nrows = comb1len + comb2len;
+  void** combinations = calloc(nrows, sizeof(void*));
+  for(unsigned long i = 0; i < comb1len; i++) {
+    combinations[i] = comb1[i];
+  }
+  for(unsigned long i = comb1len; i < nrows; i++) {
+    combinations[i] = comb2[i - comb1len];
+  }
+  free(comb1);
+  free(comb2);
+  return combinations;
+}
+
+void** get_list_of_combinations(void* arr, unsigned long* len, unsigned long element_size, unsigned long k) {
+  if(!arr || *len < k || !k) return NULL;
+  // for k = 1 is just every element in a different row
+  if(k == 1) {
+    void** combinations = malloc(sizeof(void*) * (*len));
+    for(unsigned long i = 0; i < *len; i++) {
+      combinations[i] = malloc(element_size);
+      memcpy(combinations[i], (uint8_t*)arr + (element_size * i), element_size);
+    }
+    return combinations;
+  }
+  unsigned long arr_len = *len;
+  void** combinations = NULL;
+  unsigned long combinations_len = 0;
+  for(unsigned long i = 0; i < arr_len; i++) {
+    unsigned long n_comb = *len - i - 1;
+    void** sub_combinations = get_list_of_combinations(((uint8_t*)arr) + (element_size * (i+1)), &n_comb, element_size, k-1);
+    if(!sub_combinations || !n_comb) continue;
+    // append current element to the sub_combinations (each row is in reverse order)
+    for(unsigned long j = 0; j < n_comb; j++) {
+      sub_combinations[i] = realloc(sub_combinations[i], element_size * k);
+      memcpy(((uint8_t*)sub_combinations[i]) + (element_size * k), ((uint8_t*)arr) + ( element_size * i), element_size);
+    }
+    // stack combinations
+    combinations = stack_combinations(combinations, combinations_len, sub_combinations, n_comb);
+    combinations_len += n_comb;
+  }
+  *len = combinations_len;
+  return combinations;
+}
+
+void remove_combinations(void** combinations, unsigned long len) {
+  for(unsigned long i = 0; i < len; i++) {
+    free(combinations[i]);
+  }
+  free(combinations);
+}
+
 void _multiple_removal_test(
     ATTACK* attack,
     STATISTICS* statistics,
-    CONN_LIST* non_hamiltonian_edges,
-    NODE* node,
-    CONNECTION* conn) {
+    CONNECTION*** combinations,
+    unsigned long len) {
 
-    if(!attack->n_removals) {
-        statistics->total++;
-        statistics->errors = _test_with_removed_connections(attack, non_hamiltonian_edges);
-        if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
-    } else {
+  statistics->total+=len;
+  // iterate through combinations and attack from them
+  for(unsigned long i = 0; i < len; i++) {
+    statistics->errors = _test_with_removed_connections(attack, combinations[i]);
+    if(statistics->errors > statistics->worst_case) statistics->worst_case = statistics->errors;
+  }
+}
 
-        NODE* initial_node = node;
-
-        for(; node; node = graph_get(attack->graph, node->graph_idx+1)) {
-
-            if(node->out) {
-
-                // if this is a hamiltonian edge, skip it
-                CONNECTION* c = ( node->out->node == graph_get(attack->graph, node->graph_idx+1) ? node->out->next : node->out );
-                // if this is the first node in the loop, start from the connection given by 'conn'
-                if(node == initial_node) c = (conn ? conn : c); 
-                for(; c; c = c->next) {
-                    // ignore hamiltonian edges
-                    if(c->parent->graph_idx + 1 == c->node->graph_idx ) continue;
-                    CONN_LIST* list = conn_list_create(non_hamiltonian_edges, c);
-                    ATTACK another_attack;
-                    memcpy(&another_attack, attack, sizeof(ATTACK));
-                    another_attack.n_removals -= 1;
-                    _multiple_removal_test(
-                        &another_attack,
-                        statistics,
-                        list,
-                        node,
-                        c->next);
-
-                    conn_list_free(list);
-                }
-            }
-
-        }
-    }
+unsigned long fac(unsigned long n) {
+  if(n == 1 || !n) return 1;
+  return n * fac(n-1);
 }
 
 void multiple_removal_test(ATTACK* attack, STATISTICS* statistics) {
-
-    _multiple_removal_test(attack, statistics, NULL, attack->graph->nodes[0], NULL);
+    CONN_ARR* arr = get_list_of_non_hamiltonian_edges(attack->graph);
+    if(!arr) {
+      _multiple_removal_test(attack, statistics, NULL, 0);
+      return;
+    }
+    unsigned long combinations_len = arr->len;
+    CONNECTION*** combinations = (CONNECTION***)get_list_of_combinations(arr->arr, &combinations_len, sizeof(CONNECTION*), MIN(arr->len, attack->n_removals));
+    _multiple_removal_test(attack, statistics, combinations, combinations_len);
+    conn_arr_free(arr);
+    remove_combinations((void**)combinations, combinations_len);
 }
 
 uint8_t key_is_non_zero(unsigned long key, unsigned long n_data_symbols, unsigned long symsize) {
@@ -413,13 +501,13 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
             } else {
               *identifier = invert_unsigned_long(i);
             }
-            if(!key_is_non_zero(*identifier, current_n_bits, symsize)) {
-              fprintf(stderr, "i: %lu\n", i);
-              show_bits((void*)&i, current_n_bits * symsize);
-              fprintf(stderr, "identifier: %lu\n", *identifier);
-              show_bits((void*)identifier, current_n_bits * symsize);
-              exit(EXIT_FAILURE);
-            }
+            // if(!key_is_non_zero(*identifier, current_n_bits, symsize)) {
+            //   fprintf(stderr, "i: %lu\n", i);
+            //   show_bits((void*)&i, current_n_bits * symsize);
+            //   fprintf(stderr, "identifier: %lu\n", *identifier);
+            //   show_bits((void*)identifier, current_n_bits * symsize);
+            //   exit(EXIT_FAILURE);
+            // }
 
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
@@ -427,7 +515,6 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
             } else {
               graph = watermark_encode8(identifier, identifier_len);
             }
-
             ATTACK attack = {0};
             attack.n_removals = n_removal;
             attack.graph = graph;
@@ -443,7 +530,6 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
             }
 
             multiple_removal_test(&attack, &statistics);
-
             graph_free(graph);
             #if defined(_OPENMP) 
               #pragma omp critical

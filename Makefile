@@ -31,6 +31,7 @@ help:
 # v v v v v v v v v v v v v v v v v v v v v v
 
 # compiler being used
+# COMPILER :=clang -fopenmp
 COMPILER :=clang
 
 # flags that will be used in every compilation command
