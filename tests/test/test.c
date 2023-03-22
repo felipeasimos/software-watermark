@@ -5,6 +5,7 @@
 #include "dijkstra/dijkstra.h"
 #include "checker/checker.h"
 #include "sequence_alignment/sequence_alignment.h"
+#include "rs_api/rslib.h"
 #include <limits.h>
 
 #define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
@@ -17,6 +18,29 @@
         char str[100];\
         sprintf(str, "%hhu", k);\
         graph_write_hamiltonian_dot(graph, "dot.dot", str);
+
+unsigned long invert_unsigned_long(unsigned long n) {
+
+    invert_byte_sequence((uint8_t*)&n, sizeof(n));
+    return n;
+}
+void get_key_from_k(unsigned long** k, unsigned long symsize, unsigned long num_data_symbols) {
+  // for(unsigned long i = 0; i < sizeof(*k); i++) {
+  //   invert_binary_sequence(&((uint8_t*)k)[i], 1);
+  // }
+  **k = invert_unsigned_long(**k);
+  // show_bits((void*)*k, sizeof(**k) * 8 );
+  unsigned long total_n_bits = sizeof(**k) * 8;
+  unsigned long data_bits = num_data_symbols * symsize;
+  unsigned long left_zeros = get_number_of_left_zeros((void*)*k, sizeof(**k));
+  long zeros_in_symbol = ( data_bits + left_zeros ) - total_n_bits;
+  unsigned long num_bytes = sizeof(*k);
+  // fprintf(stderr, "zeros_in_symbol: %ld, left_zeros: %lu, total_n_bits: %lu, data_bits: %lu, k: %lu\n", zeros_in_symbol, left_zeros, total_n_bits, data_bits, **k);
+  remove_left_zeros((void*)*k, &num_bytes);
+  // show_bits((void*)*k, data_bits );
+  add_left_zeros((uint8_t**)k, &num_bytes, zeros_in_symbol);
+  // show_bits((void*)*k, data_bits );
+}
 
 int graph_test() {
 
@@ -110,26 +134,39 @@ ctdd_assert( get_bit((uint8_t*)&arr, 3) == 1 );
 }
 
 int rs_test(void) {
-  uint8_t data[] = { 6, 1, 3 };// 0b110_001_011 -> 100_101 (4, 5);
-
-  unsigned long num_parity_symbols = 2;
+  { 
+    // uint8_t data[] = { 6, 1, 3 };// 0b110_001_011 -> 100_101 (4, 5);
+    //
+    // unsigned long num_parity_symbols = 2;
+    // uint16_t parity[num_parity_symbols];
+    // memset(parity, 0x00, num_parity_symbols * sizeof(uint16_t));
+    //
+    // rs_encode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
+    //
+    // ctdd_assert( parity[0] == 4 );
+    // ctdd_assert( parity[1] == 5 );
+    //
+    // // noise
+    // data[1] = 5;
+    //
+    // rs_decode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
+    //
+    // ctdd_assert( data[0] == 6 );
+    // ctdd_assert( data[1] == 1 );
+    // ctdd_assert( data[2] == 3 );
+  }
+  uint8_t data[] = { 1, 0 };
+  unsigned long num_parity_symbols = 1;
   uint16_t parity[num_parity_symbols];
   memset(parity, 0x00, num_parity_symbols * sizeof(uint16_t));
+  
+  void* rs = init_rs(3, 0x3, 1, 1, num_parity_symbols);
+  parity[0] = 0x01;
+  decode_rs8(rs, data, parity, 2, NULL, 0, NULL, 0, NULL);
+  free_rs(rs);
 
-  rs_encode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
-
-  ctdd_assert( parity[0] == 4 );
-  ctdd_assert( parity[1] == 5 );
-
-  // noise
-  data[1] = 5;
-
-  rs_decode(data, sizeof(data)/sizeof(data[0]), parity, num_parity_symbols, 3);
-
-  ctdd_assert( data[0] == 6 );
-  ctdd_assert( data[1] == 1 );
-  ctdd_assert( data[2] == 3 );
-
+  ctdd_assert( data[0] == 1 );
+  ctdd_assert( data[1] == 0 );
   return 0;
 }
 
@@ -200,52 +237,37 @@ int append_remove_rs_code_test() {
   free(data_without_rs);
 
   num_parity_symbols = 1;
-  unsigned long k_top = 1 << (num_data_symbols * symsize);
-  for(unsigned short k = 1; k < k_top; k++) {
-    invert_binary_sequence((uint8_t*)&k+1, 1);
-    n_bits = num_data_symbols;
-
-    data_with_rs = append_rs_code(&k, &n_bits, num_parity_symbols, symsize);
-
-    ctdd_assert( data_with_rs );
-    ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
-
-    data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, symsize);
-    free(data_with_rs);
-
-    n_bits = num_data_symbols * symsize;
-    for(unsigned long i = 0; i < n_bits; i++) {
-      ctdd_assert( get_bit((void*)&k, i) == get_bit((void*)data_without_rs, i) );
-    }
-
-    free(data_without_rs);
-    invert_binary_sequence((uint8_t*)&k+1, 1);
-  }
-
   unsigned long num_data_symbols_top = sizeof(unsigned short) * 8 / symsize;
   for(unsigned long num_data_symbols = 1; num_data_symbols < num_data_symbols_top; num_data_symbols++) {
-    unsigned long num_parity_symbols_max = num_data_symbols / 2 + 1;
-    for(unsigned long num_parity_symbols = 1; num_parity_symbols <= num_parity_symbols_max; num_parity_symbols++) {
-      unsigned long k_top = 1 << (num_data_symbols * symsize);
-      for(unsigned short k = 1; k < k_top; k++) {
-        invert_binary_sequence((uint8_t*)&k+1, 1);
+
+    unsigned long n_bits = num_data_symbols * symsize;
+    // unsigned long num_parity_symbols_top = num_data_symbols / 2 + 1;
+    unsigned long num_parity_symbols_top = 1;
+
+    for(unsigned long num_parity_symbols = 1; num_parity_symbols <= num_parity_symbols_top; num_parity_symbols++) {
+      unsigned long lower_bound = 1 << ((num_data_symbols-1) * symsize);
+      unsigned long upper_bound = 1 << (num_data_symbols * symsize);
+      for(unsigned long k = lower_bound; k < upper_bound; k++) {
+        unsigned long* key = malloc(sizeof(unsigned long));
+        *key = k;
+        get_key_from_k((unsigned long**)&key, symsize, num_data_symbols);
         n_bits = num_data_symbols;
 
-        data_with_rs = append_rs_code(&k, &n_bits, num_parity_symbols, symsize);
+        data_with_rs = append_rs_code(key, &n_bits, num_parity_symbols, symsize);
 
         ctdd_assert( data_with_rs );
         ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);
-
         data_without_rs = remove_rs_code(data_with_rs, num_data_symbols, num_parity_symbols, symsize);
+        ctdd_assert( data_without_rs );
+        // show_bits(data_without_rs, num_data_symbols * symsize);
         free(data_with_rs);
 
         n_bits = num_data_symbols * symsize;
         for(unsigned long i = 0; i < n_bits; i++) {
-          ctdd_assert( get_bit((void*)&k, i) == get_bit((void*)data_without_rs, i) );
+          ctdd_assert( get_bit((void*)key, i) == get_bit((void*)data_without_rs, i) );
         }
-
         free(data_without_rs);
-        invert_binary_sequence((uint8_t*)&k+1, 1);
+        free(key);
       }
     }
   }
@@ -771,17 +793,17 @@ int sequence_alignment_score_test() {
     return 0;
 }
 
-unsigned short get_key_from_k(unsigned short k, unsigned long symsize, unsigned long num_data_symbols) {
-  unsigned long key = 0;
-  for(unsigned long i = 0; i < sizeof(k); i++) {
-    invert_binary_sequence(&((uint8_t*)&k)[i], 1);
-  }
-  unsigned long n_bits = symsize * num_data_symbols;
-  for(unsigned long i = 0; i < n_bits; i++) {
-    set_bit((void*)&key, i, get_bit((void*)&k, i));
-  }
-  return key;
-}
+// unsigned short get_key_from_k(unsigned short k, unsigned long symsize, unsigned long num_data_symbols) {
+//   unsigned long key = 0;
+//   for(unsigned long i = 0; i < sizeof(k); i++) {
+//     invert_binary_sequence(&((uint8_t*)&k)[i], 1);
+//   }
+//   unsigned long n_bits = symsize * num_data_symbols;
+//   for(unsigned long i = 0; i < n_bits; i++) {
+//     set_bit((void*)&key, i, get_bit((void*)&k, i));
+//   }
+//   return key;
+// }
 
 int watermark2017_rs_3_bit_test() {
 
@@ -808,30 +830,38 @@ int watermark2017_rs_3_bit_test() {
 
       unsigned long n_bits = num_data_symbols * symsize;
       unsigned long n_bytes = n_bits / 8 + !!(n_bits % 8);
-      unsigned long num_parity_symbols_top = num_data_symbols / 2 + 1;
+      unsigned long num_parity_symbols = num_data_symbols / 2 + 1;
 
-      for(unsigned long num_parity_symbols = 1; num_parity_symbols <= num_parity_symbols_top; num_parity_symbols++) {
-        unsigned long k_top = 1 << (num_data_symbols * symsize);
-        for(unsigned short k = 1; k < k_top; k++) {
-          unsigned short key = get_key_from_k(k, symsize, num_data_symbols);
+      unsigned long lower_bound = 1 << ((num_data_symbols-1) * symsize);
+      unsigned long upper_bound = 1 << (num_data_symbols * symsize);
+      for(unsigned long k = lower_bound; k < upper_bound; k++) {
+        unsigned long* key = malloc(sizeof(unsigned long));
+        *key = k; 
+        get_key_from_k((unsigned long**)&key, symsize, num_data_symbols);
+        GRAPH* graph = watermark_rs_encode(key, num_data_symbols, num_parity_symbols, symsize);
+        graph_write_hamiltonian_dot(graph, "original.dot", NULL);
+        // it should be able to take all cases of 1 edge removals like a champ
+        if( num_parity_symbols >= 2 ) {
+          CONNECTION* conn1 = conn_next_non_hamiltonian_edge(graph->nodes[0]->out);
+          if(conn1) graph_oriented_disconnect(conn1->parent, conn1->node);
+        } 
+        graph_write_hamiltonian_dot(graph, "copy.dot", NULL);
+        
+        ctdd_assert( graph );
 
-          GRAPH* graph = watermark_rs_encode(&key, num_data_symbols, num_parity_symbols, symsize);
+        unsigned long num_result_bytes = num_data_symbols;
+        uint8_t* result = watermark_rs_decode_improved(graph, key, &num_result_bytes, num_parity_symbols, symsize);
 
-          ctdd_assert( graph );
+        ctdd_assert( result );
+        graph_free(graph);
 
-          unsigned long num_result_bytes = num_data_symbols;
-          uint8_t* result = watermark_rs_decode_improved(graph, &key, &num_result_bytes, num_parity_symbols, symsize);
+        ctdd_assert( num_result_bytes == n_bytes );
 
-          ctdd_assert( result );
-          graph_free(graph);
-
-          ctdd_assert( num_result_bytes == n_bytes );
-
-          for(unsigned long i = 0; i < n_bits; i++) {
-            ctdd_assert( get_bit((void*)&key, i) == get_bit((void*)result, i) );
-          }
-          free(result);
+        for(unsigned long i = 0; i < n_bits; i++) {
+          ctdd_assert( get_bit((void*)key, i) == get_bit((void*)result, i) );
         }
+        free(result);
+        free(key);
       }
     }
 

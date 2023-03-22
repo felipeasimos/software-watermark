@@ -1,0 +1,131 @@
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/checker/checker.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/checker/checker.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/code_generation/code_generation.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/code_generation/code_generation.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/connection/connection.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/connection/connection.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/decoder/decoder.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/decoder/decoder.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/dijkstra/dijkstra.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/dijkstra/dijkstra.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/encoder/encoder.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/encoder/encoder.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/graph/graph.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/graph/graph.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/hashmap/hashmap.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/hashmap/hashmap.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/node/node.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/node/node.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/rs_api/reed_solomon.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/rs_api/reed_solomon.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/rs_api/rs.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/rs_api/rs.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/sequence_alignment/sequence_alignment.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/sequence_alignment/sequence_alignment.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/set/set.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/set/set.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG  -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//src/utils/utils.c -c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/utils/utils.o  
+clang -fPIC -pedantic-errors -Wall -Wextra  -Werror -O3 -DNDEBUG   -I/home/asimos/Documents/uff/ic/waterwark/software-watermark//include /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/checker/checker.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/code_generation/code_generation.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/connection/connection.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/decoder/decoder.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/dijkstra/dijkstra.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/encoder/encoder.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/graph/graph.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/hashmap/hashmap.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/node/node.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/rs_api/reed_solomon.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/rs_api/rs.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/sequence_alignment/sequence_alignment.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/set/set.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/objs/utils/utils.o /home/asimos/Documents/uff/ic/waterwark/software-watermark//watermark.c -o /home/asimos/Documents/uff/ic/waterwark/software-watermark//build/main/watermark    
+make -C /home/asimos/Documents/uff/ic/waterwark/software-watermark/ clean-objs
+make[1]: Entering directory '/home/asimos/Documents/uff/ic/waterwark/software-watermark'
+make[1]: Leaving directory '/home/asimos/Documents/uff/ic/waterwark/software-watermark'
+/home/asimos/Documents/uff/ic/waterwark/software-watermark//build/main/watermark
+1) encode string
+2) encode number
+3) encode number with reed solomon
+4) generate graph from dijkstra code
+5) run removal test
+6) run removal test with improved decoding
+7) run removal test with improved decoding and reed solomon
+8) reed solomon encode
+9) reed solomon decode
+10) show report matrix
+else) exit
+input an option: input number of removals: input maximum number of message symbols: input number of parity symbols: input symbol size (1-16): openmp is not being used.
+	number of bits: 1 - 0.000204 secs
+	number of bits: 2parity zero
+parity zero
+parity zero
+parity zero
+ - 0.001687 secs
+	number of bits: 3parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+parity zero
+ - 0.018874 secs
+lost bits\bits in key
+        1     & 2     & 3     & 4     & 5     & 6     & 7     & 8     & 9     & 10   
+0     & 7     & 54    & 425   & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+1     & 0     & 1     & 8     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+2     & 0     & 1     & 13    & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+3     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+4     & 0     & 0     & 2     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+5     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+6     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+7     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+8     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+9     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline
+Total & 7     & 56    & 448   & 0     & 0     & 0     & 0     & 0     & 0     & 0    \\ \hline

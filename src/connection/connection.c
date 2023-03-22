@@ -1,4 +1,5 @@
 #include "connection/connection.h"
+#include "node/node.h"
 
 CONNECTION* connection_create(NODE* parent, NODE* node) {
 
@@ -88,4 +89,24 @@ void connection_print(CONNECTION* connection, void(*print_func)(FILE*, NODE*)){
         node_print(connection->node, print_func);
         printf(" ");
     }
+}
+
+uint8_t is_hamiltonian(CONNECTION* conn) {
+  return conn->parent->graph_idx + 1 == conn->node->graph_idx;
+}
+
+CONNECTION* conn_next(CONNECTION* conn) {
+  if(conn->next) return conn->next;
+  // iterate over nodes
+  for(NODE* next_node = graph_get(conn->parent->graph, conn->parent->graph_idx + 1); next_node; next_node = graph_get(next_node->graph, next_node->graph_idx + 1)) {
+    if(next_node->out) return next_node->out;
+  }
+  return NULL;
+}
+
+CONNECTION* conn_next_non_hamiltonian_edge(CONNECTION* conn) {
+  do {
+    conn = conn_next(conn);
+  } while(conn && is_hamiltonian(conn));
+  return conn;
 }

@@ -2,9 +2,9 @@
 #define CONNECTION_H
 
 #include <stdio.h>
-#include <string.h>
+#include <stdint.h>
 
-struct NODE; //just so we can point to NODE struct before including node.h
+typedef struct NODE NODE; //just so we can point to NODE struct before including node.h
 
 //connections, pointing to the next connection on the simple linked list
 typedef struct CONNECTION{
@@ -14,8 +14,6 @@ typedef struct CONNECTION{
     struct CONNECTION* next;
     struct CONNECTION* prev;
 } CONNECTION;
-
-#include "node/node.h" //we can't include it before 'struct NODE;'
 
 //create empty connection
 CONNECTION* connection_create(NODE* parent, NODE* node);
@@ -31,5 +29,9 @@ uint8_t connection_delete_neighbour(CONNECTION* connection_node, NODE* graph_nod
 void connection_free(CONNECTION* connection_root);
 
 void connection_print(CONNECTION* connection, void (*)(FILE*, NODE*));
+
+uint8_t is_hamiltonian(CONNECTION* conn);
+CONNECTION* conn_next(CONNECTION* conn);
+CONNECTION* conn_next_non_hamiltonian_edge(CONNECTION* conn);
 
 #endif

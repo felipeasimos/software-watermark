@@ -27,7 +27,7 @@
 #define MIN(a, b) a < b ? a : b
 #define write_graphs do { graph_write_hamiltonian_dot(attack->graph, "original.dot", NULL); graph_write_hamiltonian_dot(copy, "copy.dot", NULL); } while(0)
 
-#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
+#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ": ", __FILE__, __LINE__);\
   for(unsigned long i = 0; i < len; i++) {\
     fprintf(stderr, "%hhu", get_bit(bits, i));\
   }\
@@ -164,8 +164,8 @@ unsigned long _check_rs(void* result, void* identifier, unsigned long n_bits) {
     bit_idx_result++;
     bit_idx_identifier++;
   }
-  show_bits((void*)identifier, n_bits);
-  show_bits((void*)result, n_bits);
+  // show_bits((void*)identifier, n_bits);
+  // show_bits((void*)result, n_bits);
   return errors + abs((int)n_bits - (int)n_bits);
 }
 
@@ -239,10 +239,10 @@ unsigned long _test_with_removed_connections(
 
 #ifdef DEBUG
       if(conns[i]->parent->graph_idx > conns[i]->node->graph_idx) {
-        printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
+        // printf("removed \x1b[31mbackedge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
       } else if(conns[i]->parent->graph_idx + 2 == conns[i]->node->graph_idx ) {
         has_forward_removal = 1;
-        printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
+        // printf("removed \x1b[92mforward edge\x1b[0m from %lu to %lu\n", conns[i]->parent->graph_idx, conns[i]->node->graph_idx);
       } else {
         fprintf(stderr, "TEST ERROR: hamiltonian edge removed\n");
         write_graphs;
@@ -264,7 +264,7 @@ unsigned long _test_with_removed_connections(
         break;
       case IMPROVED_WITH_RS:
         num_bytes = attack->info.rs.n_data_symbols;
-        result = watermark_rs_decode_improved(attack->graph, attack->identifier, &num_bytes, attack->info.rs.n_parity_symbols, attack->info.rs.symsize);
+        result = watermark_rs_decode_improved(copy, attack->identifier, &num_bytes, attack->info.rs.n_parity_symbols, attack->info.rs.symsize);
         if(!result) {
           free(result);
           graph_free(copy);
@@ -276,10 +276,11 @@ unsigned long _test_with_removed_connections(
     unsigned long errors = attack->method == IMPROVED_WITH_RS ? _check_rs(result, attack->identifier, attack->info.rs.symsize * attack->info.rs.n_data_symbols)
     : _check(result, attack->identifier, num_bytes, attack->identifier_len) ;
 #ifdef DEBUG
-    if(errors > 1 || (( has_forward_removal && errors == 1 )&&0)) {
+    if(errors >= 1 || (( has_forward_removal && errors == 1 )&&0)) {
       printf("errors: %lu\n", errors);
       printf("identifier: ");
-      for(unsigned long i = get_first_positive_bit_index(attack->identifier, attack->identifier_len); i < attack->identifier_len * 8; i++) {
+      unsigned long n_bits = attack->method == IMPROVED_WITH_RS ? attack->info.rs.symsize * attack->info.rs.n_data_symbols : attack->identifier_len * 8;
+      for(unsigned long i = 0; i < n_bits; i++) {
         printf("%hhu", get_bit(attack->identifier, i));
       }
       printf("\n");
@@ -291,11 +292,11 @@ unsigned long _test_with_removed_connections(
       printf("\n");
       graph_print(copy, NULL);
     } else {
-      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
-        printf("%hhu", get_bit(result, i));
-      }
-      printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
-      if(errors) graph_print(copy, NULL);
+      // for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+      //   printf("%hhu", get_bit(result, i));
+      // }
+      // printf(": %lu errors \x1b[32m✓\x1b[0m\n", errors);
+      // if(errors) graph_print(copy, NULL);
     }
 #endif
 
@@ -303,26 +304,6 @@ unsigned long _test_with_removed_connections(
     graph_free(copy);
 
     return errors;
-}
-
-uint8_t is_hamiltonian(CONNECTION* conn) {
-  return conn->parent->graph_idx + 1 == conn->node->graph_idx;
-}
-
-CONNECTION* conn_next(CONNECTION* conn) {
-  if(conn->next) return conn->next;
-  // iterate over nodes
-  for(NODE* next_node = graph_get(conn->parent->graph, conn->parent->graph_idx + 1); next_node; next_node = graph_get(next_node->graph, next_node->graph_idx + 1)) {
-    if(next_node->out) return next_node->out;
-  }
-  return NULL;
-}
-
-CONNECTION* conn_next_non_hamiltonian_edge(CONNECTION* conn) {
-  do {
-    conn = conn_next(conn);
-  } while(conn && is_hamiltonian(conn));
-  return conn;
 }
 
 CONN_ARR* get_list_of_non_hamiltonian_edges(GRAPH* graph) {
@@ -470,6 +451,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
     unsigned long identifier_len = sizeof(unsigned long);
     for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
+        n_parity_symbols = n_removal * 2;
 
         printf("\tnumber of bits: %lu", current_n_bits);
         #if defined(_OPENMP)
@@ -483,7 +465,7 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
         if(method == IMPROVED_WITH_RS) {
           lower_bound = 1 << ((current_n_bits-1) * symsize);
-          upper_bound = 1 << (current_n_bits * symsize);    
+          upper_bound = 1 << (current_n_bits * symsize);
         }
         fprintf(stderr,"lower bound: %lu, upper bound: %lu\n", lower_bound, upper_bound);
 
@@ -513,6 +495,12 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
               graph = watermark_rs_encode(identifier, current_n_bits, n_parity_symbols, symsize); 
+              if(!graph) {
+                printf("number of data symbols: %lu, identifier: %lu\n", current_n_bits, i);
+                show_bits((void*)identifier, current_n_bits * symsize);
+                free(identifier);
+                continue;
+              }
             } else {
               graph = watermark_encode8(identifier, identifier_len);
             }
@@ -669,11 +657,13 @@ uint8_t* get_binary_sequence(const char* msg, unsigned long* n_bits, unsigned lo
     int res = scanf(" %" MAX_SIZE_STR "[01]", bin_char);
     if(res != 1) return NULL;
     *n_bits = strlen(bin_char);
-    uint8_t bin_u8[*n_bits];
-    for(unsigned int i = 0; i < *n_bits; i++) {
-      bin_u8[i] = bin_char[i] - '0';
+    *num_bytes = *n_bits / 8 + !!(*n_bits % 8);
+    uint8_t* bin_u8 = malloc(*num_bytes);
+    memset(bin_u8, 0x00, *num_bytes);
+    for(unsigned long i = 0; i < *n_bits; i++ ) {
+      set_bit(bin_u8, i, bin_char[i] - '0');
     }
-    return get_sequence_from_bit_arr(bin_u8, *n_bits, num_bytes);
+    return bin_u8;
 }
 
 int main(void) {
@@ -793,43 +783,45 @@ int main(void) {
         case 8: {
           unsigned long n_bits, num_bytes;
           uint8_t* data = get_binary_sequence("input message as binary sequence: ", &n_bits, &num_bytes);
+          show_bits(data, n_bits);
 
           unsigned long n_parity_symbols;
           printf("input number of parity symbols: ");
           scanf("%lu", &n_parity_symbols);
 
+          unsigned long num_data_symbols;
+          printf("input number of data symbols: ");
+          scanf("%lu", &num_data_symbols);
+
           int symbol_size;
           printf("input symbol size (1-16): ");
           scanf("%d", &symbol_size);
 
-          unsigned long symbol_bytes = (symbol_size / 8) + !!(symbol_size % 8);
-          unsigned long num_data_symbols = (n_bits/symbol_size) + !!(n_bits % symbol_size);
-          uint8_t* unmerged_data = NULL;
-          printf("num_data_symbols: %lu, symbol_bytes: %lu, symbol_size: %d\n", num_data_symbols, symbol_bytes, symbol_size);
-          unmerge_arr(data, num_data_symbols, symbol_bytes, symbol_size, (void**)&unmerged_data);
-          uint16_t parity[n_parity_symbols];
-          memset(parity, 0x00, sizeof(uint16_t) * n_parity_symbols);
-          rs_encode(unmerged_data, num_data_symbols, parity, n_parity_symbols, symbol_size);
-          for(unsigned long i = 0; i < num_data_symbols; i++) {
-            for(unsigned long j = symbol_bytes*8 - symbol_size; j < symbol_bytes*8; j++) {
-              printf("%hhu", get_bit(&unmerged_data[i], j));
-            }
-            printf(" ");
-          }
-          printf("| ");
-          for(unsigned long i = 0; i < n_parity_symbols; i++) {
-            for(unsigned long j = symbol_bytes*8 - symbol_size; j < symbol_bytes*8; j++) {
-              printf("%hhu", get_bit((uint8_t*)&parity[i], j));
-            }
-          }
-
-          printf("\n");
-          free(unmerged_data);
+          uint8_t* data_with_rs = append_rs_code(data, &num_data_symbols, n_parity_symbols, symbol_size);
+          show_bits(data_with_rs, num_data_symbols);
           free(data);
           break;
         }
         case 9: {
-          
+          unsigned long n_bits, num_bytes;
+          uint8_t* data = get_binary_sequence("input message as binary sequence: ", &n_bits, &num_bytes);
+
+          unsigned long n_parity_symbols;
+          printf("input number of parity symbols: ");
+          scanf("%lu", &n_parity_symbols);
+
+          unsigned long num_data_symbols;
+          printf("input number of data symbols: ");
+          scanf("%lu", &num_data_symbols);
+
+          int symbol_size;
+          printf("input symbol size (1-16): ");
+          scanf("%d", &symbol_size);
+
+          uint8_t* data_without_rs = remove_rs_code(data, num_data_symbols, n_parity_symbols, symbol_size);
+
+          show_bits(data_without_rs, num_data_symbols * symbol_size);
+          free(data_without_rs);
           break;
         }
         case 10: {
