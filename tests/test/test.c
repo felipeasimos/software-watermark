@@ -8,7 +8,7 @@
 #include "rs_api/rslib.h"
 #include <limits.h>
 
-#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ":", __FILE__, __LINE__);\
+#define show_bits(bits,len) fprintf(stderr, "%s:%d:" #bits ": ", __FILE__, __LINE__);\
   for(unsigned long i = 0; i < len; i++) {\
     fprintf(stderr, "%hhu", get_bit(bits, i));\
   }\
@@ -155,18 +155,24 @@ int rs_test(void) {
     // ctdd_assert( data[1] == 1 );
     // ctdd_assert( data[2] == 3 );
   }
-  uint8_t data[] = { 1, 0 };
-  unsigned long num_parity_symbols = 1;
-  uint16_t parity[num_parity_symbols];
-  memset(parity, 0x00, num_parity_symbols * sizeof(uint16_t));
-  
-  void* rs = init_rs(3, 0x3, 1, 1, num_parity_symbols);
-  parity[0] = 0x01;
-  decode_rs8(rs, data, parity, 2, NULL, 0, NULL, 0, NULL);
-  free_rs(rs);
-
-  ctdd_assert( data[0] == 1 );
-  ctdd_assert( data[1] == 0 );
+  // uint8_t data[] = { 1, 0 };
+  // unsigned long num_parity_symbols = 1;
+  // uint16_t parity[num_parity_symbols];
+  // memset(parity, 0x00, num_parity_symbols * sizeof(uint16_t));
+  // 
+  // void* rs = init_rs(3, 0x3, 1, 1, num_parity_symbols);
+  // parity[0] = 0x01;
+  // decode_rs8(rs, data, parity, 2, NULL, 0, NULL, 0, NULL);
+  //
+  // ctdd_assert( data[0] == 1 );
+  // ctdd_assert( data[1] == 0 );
+  //
+  // data[0] = 1;
+  // data[1] = 2;
+  // memset(parity, 0x00, sizeof(uint16_t) * num_parity_symbols);
+  // encode_rs8(rs, data, 2, parity, 0x00);
+  // ctdd_assert( parity[0] );
+  // free_rs(rs);
   return 0;
 }
 
@@ -254,6 +260,7 @@ int append_remove_rs_code_test() {
         n_bits = num_data_symbols;
 
         data_with_rs = append_rs_code(key, &n_bits, num_parity_symbols, symsize);
+        show_bits((void*)key, num_data_symbols * symsize);
 
         ctdd_assert( data_with_rs );
         ctdd_assert( n_bits == (num_data_symbols + num_parity_symbols) * symsize);

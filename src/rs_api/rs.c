@@ -1,6 +1,5 @@
-#include "rs_api/rs.h"
 #include "utils/utils.h"
-#include "rs_api/rslib.h"
+#include <fec.h>
 
 #define XOR_MASK 0x00
 
@@ -10,12 +9,23 @@
   }\
   fprintf(stderr, "\n");
 
-struct rs_control* get_rs_struct(int symbol_size, int parity_len) {
+struct rs_control* get_rs_struct(int symsize, int num_parity, int data_len) {
 
+  int n = (1 << symsize) - 1;
+  int pad = n - num_parity - data_len;
   int gfpoly, fcr, prim;
-  switch(symbol_size) {
+  switch(symsize) {
+    case 2:
     case 3:
+    case 4:
+    case 6:
+    case 7:
       gfpoly = 0x3;
+      fcr = 1;
+      prim = 1;
+      break;
+    case 5:
+      gfpoly = 0x5;
       fcr = 1;
       prim = 1;
       break;
@@ -32,9 +42,12 @@ struct rs_control* get_rs_struct(int symbol_size, int parity_len) {
     #pragma omp critical
     {
   #endif
-  struct rs_control* rs = init_rs(symbol_size, gfpoly, fcr, prim, parity_len);
+  void* rs = init_rs_char(symsize, gfpoly, fcr, prim, num_parity, pad);
   if(!rs) {
-    fprintf(stderr, "'init_rs' returned %p for symbol_size: %d and parity_len: %d\n", (void*)rs, symbol_size, parity_len);
+    fprintf(stderr, "'init_rs' returned %p for symbol_size: %d and parity_len: %d\n", rs, symsize, num_parity);
+    if(num_parity + data_len > n) {
+      fprintf(stderr, "cause: num_parity + data_len > n. (%d + %d > %d)\n", num_parity, data_len, n);
+    }
     exit(EXIT_FAILURE);
   }
   return rs;
@@ -43,121 +56,94 @@ struct rs_control* get_rs_struct(int symbol_size, int parity_len) {
   #endif
 }
 
-// give data, data_len and parity_len, get parity back
-int rs_encode8(uint8_t* data, int data_len, uint8_t* parity, int number_of_parity_symbols) {
-
-	struct rs_control* rs = get_rs_struct(8, number_of_parity_symbols);
-
-  uint16_t parity16[number_of_parity_symbols];
-  memset(parity16, 0x00, sizeof(uint16_t) * number_of_parity_symbols);
+void rs_encode(uint8_t* data, int data_len, uint8_t* parity, int num_parity, int symsize) {
+  void* rs = get_rs_struct(symsize, num_parity, data_len);
 
   #if defined(_OPENMP)
     #pragma omp critical
   #endif
-	int res = encode_rs8(rs, data, data_len, parity16, XOR_MASK);
-  for(int i = 0; i < number_of_parity_symbols; i++) parity[i] = parity16[i];
+
+  memset(parity, 0x00, num_parity * sizeof(uint8_t));
+  encode_rs_char(rs, data, parity);
 
   #if defined(_OPENMP)
     #pragma omp critical
   #endif
-	free_rs(rs);
-  return res;
+  free_rs_char(rs);
 }
 
-int rs_encode(uint8_t* data, int data_len, uint16_t* parity, int number_of_parity_symbols, int symsize) {
-  struct rs_control* rs = get_rs_struct(symsize, number_of_parity_symbols);
-  memset(parity, 0x00, sizeof(uint16_t) * number_of_parity_symbols);
+#define return_defer(value) do { numerr = value; goto defer; } while(0);
 
-  #if defined(_OPENMP)
-    #pragma omp critical
-  #endif
-	int res = encode_rs8(rs, data, data_len, parity, XOR_MASK);
-  uint8_t has_non_zero_symbol = 0;
-  for(unsigned long i = 0; i < (unsigned long)number_of_parity_symbols; i++) {
-    if(parity[i]) {
-      has_non_zero_symbol = 1;
-      break;
+#define decode_erasure(num_erasures) do { \
+      memcpy(decoded_data, result, num_symbols); \
+      numerr = decode_rs_char(rs, decoded_data, erasures, num_erasures); \
+      if(numerr == -1) return_defer(numerr);\
+      if(numerr < best_num_errs || best_num_errs == -1) {\
+        best_num_errs = numerr;\
+        memcpy(best_decoded_data, decoded_data, num_data); \
+      }\
+      if(!numerr) return_defer(numerr);\
+} while(0);
+
+int decode_with_erasure(void* rs, int num_data, int num_parity, uint8_t* data, uint8_t* decoded_data_with_erasure){
+
+  unsigned long num_symbols = num_data + num_parity;
+  uint8_t data_copy[num_symbols];
+  int erasures[num_symbols];
+  int best_num_errs = -1;
+  uint8_t best_decoded_data[num_symbols];
+  for(unsigned long i = 0; i < num_symbols; i++) {
+    memcpy(data_copy, data, num_symbols);
+    erasures[0] = i;
+    int numerr = decode_rs_char(rs, data_copy, erasures, 1);
+    if(numerr < best_num_errs || best_num_errs == -1) {
+      best_num_errs = numerr;
+      memcpy(best_decoded_data, data_copy, num_symbols);
+    }
+    if(!best_num_errs) {
+      goto defer;
     }
   }
-  if(!has_non_zero_symbol) {
-    return -1;
-  }
-
-  #if defined(_OPENMP)
-    #pragma omp critical
-  #endif
-  free_rs(rs);
-  return res;
+defer:
+  memcpy(decoded_data_with_erasure, best_decoded_data, num_symbols);
+  return best_num_errs;
 }
 
-// give data, data_len, parity and parity_len, data array is changed to correct errors
-// if errors can't be corrected, -1 is returned, otherwise number of errors is returned (can be 0)
-int rs_decode8(uint8_t* data, int data_len, uint8_t* parity, int number_of_parity_symbols) {
+int rs_decode(uint8_t* result, int num_data, int num_parity, int symsize) {
 
-	struct rs_control* rs = get_rs_struct(8, number_of_parity_symbols);
-
-  uint16_t parity16[number_of_parity_symbols];
-  for(int i = 0; i < number_of_parity_symbols; i++) parity16[i] = parity[i];
+  void* rs = get_rs_struct(symsize, num_parity, num_data);
 
   int numerr;
   #if defined(_OPENMP)
     #pragma omp critical
   #endif
 
-  // if a bit is removed, the parity may be zero
-  uint8_t has_non_zero_symbol = 0;
-  for(unsigned long i = 0; i < (unsigned long)number_of_parity_symbols; i++) {
-    if(parity[i]) {
-      has_non_zero_symbol = 1;
-      break;
-    }
-  }
-  if(!has_non_zero_symbol) {
-    parity[number_of_parity_symbols - 1] = 0x01;
-  }
+  // 1. make copy of data
+  unsigned long num_symbols = num_data + num_parity;
+  uint8_t best_decoded_data[num_symbols];
+  memcpy(best_decoded_data, result, num_symbols);
 
-	numerr = decode_rs8(rs, data, parity16, data_len, NULL, 0, NULL, XOR_MASK, NULL);
+  // 2. try decoding with no erasures
+  numerr = decode_rs_char(rs, best_decoded_data, NULL, 0);
+
+  // 3. unless it is just a matter of using erasure decoding, return
+  if(numerr != -2) return_defer(numerr);
+
+defer:
   #if defined(_OPENMP)
     #pragma omp critical
   #endif
-	free_rs(rs);
+	  free_rs_char(rs);
 
-	return numerr == -74 ? -1 : numerr;
-}
+  memcpy(result, best_decoded_data, num_data);
 
-int rs_decode(uint8_t* data, int data_len, uint16_t* parity, int number_of_parity_symbols, int symsize) {
-
-	struct rs_control* rs = get_rs_struct(symsize, number_of_parity_symbols);
-
-  int numerr;
-  #if defined(_OPENMP)
-    #pragma omp critical
-  #endif
-  // if a bit is removed, the parity may be zero
-  uint8_t has_non_zero_symbol = 0;
-  for(unsigned long i = 0; i < (unsigned long)number_of_parity_symbols; i++) {
-    if(parity[i]) {
-      has_non_zero_symbol = 1;
-      break;
-    }
-  }
-  if(!has_non_zero_symbol) {
-    parity[number_of_parity_symbols - 1] = 0x01;
-  }
-	numerr = decode_rs8(rs, data, parity, data_len, NULL, 0, NULL, XOR_MASK, NULL);
-
-  #if defined(_OPENMP)
-    #pragma omp critical
-  #endif
-	free_rs(rs);
-
-	return numerr == -74 ? -1 : numerr;
+  return numerr;
 }
 
 void* append_rs_code8(void* data, unsigned long* data_len, unsigned long num_parity_symbols) {
 
     uint8_t parity[num_parity_symbols];
-    rs_encode8(data, *data_len, parity, num_parity_symbols);
+    rs_encode(data, *data_len, parity, num_parity_symbols, 8);
 
     unsigned long new_len = (*data_len) + num_parity_symbols;
     uint8_t* data_with_parity = malloc(new_len);
@@ -199,32 +185,19 @@ void* append_rs_code(void* data, unsigned long* num_data_symbols, unsigned long 
   unsigned long total_bytes = total_bits / 8 + !!(total_bits % 8);
   unsigned long symbol_bytes = symsize / 8 + !!(symsize % 8);
 
-  uint16_t parity[num_parity_symbols];
-  memset(parity, 0x00, sizeof(uint16_t) * num_parity_symbols);
+  uint8_t parity[num_parity_symbols];
   uint8_t* res = NULL;
   // 1. unmerge data symbols and encode
   unmerge_arr(data, *num_data_symbols, symbol_bytes, symsize, (void**)&res);
-  int encode_result = rs_encode(res, *num_data_symbols, parity, num_parity_symbols, symsize);
-  if(encode_result == -1) {
-    return NULL;
-  }
-  // 2. convert parity elements to big endian if necessary, to put LSBs on the right
-  if( is_little_endian_machine() ) {
-    for(unsigned long i = 0; i < num_parity_symbols; i++) {
-      uint8_t* parity_element = (uint8_t*)&parity[i];
-      uint8_t tmp = parity_element[0];
-      parity_element[0] = parity_element[1];
-      parity_element[1] = tmp;
-    }
-  }
-  // 3. alloc memory for data + parity sequence
+  rs_encode(res, *num_data_symbols, parity, num_parity_symbols, symsize);
+  // 2. alloc memory for data + parity sequence
   uint8_t* data_with_parity = malloc(total_bytes);
   memset(data_with_parity, 0x00, total_bytes);
   // 4. copy data bits
   unsigned long next_bit = 0;
   copy_unmerged_arr_to_merged_arr(res, data_with_parity, *num_data_symbols, symsize, symbol_bytes, &next_bit);
   // 5. copy parity bits
-  copy_unmerged_arr_to_merged_arr(parity, data_with_parity, num_parity_symbols, symsize, sizeof(uint16_t), &next_bit);
+  copy_unmerged_arr_to_merged_arr(parity, data_with_parity, num_parity_symbols, symsize, sizeof(uint8_t), &next_bit);
   // 6. set 'num_data_symbols' to total number of bits of the final sequence
   *num_data_symbols = total_bits;
   free(res);
@@ -237,7 +210,7 @@ uint8_t* remove_rs_code8(uint8_t* data, unsigned long data_len, unsigned long* n
 
     unsigned long original_size = data_len - (*num_parity_symbols);
 
-    if( rs_decode8(data, original_size, (uint8_t*)(data+original_size), *num_parity_symbols) != -1 ) {
+    if( rs_decode(data, original_size, *num_parity_symbols, 8) != -1 ) {
         *num_parity_symbols = original_size;
         return realloc(data, original_size);
     } else {
@@ -252,29 +225,17 @@ uint8_t* remove_rs_code(uint8_t* data, unsigned long num_data_symbols, unsigned 
     unsigned long num_data_bits = num_data_symbols * symsize;
     unsigned long num_data_bytes = num_data_bits / 8 + !!(num_data_bits % 8);
     unsigned long symbol_bytes = symsize / 8 + !!(symsize % 8);
- 
-    // 1. unmerge data
+
+    // 1. unmerge all symbols
     uint8_t* res = NULL;
-    unmerge_arr(data, num_data_symbols, symbol_bytes, symsize, (void**)&res);
+    unmerge_arr(data, num_data_symbols + num_parity_symbols, symbol_bytes, symsize, (void**)&res);
 
-    // 2. unmerge parity, separating it from data
-    uint16_t parity[num_parity_symbols];
-    memset(parity, 0x00, sizeof(uint16_t) * (num_parity_symbols));
-    unsigned long next_bit = num_data_bits;
-    copy_merged_arr_to_unmerged_arr(data, parity, num_parity_symbols, symsize, sizeof(uint16_t), &next_bit);
-
-    // 3. convert parity from big endian to little endian, if necessary
-    if( is_little_endian_machine() ) {
-      for(unsigned long i = 0; i < num_parity_symbols; i++) {
-        uint8_t* parity_element = (uint8_t*)&parity[i];
-        uint8_t tmp = parity_element[0];
-        parity_element[0] = parity_element[1];
-        parity_element[1] = tmp;
-      }
-    }
-    int decode_status = rs_decode(res, num_data_symbols, parity, num_parity_symbols, symsize);
+    // 2. decode
+    int decode_status = rs_decode(res, num_data_symbols, num_parity_symbols, symsize);
     if( decode_status != -1 ) {
-      merge_arr(res, &num_data_symbols, sizeof(uint8_t), symsize); 
+      // 3. merge only the data symbols back
+      unsigned long n_bytes = num_data_symbols;
+      merge_arr(res, &n_bytes, sizeof(uint8_t), symsize); 
       return realloc(res, num_data_bytes);
     } else {
       free(res);

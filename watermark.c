@@ -276,7 +276,8 @@ unsigned long _test_with_removed_connections(
     unsigned long errors = attack->method == IMPROVED_WITH_RS ? _check_rs(result, attack->identifier, attack->info.rs.symsize * attack->info.rs.n_data_symbols)
     : _check(result, attack->identifier, num_bytes, attack->identifier_len) ;
 #ifdef DEBUG
-    if(errors >= 1 || (( has_forward_removal && errors == 1 )&&0)) {
+    if(errors >= 2 || (( has_forward_removal && errors == 1 )&&0)) {
+      write_graphs;
       printf("errors: %lu\n", errors);
       printf("identifier: ");
       unsigned long n_bits = attack->method == IMPROVED_WITH_RS ? attack->info.rs.symsize * attack->info.rs.n_data_symbols : attack->identifier_len * 8;
@@ -286,7 +287,7 @@ unsigned long _test_with_removed_connections(
       printf("\n");
       graph_print(attack->graph, NULL);
       printf("result: ");
-      for(unsigned long i = get_first_positive_bit_index(result, num_bytes); i < num_bytes * 8; i++) {
+      for(unsigned long i = 0; i < n_bits; i++) {
         printf("%hhu", get_bit(result, i));
       }
       printf("\n");
@@ -439,7 +440,7 @@ void get_key_from_k(unsigned long** k, unsigned long symsize, unsigned long num_
 
 void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsigned long n_parity_symbols, unsigned long symsize) {
 
-    unsigned long matrix_size = method == IMPROVED_WITH_RS ? n_bits * symsize + 1 : n_bits + 1;
+    unsigned long matrix_size = method == IMPROVED_WITH_RS ? n_bits * symsize: n_bits;
     unsigned long matrix[matrix_size][matrix_size];
     memset(matrix, 0x00, sizeof(unsigned long) * matrix_size * matrix_size);
   #if defined(_OPENMP)
@@ -451,7 +452,6 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
 
     unsigned long identifier_len = sizeof(unsigned long);
     for(unsigned long current_n_bits = 1; current_n_bits <= n_bits; current_n_bits++) {
-        n_parity_symbols = n_removal * 2;
 
         printf("\tnumber of bits: %lu", current_n_bits);
         #if defined(_OPENMP)
@@ -495,12 +495,6 @@ void attack(METHOD method, unsigned long n_removal, unsigned long n_bits, unsign
             GRAPH* graph = NULL;
             if(method == IMPROVED_WITH_RS) {
               graph = watermark_rs_encode(identifier, current_n_bits, n_parity_symbols, symsize); 
-              if(!graph) {
-                printf("number of data symbols: %lu, identifier: %lu\n", current_n_bits, i);
-                show_bits((void*)identifier, current_n_bits * symsize);
-                free(identifier);
-                continue;
-              }
             } else {
               graph = watermark_encode8(identifier, identifier_len);
             }
@@ -685,7 +679,7 @@ int main(void) {
             unsigned long data_len=strlen(s);
             void* data = encode_numeric_string(s, &data_len);
 
-            GRAPH* g = watermark_encode(data, data_len);
+            GRAPH* g = watermark_encode8(data, data_len);
             char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
@@ -700,7 +694,8 @@ int main(void) {
         case 2: {
             unsigned long n = get_ulong("Input number to encode: ");
             invert_byte_sequence((uint8_t*)&n, sizeof(n));
-            GRAPH* g = watermark_encode(&n, sizeof(n));
+            show_bits((void*)&n, 64);
+            GRAPH* g = watermark_encode8(&n, sizeof(n));
             char* dijkstra_code = dijkstra_get_code(g);
             graph_write_hamiltonian_dot(g, "dot.dot", dijkstra_code);
             graph_print(g, NULL);
@@ -773,7 +768,7 @@ int main(void) {
             printf("input number of parity symbols: ");
             unsigned long n_parity;
             scanf("%lu", &n_parity);
-            printf("input symbol size (1-16): ");
+            printf("input symbol size (1-8): ");
             unsigned long symsize;
             scanf("%lu", &symsize);
             attack(IMPROVED_WITH_RS, n_removals, n_symbols, n_parity, symsize);
@@ -794,11 +789,16 @@ int main(void) {
           scanf("%lu", &num_data_symbols);
 
           int symbol_size;
-          printf("input symbol size (1-16): ");
+          printf("input symbol size (1-8): ");
           scanf("%d", &symbol_size);
 
           uint8_t* data_with_rs = append_rs_code(data, &num_data_symbols, n_parity_symbols, symbol_size);
+          if(!data_with_rs) {
+            printf("an error occured!\n");
+          }
           show_bits(data_with_rs, num_data_symbols);
+          GRAPH* graph = watermark_encode(data_with_rs, num_data_symbols);
+          graph_write_hamiltonian_dot(graph, "dot.dot", NULL);
           free(data);
           break;
         }
@@ -815,7 +815,7 @@ int main(void) {
           scanf("%lu", &num_data_symbols);
 
           int symbol_size;
-          printf("input symbol size (1-16): ");
+          printf("input symbol size (1-8): ");
           scanf("%d", &symbol_size);
 
           uint8_t* data_without_rs = remove_rs_code(data, num_data_symbols, n_parity_symbols, symbol_size);

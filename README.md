@@ -2,8 +2,6 @@
 
 This repository explores algorithms for encoding/decoding/embedding/extracting arbitrary binary sequences from and to a function source code's CFG.
 
-Reed-Solomon (rs-api) code from: https://github.com/tierney/reed-solomon.
-
 ## How to Run
 
 `make run` should run the main executable. From there you have some options:

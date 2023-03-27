@@ -179,7 +179,7 @@ uint8_t watermark_rs_check(GRAPH* graph, void* data, unsigned long num_bytes, un
     // get correct parity numbers
     uint8_t parity[num_parity_symbols];
     memset(parity, 0x00, num_parity_symbols);
-    rs_encode8(data, num_bytes, parity, num_parity_symbols);
+    rs_encode(data, num_bytes, parity, num_parity_symbols, 8);
 
     unsigned long data_with_parity_n_bits = num_parity_symbols+payload_n_bytes;
     uint8_t data_with_parity[num_parity_symbols+payload_n_bytes];
@@ -353,7 +353,7 @@ void* watermark_rs_check_analysis(GRAPH* graph, void* data, unsigned long* num_b
     // get correct parity numbers
     uint8_t parity[num_parity_symbols];
     memset(parity, 0x00, num_parity_symbols);
-    rs_encode8(data, *num_bytes, parity, num_parity_symbols);
+    rs_encode(data, *num_bytes, parity, num_parity_symbols, 8);
 
     unsigned long data_with_parity_n_bits = num_parity_symbols+payload_n_bytes;
     uint8_t data_with_parity[num_parity_symbols+payload_n_bytes];

@@ -53,7 +53,6 @@ void* watermark_decode_improved8(GRAPH* graph, uint8_t* data, unsigned long* num
 }
 
 void* watermark_decode_improved(GRAPH* graph, uint8_t* data, unsigned long* num_bits) {
-
     unsigned long data_num_bits = *num_bits;
     unsigned long num_bytes = *num_bits / 8 + !!(*num_bits % 8);
     unsigned long data_begin = get_first_positive_bit_index(data, num_bytes);
@@ -242,7 +241,6 @@ void* watermark_rs_decode_improved(GRAPH* graph, void* key, unsigned long* num_d
   // show_bits(key, (*num_data_symbols) * symsize);
   // 1. get key with RS code
   void* key_with_parity = append_rs_code(key, &num_key_bits_with_parity, num_parity_symbols, symsize);
-  if(!key_with_parity) return NULL;
   // show_bits(key_with_parity, num_key_bits_with_parity);
   unsigned long num_result_bits_with_parity = num_key_bits_with_parity;
   // 2. decode graph

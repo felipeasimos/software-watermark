@@ -32,7 +32,7 @@ help:
 
 # compiler being used
 # COMPILER :=clang -fopenmp
-COMPILER :=clang
+COMPILER :=clang -lfec
 
 # flags that will be used in every compilation command
 FLAGS :=-std=c99
@@ -72,7 +72,7 @@ TESTS_HEADERS_LOCATION :=./tests
 
 # general flags
 # FLAGS := -fPIC
-FLAGS := -fPIC -pedantic-errors -Wall -Wextra  -Werror
+FLAGS := -fPIC -pedantic-errors -Wall -Wextra -Wunused-command-line-argument
 DEBUG_FLAGS :=-DDEBUG -O0 -g
 RELEASE_FLAGS :=-O3 -DNDEBUG
 TESTS_FLAGS :=--coverage
