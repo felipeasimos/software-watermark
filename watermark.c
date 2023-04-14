@@ -1,6 +1,7 @@
 #include "decoder/decoder.h"
 #include "encoder/encoder.h"
 #include "code_generation/code_generation.h"
+#include "graph/graph.h"
 #include "sequence_alignment/sequence_alignment.h"
 #include "dijkstra/dijkstra.h"
 #include <dirent.h>
@@ -672,6 +673,7 @@ int main(void) {
     printf("8) reed solomon encode\n");
     printf("9) reed solomon decode\n");
     printf("10) show report matrix\n");
+    printf("11) get .dot file dijkstra code\n");
     printf("else) exit\n");
     switch(get_uint8_t("input an option: ")) {
         case 1: {
@@ -826,6 +828,28 @@ int main(void) {
         }
         case 10: {
             show_report_matrix();
+        }
+        case 11: {
+            char filename[1000];
+            printf(".dot file name: ");
+            scanf("%s", filename);
+            FILE* f = NULL;
+            if(( f = fopen(filename, "rb") )) {
+
+                GRAPH* graph = graph_create_from_dot(f);
+                fclose(f);
+                graph_topological_sort(graph);
+                graph_write_dot(graph, "dot.dot", filename);
+                if( dijkstra_check(graph) ) {
+                    char* code = dijkstra_get_code(graph);
+                    graph_write_hamiltonian_dot(graph, "dot.dot", filename);
+                    printf("dijkstra code: %s\n", code);
+                    free(code);
+                } else {
+                    printf("this is not a dijkstra graph\n");
+                }
+                graph_free(graph);
+            }
         }
     }
 

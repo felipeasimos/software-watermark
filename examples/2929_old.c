@@ -2,16 +2,19 @@
 #include <math.h>
 #include <stdio.h>
 
+#define POINTS_LEN 50
+#define NUM_ITERATIONS 25
+
 // perform K means algorithm with 2 clusters and return the mean variance
-float linear_kmeans2(float* points, float* clusters, unsigned long points_len, unsigned long num_iterations) {
+float linear_kmeans2(float* points, float* clusters) {
   unsigned long step = 0;
-  int ownership[points_len];
-  float distance0[points_len], distance1[points_len];
+  int ownership[POINTS_LEN];
+  float distance0[POINTS_LEN], distance1[POINTS_LEN];
   // compute Kmeans K times
-  for(unsigned long step = 0; step < num_iterations; step++) {
+  for(unsigned long step = 0; step < NUM_ITERATIONS; step++) {
     float next_cluster0 = 0, next_cluster1 = 0;
     // iterate over points, find closest cluster and prepare to update it
-    for(unsigned long i = 0; i < points_len; i++) {
+    for(unsigned long i = 0; i < POINTS_LEN; i++) {
       distance0[i] = fabs(clusters[0] - points[i]);
       distance1[i] = fabs(clusters[1] - points[i]);
       ownership[i] = distance1[i] < distance0[i];
@@ -22,13 +25,13 @@ float linear_kmeans2(float* points, float* clusters, unsigned long points_len, u
       }
     }
     // update clusters
-    clusters[1] = next_cluster1/points_len;
-    clusters[0] = next_cluster0/points_len;
+    clusters[1] = next_cluster1/POINTS_LEN;
+    clusters[0] = next_cluster0/POINTS_LEN;
   }
   // find variance
   float sum0 = 0, sum1 = 0;
   unsigned long num_cluster1_points = 0;
-  for(unsigned long i = 0; i < points_len; i++) {
+  for(unsigned long i = 0; i < POINTS_LEN; i++) {
     if(ownership[i]) {
       sum1 += powf(clusters[1] - points[i], 2);
       num_cluster1_points++;
@@ -36,7 +39,7 @@ float linear_kmeans2(float* points, float* clusters, unsigned long points_len, u
       sum0 += powf(clusters[0] - points[i], 2);
     }
   }
-  unsigned long num_cluster0_points = points_len - num_cluster1_points;
+  unsigned long num_cluster0_points = POINTS_LEN - num_cluster1_points;
   sum0 /= num_cluster0_points;
   sum1 /= num_cluster1_points;
   if(isnanf(sum0)) sum0 = 0;
@@ -50,13 +53,12 @@ float linear_kmeans2(float* points, float* clusters, unsigned long points_len, u
 int main() {
 
   srand(1);
-  unsigned long points_len = 2;
   float clusters[2] = { 0, 0.7 };
-  float points[points_len];
-  for(unsigned long i = 0; i < points_len; i++) points[i] = (float)rand() / (float)RAND_MAX;
+  float points[POINTS_LEN];
+  for(unsigned long i = 0; i < POINTS_LEN; i++) points[i] = (float)rand() / (float)RAND_MAX;
   points[0] = 0.5;
   points[1] = 1;
-  float mean_variance = linear_kmeans2(points, clusters, points_len, 1);
+  float mean_variance = linear_kmeans2(points, clusters);
   printf("mean variance: %f\n", mean_variance);
 
   return 0;

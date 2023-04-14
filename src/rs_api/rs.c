@@ -59,11 +59,10 @@ struct rs_control* get_rs_struct(int symsize, int num_parity, int data_len) {
 void rs_encode(uint8_t* data, int data_len, uint8_t* parity, int num_parity, int symsize) {
   void* rs = get_rs_struct(symsize, num_parity, data_len);
 
+  memset(parity, 0x00, num_parity * sizeof(uint8_t));
   #if defined(_OPENMP)
     #pragma omp critical
   #endif
-
-  memset(parity, 0x00, num_parity * sizeof(uint8_t));
   encode_rs_char(rs, data, parity);
 
   #if defined(_OPENMP)
@@ -74,49 +73,14 @@ void rs_encode(uint8_t* data, int data_len, uint8_t* parity, int num_parity, int
 
 #define return_defer(value) do { numerr = value; goto defer; } while(0);
 
-#define decode_erasure(num_erasures) do { \
-      memcpy(decoded_data, result, num_symbols); \
-      numerr = decode_rs_char(rs, decoded_data, erasures, num_erasures); \
-      if(numerr == -1) return_defer(numerr);\
-      if(numerr < best_num_errs || best_num_errs == -1) {\
-        best_num_errs = numerr;\
-        memcpy(best_decoded_data, decoded_data, num_data); \
-      }\
-      if(!numerr) return_defer(numerr);\
-} while(0);
-
-int decode_with_erasure(void* rs, int num_data, int num_parity, uint8_t* data, uint8_t* decoded_data_with_erasure){
-
-  unsigned long num_symbols = num_data + num_parity;
-  uint8_t data_copy[num_symbols];
-  int erasures[num_symbols];
-  int best_num_errs = -1;
-  uint8_t best_decoded_data[num_symbols];
-  for(unsigned long i = 0; i < num_symbols; i++) {
-    memcpy(data_copy, data, num_symbols);
-    erasures[0] = i;
-    int numerr = decode_rs_char(rs, data_copy, erasures, 1);
-    if(numerr < best_num_errs || best_num_errs == -1) {
-      best_num_errs = numerr;
-      memcpy(best_decoded_data, data_copy, num_symbols);
-    }
-    if(!best_num_errs) {
-      goto defer;
-    }
-  }
-defer:
-  memcpy(decoded_data_with_erasure, best_decoded_data, num_symbols);
-  return best_num_errs;
-}
-
 int rs_decode(uint8_t* result, int num_data, int num_parity, int symsize) {
 
   void* rs = get_rs_struct(symsize, num_parity, num_data);
 
   int numerr;
-  #if defined(_OPENMP)
-    #pragma omp critical
-  #endif
+  // #if defined(_OPENMP)
+  //   #pragma omp critical
+  // #endif
 
   // 1. make copy of data
   unsigned long num_symbols = num_data + num_parity;
@@ -124,6 +88,9 @@ int rs_decode(uint8_t* result, int num_data, int num_parity, int symsize) {
   memcpy(best_decoded_data, result, num_symbols);
 
   // 2. try decoding with no erasures
+  #if defined(_OPENMP)
+    #pragma omp critical
+  #endif
   numerr = decode_rs_char(rs, best_decoded_data, NULL, 0);
 
   // 3. unless it is just a matter of using erasure decoding, return
