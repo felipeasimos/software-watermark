@@ -1,5 +1,7 @@
 # Software Watermark
 
+* [Click here for the published paper](http://dx.doi.org/10.1109/MetroInd4.0IoT54413.2022.9831668)
+
 This repository explores algorithms for encoding/decoding/embedding/extracting arbitrary binary sequences from and to a function source code's CFG.
 
 ## How to Run
