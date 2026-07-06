@@ -9,6 +9,7 @@ This repository explores algorithms for encoding/decoding/embedding/extracting a
 * Prerequisites:
     * `libfec-dev` ([Phil Karn's site](https://www.ka9q.net/code/fec/) for further information)
     * `openmp`
+    * `graphviz` (optional, the program only generates `.dot` files that can be used by it for better visualization)
 
 This project contains a `flake.nix` that can be used/consulted to better understand the prerequisites if needed.
 
