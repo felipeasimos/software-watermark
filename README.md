@@ -6,7 +6,11 @@ This repository explores algorithms for encoding/decoding/embedding/extracting a
 
 ## How to Run
 
-Have `libfec-dev` installed. Take a look at `flake.nix` for further information.
+* Prerequisites:
+    * `libfec-dev` ([Phil Karn's site](https://www.ka9q.net/code/fec/) for further information)
+    * `openmp`
+
+This project contains a `flake.nix` that can be used/consulted to better understand the prerequisites if needed.
 
 `make run` should run the main executable. From there you have some options:
 
