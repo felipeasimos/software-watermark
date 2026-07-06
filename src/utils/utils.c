@@ -1,6 +1,6 @@
 #include "utils/utils.h"
 
-uint8_t is_little_endian_machine() {
+uint8_t is_little_endian_machine(void) {
 
 	uint16_t x = 1;
 

@@ -37,7 +37,7 @@ typedef struct UTILS_NODE {
 #include "graph/graph.h"
 
 // system
-uint8_t is_little_endian_machine();
+uint8_t is_little_endian_machine(void);
 
 // math
 unsigned long ceil_power_of_2(unsigned long n);

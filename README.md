@@ -6,6 +6,8 @@ This repository explores algorithms for encoding/decoding/embedding/extracting a
 
 ## How to Run
 
+Have `libfec-dev` installed. Take a look at `flake.nix` for further information.
+
 `make run` should run the main executable. From there you have some options:
 
 ```
