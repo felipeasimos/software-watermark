@@ -52,6 +52,7 @@
             cmake
             pkg-config
             libfec
+            graphviz
           ];
           NIX_DEV_SHELL = 1;
           NIX_DEV_FLAKE = "software-watermark";
